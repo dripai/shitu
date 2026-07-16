@@ -187,6 +187,7 @@ fn arrow_path(start: (u32, u32), end: (u32, u32)) -> String {
 #[cfg(test)]
 mod tests {
     use super::{AnnotationHistory, DrawStyle, arrow_path, rectangle_path};
+    use crate::image::CapturedImage;
 
     #[test]
     fn undo_and_redo_preserve_commands() {
@@ -215,5 +216,26 @@ mod tests {
             "M 10 20 L 30 20 L 30 40 L 10 40 Z"
         );
         assert!(arrow_path((10, 10), (30, 20)).starts_with("M 10 10 L 30 20"));
+    }
+
+    #[test]
+    fn rendering_composites_annotations_without_changing_the_base_image() {
+        let base = CapturedImage::from_rgba(0, 0, 4, 4, &[0; 4 * 4 * 4]).unwrap();
+        let original = base.rgba_bytes();
+        let mut history = AnnotationHistory::default();
+        history.begin(
+            1,
+            (1, 1),
+            DrawStyle {
+                rgba: [255, 0, 0, 255],
+                radius: 1,
+            },
+        );
+        history.update((2, 2));
+        history.finish();
+
+        let rendered = history.render(&base);
+        assert_eq!(base.rgba_bytes(), original);
+        assert_ne!(rendered.rgba_bytes(), original);
     }
 }

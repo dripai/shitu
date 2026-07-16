@@ -7,16 +7,16 @@ use std::{
 };
 
 use anyhow::Result;
-use slint::{ComponentHandle, PhysicalPosition, PhysicalSize, Timer};
+use slint::{ComponentHandle, ModelRc, PhysicalPosition, PhysicalSize, Timer, VecModel};
 
 use super::{
-    AppController, MainWindow, PinMenuWindow, PinWindow, StatusLevel,
-    capture_controller::ocr_result_payload, set_status_level,
+    AnnotationView, AppController, MainWindow, PinMenuWindow, PinWindow, StatusLevel,
+    annotation::AnnotationHistory, capture_controller::ocr_result_payload, set_status_level,
 };
 use crate::{
     capture,
     config::{CaptureConfig, PinConfig},
-    image::CapturedImage,
+    image::{CapturedImage, DrawStyle},
     logging, output,
     platform::{
         ocr::{OcrEngine, OcrFailure, system_engine},
@@ -61,6 +61,7 @@ impl PinRegistry {
         pin.set_scale_percent(100);
         pin.set_original_size_text(format!("{} × {}", image.width(), image.height()).into());
         pin.set_has_source_file(source_path.is_some());
+        pin.set_annotations(empty_annotation_model());
         pin.window()
             .set_position(PhysicalPosition::new(image.bounds.left, image.bounds.top));
         pin.window()
@@ -81,6 +82,11 @@ impl PinRegistry {
             scale_percent: 100,
             zoom_step: pin_config.zoom_step,
             capture_config,
+            annotations: AnnotationHistory::default(),
+            draw_style: DrawStyle {
+                rgba: [236, 92, 102, 255],
+                radius: 2,
+            },
         }));
         let controller = PinController {
             id,
@@ -138,6 +144,13 @@ enum PinCommand {
     SetShadow(bool),
     SetTop(bool),
     SetToolbar(bool),
+    BeginAnnotation(f32, f32, i32),
+    UpdateAnnotation(f32, f32),
+    FinishAnnotation,
+    Undo,
+    Redo,
+    SetColor(i32),
+    SetWidth(i32),
     ReplaceClipboard,
     ReplaceFile,
     RevealFile,
@@ -216,6 +229,33 @@ impl PinController {
                 controller.dispatch(PinCommand::OcrResult(code, text.to_string()));
             });
         }
+        {
+            let controller = self.clone();
+            pin.on_begin_annotation(move |x, y, tool| {
+                controller.dispatch(PinCommand::BeginAnnotation(x, y, tool));
+            });
+        }
+        {
+            let controller = self.clone();
+            pin.on_update_annotation(move |x, y| {
+                controller.dispatch(PinCommand::UpdateAnnotation(x, y));
+            });
+        }
+        bind!(on_finish_annotation, PinCommand::FinishAnnotation);
+        bind!(on_undo, PinCommand::Undo);
+        bind!(on_redo, PinCommand::Redo);
+        {
+            let controller = self.clone();
+            pin.on_select_color(move |index| {
+                controller.dispatch(PinCommand::SetColor(index));
+            });
+        }
+        {
+            let controller = self.clone();
+            pin.on_select_width(move |radius| {
+                controller.dispatch(PinCommand::SetWidth(radius));
+            });
+        }
     }
 
     fn dispatch(&self, command: PinCommand) {
@@ -248,8 +288,18 @@ impl PinController {
             PinCommand::SetToolbar(enabled) => {
                 if let Some(pin) = self.pin.upgrade() {
                     pin.set_toolbar_visible(enabled);
+                    if !enabled {
+                        pin.set_active_tool(0);
+                    }
                 }
             }
+            PinCommand::BeginAnnotation(x, y, tool) => self.begin_annotation(x, y, tool),
+            PinCommand::UpdateAnnotation(x, y) => self.update_annotation(x, y),
+            PinCommand::FinishAnnotation => self.finish_annotation(),
+            PinCommand::Undo => self.undo(),
+            PinCommand::Redo => self.redo(),
+            PinCommand::SetColor(index) => self.set_color(index),
+            PinCommand::SetWidth(radius) => self.set_width(radius),
             PinCommand::ReplaceClipboard => self.replace_clipboard(),
             PinCommand::ReplaceFile => self.replace_file(),
             PinCommand::RevealFile => self.reveal_file(),
@@ -270,19 +320,22 @@ impl PinController {
     }
 
     fn copy(&self) {
-        let result = capture::copy_to_clipboard(&self.state.borrow().image);
+        let image = self.state.borrow().rendered_image();
+        let result = capture::copy_to_clipboard(&image);
         self.report(result, "已复制钉住图像");
     }
 
     fn save(&self) {
-        let state = self.state.borrow();
-        let result = output::save_as_dialog(
-            &state.image,
-            &state.capture_config.save_directory,
-            state.capture_config.format,
-            state.capture_config.jpeg_quality,
-        );
-        drop(state);
+        let (image, save_directory, format, jpeg_quality) = {
+            let state = self.state.borrow();
+            (
+                state.rendered_image(),
+                state.capture_config.save_directory.clone(),
+                state.capture_config.format,
+                state.capture_config.jpeg_quality,
+            )
+        };
+        let result = output::save_as_dialog(&image, &save_directory, format, jpeg_quality);
         match result {
             Ok(Some(path)) => {
                 self.state.borrow_mut().source_path = Some(path.clone());
@@ -304,6 +357,62 @@ impl PinController {
             return;
         };
         spawn_pin_ocr(pin.as_weak(), self.state.borrow().image.clone());
+    }
+
+    fn begin_annotation(&self, x: f32, y: f32, tool: i32) {
+        {
+            let mut state = self.state.borrow_mut();
+            let point = annotation_point(x, y, &state.image);
+            let style = state.draw_style;
+            state.annotations.begin(tool, point, style);
+        }
+        self.refresh_annotations();
+    }
+
+    fn update_annotation(&self, x: f32, y: f32) {
+        {
+            let mut state = self.state.borrow_mut();
+            let point = annotation_point(x, y, &state.image);
+            state.annotations.update(point);
+        }
+        self.refresh_annotations();
+    }
+
+    fn finish_annotation(&self) {
+        self.state.borrow_mut().annotations.finish();
+    }
+
+    fn undo(&self) {
+        self.state.borrow_mut().annotations.undo();
+        self.refresh_annotations();
+    }
+
+    fn redo(&self) {
+        self.state.borrow_mut().annotations.redo();
+        self.refresh_annotations();
+    }
+
+    fn set_color(&self, index: i32) {
+        let mut state = self.state.borrow_mut();
+        state.draw_style.rgba = match index {
+            0 => [236, 92, 102, 255],
+            1 => [74, 144, 226, 255],
+            2 => [49, 163, 107, 255],
+            3 => [245, 197, 66, 255],
+            _ => state.draw_style.rgba,
+        };
+    }
+
+    fn set_width(&self, radius: i32) {
+        self.state.borrow_mut().draw_style.radius = radius.clamp(1, 12);
+    }
+
+    fn refresh_annotations(&self) {
+        let Some(pin) = self.pin.upgrade() else {
+            return;
+        };
+        let views = self.state.borrow().annotations.views();
+        pin.set_annotations(ModelRc::new(VecModel::from(views)));
     }
 
     fn handle_ocr_result(&self, code: i32, text: &str) {
@@ -418,11 +527,12 @@ impl PinController {
         };
         let (image, source_path, message) = {
             let state = self.state.borrow();
+            let rendered = state.rendered_image();
             let image = match transform {
-                PinTransform::RotateLeft => state.image.rotate_left(),
-                PinTransform::RotateRight => state.image.rotate_right(),
-                PinTransform::FlipHorizontal => state.image.flip_horizontal(),
-                PinTransform::FlipVertical => state.image.flip_vertical(),
+                PinTransform::RotateLeft => rendered.rotate_left(),
+                PinTransform::RotateRight => rendered.rotate_right(),
+                PinTransform::FlipHorizontal => rendered.flip_horizontal(),
+                PinTransform::FlipVertical => rendered.flip_vertical(),
             };
             let message = match transform {
                 PinTransform::RotateLeft => "图像已向左旋转",
@@ -585,8 +695,11 @@ fn replace_pin_image(
         state.image = image.clone();
         state.source_path = source_path;
         state.scale_percent = 100;
+        state.annotations.clear();
     }
     pin.set_screenshot(image.slint_image());
+    pin.set_annotations(empty_annotation_model());
+    pin.set_active_tool(0);
     pin.set_original_size_text(format!("{width} × {height}").into());
     pin.set_scale_percent(100);
     pin.set_has_source_file(state.borrow().source_path.is_some());
@@ -624,4 +737,23 @@ struct PinnedWindowState {
     scale_percent: i32,
     zoom_step: u8,
     capture_config: CaptureConfig,
+    annotations: AnnotationHistory,
+    draw_style: DrawStyle,
+}
+
+impl PinnedWindowState {
+    fn rendered_image(&self) -> CapturedImage {
+        self.annotations.render(&self.image)
+    }
+}
+
+fn annotation_point(x: f32, y: f32, image: &CapturedImage) -> (u32, u32) {
+    (
+        x.clamp(0.0, image.width().saturating_sub(1) as f32) as u32,
+        y.clamp(0.0, image.height().saturating_sub(1) as f32) as u32,
+    )
+}
+
+fn empty_annotation_model() -> ModelRc<AnnotationView> {
+    ModelRc::new(VecModel::from(Vec::<AnnotationView>::new()))
 }

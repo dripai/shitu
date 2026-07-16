@@ -99,13 +99,14 @@ export component CaptureToolbar inherits Rectangle {
     in property <bool> pin-action-visible: true;
     in property <int> output-mode: 0;
     in property <string> output-tip-override;
+    in property <string> ocr-tip-override;
     in property <string> cancel-tip: "取消截图";
     in-out property <int> active-tool: 0;
     in-out property <int> color-index: 0;
     in-out property <int> stroke-radius: 2;
     property <length> calculated-width: root.annotation-tools-visible
-        ? (root.ocr-available ? 488px : 458px)
-        : (root.ocr-available ? 96px : 66px);
+        ? 428px + (root.ocr-available ? 30px : 0px) + (root.pin-action-visible ? 30px : 0px)
+        : 66px + (root.ocr-available ? 30px : 0px) + (root.pin-action-visible ? 30px : 0px);
 
     callback undo();
     callback redo();
@@ -181,7 +182,9 @@ export component CaptureToolbar inherits Rectangle {
         }
         if root.ocr-available: ToolCell {
             icon: @image-url("../src/icons/scan-text.svg");
-            tip: root.annotation-tools-visible ? "识别选区文字" : "识别图像文字";
+            tip: root.ocr-tip-override != ""
+                ? root.ocr-tip-override
+                : root.annotation-tools-visible ? "识别选区文字" : "识别图像文字";
             activated => { root.recognize-text(); }
         }
         if root.pin-action-visible: ToolCell {

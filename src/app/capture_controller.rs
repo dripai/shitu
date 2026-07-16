@@ -20,6 +20,8 @@ use crate::{
     },
 };
 
+const OVERLAY_HANDLE_RETRY_LIMIT: u8 = 10;
+
 pub(super) fn start_capture(main: slint::Weak<MainWindow>, state: Rc<RefCell<AppController>>) {
     let Some(main_window) = main.upgrade() else {
         return;
@@ -109,12 +111,68 @@ fn open_overlay(
         state.borrow_mut().session = None;
         return Err(error.into());
     }
-    if let Err(error) = window::set_excluded_from_capture(overlay.window(), true) {
-        let _ = overlay.hide();
-        state.borrow_mut().session = None;
-        return Err(anyhow!("无法将截图遮罩排除在截图外：{error}"));
-    }
+    prepare_overlay_capture(overlay.as_weak(), main, Rc::clone(&state), 0);
     Ok(())
+}
+
+fn prepare_overlay_capture(
+    overlay: slint::Weak<OverlayWindow>,
+    main: slint::Weak<MainWindow>,
+    state: Rc<RefCell<AppController>>,
+    attempt: u8,
+) {
+    let delay = if attempt == 0 {
+        Duration::ZERO
+    } else {
+        Duration::from_millis(16)
+    };
+    Timer::single_shot(delay, move || {
+        let Some(overlay_window) = overlay.upgrade() else {
+            return;
+        };
+        if window::hwnd(overlay_window.window()).is_none() {
+            if attempt < OVERLAY_HANDLE_RETRY_LIMIT {
+                prepare_overlay_capture(overlay_window.as_weak(), main, state, attempt + 1);
+            } else {
+                fail_overlay_preparation(
+                    &overlay_window,
+                    &main,
+                    &state,
+                    "截图遮罩窗口句柄未就绪".to_owned(),
+                );
+            }
+            return;
+        }
+
+        match window::set_excluded_from_capture(overlay_window.window(), true) {
+            Ok(()) => {
+                overlay_window.set_capture_ready(true);
+                overlay_window.window().request_redraw();
+            }
+            Err(error) => fail_overlay_preparation(
+                &overlay_window,
+                &main,
+                &state,
+                format!("无法将截图遮罩排除在截图外：{error}"),
+            ),
+        }
+    });
+}
+
+fn fail_overlay_preparation(
+    overlay: &OverlayWindow,
+    main: &slint::Weak<MainWindow>,
+    state: &Rc<RefCell<AppController>>,
+    message: String,
+) {
+    logging::error(message.as_str());
+    let _ = overlay.hide();
+    {
+        let mut state = state.borrow_mut();
+        state.session = None;
+        set_error_status(main, &mut state, format!("截图窗口打开失败：{message}"));
+    }
+    restore_main_after_capture(main, state);
 }
 
 fn bind_overlay(

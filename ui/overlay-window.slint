@@ -1,11 +1,6 @@
 import { Palette } from "std-widgets.slint";
+import { AnnotationView } from "annotation-view.slint";
 import { CaptureToolbar } from "capture-toolbar.slint";
-
-export struct AnnotationView {
-    commands: string,
-    stroke-color: color,
-    stroke-width: float,
-}
 
 export component OverlayWindow inherits Window {
     title: "选择截图区域";
@@ -20,6 +15,7 @@ export component OverlayWindow inherits Window {
     in property <string> selection-info;
     in property <int> output-mode: 0;
     in property <bool> ocr-available: false;
+    in-out property <bool> capture-ready: false;
     in-out property <float> hover-left: 0;
     in-out property <float> hover-top: 0;
     in-out property <float> hover-right: 0;
@@ -170,7 +166,7 @@ export component OverlayWindow inherits Window {
     TouchArea {
         width: parent.width;
         height: parent.height;
-        enabled: !root.completed;
+        enabled: !root.completed && root.capture-ready;
         mouse-cursor: crosshair;
 
         moved => {
