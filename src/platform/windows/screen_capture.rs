@@ -14,7 +14,7 @@ use windows::Win32::{
 
 use crate::image::{CapturedImage, DesktopBounds};
 
-pub fn capture_virtual_desktop() -> Result<CapturedImage> {
+pub fn virtual_desktop_bounds() -> Result<DesktopBounds> {
     let bounds = DesktopBounds {
         left: unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) },
         top: unsafe { GetSystemMetrics(SM_YVIRTUALSCREEN) },
@@ -23,6 +23,31 @@ pub fn capture_virtual_desktop() -> Result<CapturedImage> {
     };
     if bounds.width <= 0 || bounds.height <= 0 {
         return Err(anyhow!("虚拟桌面没有可见像素"));
+    }
+    Ok(bounds)
+}
+
+pub fn capture_region(bounds: DesktopBounds) -> Result<CapturedImage> {
+    if bounds.width <= 0 || bounds.height <= 0 {
+        return Err(anyhow!("截图区域没有可见像素"));
+    }
+    let desktop = virtual_desktop_bounds()?;
+    let right = bounds
+        .left
+        .checked_add(bounds.width)
+        .ok_or_else(|| anyhow!("截图区域坐标溢出"))?;
+    let bottom = bounds
+        .top
+        .checked_add(bounds.height)
+        .ok_or_else(|| anyhow!("截图区域坐标溢出"))?;
+    let desktop_right = desktop.left + desktop.width;
+    let desktop_bottom = desktop.top + desktop.height;
+    if bounds.left < desktop.left
+        || bounds.top < desktop.top
+        || right > desktop_right
+        || bottom > desktop_bottom
+    {
+        return Err(anyhow!("截图区域超出虚拟桌面"));
     }
     unsafe { capture(bounds) }
 }

@@ -2,15 +2,25 @@ use anyhow::Result;
 #[cfg(not(windows))]
 use anyhow::anyhow;
 
-use crate::image::CapturedImage;
+use crate::image::{CapturedImage, DesktopBounds};
 
 #[cfg(windows)]
-pub fn capture_virtual_desktop() -> Result<CapturedImage> {
-    crate::platform::windows::screen_capture::capture_virtual_desktop()
+pub fn virtual_desktop_bounds() -> Result<DesktopBounds> {
+    crate::platform::windows::screen_capture::virtual_desktop_bounds()
 }
 
 #[cfg(not(windows))]
-pub fn capture_virtual_desktop() -> Result<CapturedImage> {
+pub fn virtual_desktop_bounds() -> Result<DesktopBounds> {
+    Err(anyhow!("当前平台尚未实现屏幕截图"))
+}
+
+#[cfg(windows)]
+pub fn capture_region(bounds: DesktopBounds) -> Result<CapturedImage> {
+    crate::platform::windows::screen_capture::capture_region(bounds)
+}
+
+#[cfg(not(windows))]
+pub fn capture_region(_bounds: DesktopBounds) -> Result<CapturedImage> {
     Err(anyhow!("当前平台尚未实现屏幕截图"))
 }
 

@@ -78,39 +78,6 @@ impl CapturedImage {
         self
     }
 
-    pub fn crop(&self, left: u32, top: u32, width: u32, height: u32) -> Option<Self> {
-        if width == 0
-            || height == 0
-            || left.checked_add(width)? > self.bounds.width as u32
-            || top.checked_add(height)? > self.bounds.height as u32
-        {
-            return None;
-        }
-
-        let mut pixels = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
-        let source = self.pixels.as_slice();
-        let target = pixels.make_mut_slice();
-        let source_stride = self.bounds.width as usize;
-        let target_stride = width as usize;
-
-        for row in 0..height as usize {
-            let source_offset = (top as usize + row) * source_stride + left as usize;
-            let target_offset = row * target_stride;
-            target[target_offset..target_offset + target_stride]
-                .copy_from_slice(&source[source_offset..source_offset + target_stride]);
-        }
-
-        Some(Self {
-            bounds: DesktopBounds {
-                left: self.bounds.left + left as i32,
-                top: self.bounds.top + top as i32,
-                width: width as i32,
-                height: height as i32,
-            },
-            pixels,
-        })
-    }
-
     pub fn slint_image(&self) -> Image {
         Image::from_rgba8(self.pixels.clone())
     }

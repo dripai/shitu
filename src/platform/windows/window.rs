@@ -1,3 +1,4 @@
+use anyhow::{Result, anyhow};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use slint::{PhysicalPosition, PhysicalSize, Window};
 use windows::Win32::{
@@ -18,8 +19,9 @@ use windows::Win32::{
             GWL_EXSTYLE, GWLP_HWNDPARENT, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW,
             HTCAPTION, HWND_NOTOPMOST, HWND_TOPMOST, LWA_ALPHA, SWP_FRAMECHANGED, SWP_NOMOVE,
             SWP_NOSIZE, SWP_NOZORDER, SendMessageW, SetForegroundWindow,
-            SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, WM_NCLBUTTONDOWN,
-            WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+            SetLayeredWindowAttributes, SetWindowDisplayAffinity, SetWindowLongPtrW, SetWindowPos,
+            WDA_EXCLUDEFROMCAPTURE, WDA_NONE, WM_NCLBUTTONDOWN, WS_EX_APPWINDOW, WS_EX_LAYERED,
+            WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
         },
     },
 };
@@ -41,6 +43,16 @@ pub fn activate(window: &Window) {
             let _ = SetForegroundWindow(hwnd);
         }
     }
+}
+
+pub fn set_excluded_from_capture(window: &Window, excluded: bool) -> Result<()> {
+    let hwnd = hwnd(window).ok_or_else(|| anyhow!("窗口句柄尚未就绪"))?;
+    let affinity = if excluded {
+        WDA_EXCLUDEFROMCAPTURE
+    } else {
+        WDA_NONE
+    };
+    unsafe { SetWindowDisplayAffinity(hwnd, affinity) }.map_err(Into::into)
 }
 
 pub fn configure_context_menu(window: &Window, owner: &Window) {

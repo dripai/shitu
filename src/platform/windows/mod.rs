@@ -6,6 +6,7 @@ pub mod screen_capture;
 pub mod shell;
 pub mod startup;
 pub mod window;
+pub mod window_target;
 
 use std::mem::size_of;
 

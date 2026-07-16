@@ -12,9 +12,12 @@ use super::{
 use crate::{
     capture,
     config::{CaptureConfig, CompletionAction},
-    image::CapturedImage,
+    image::{CapturedImage, DesktopBounds},
     logging, output,
-    platform::ocr::{OcrEngine, OcrFailure, system_engine},
+    platform::{
+        ocr::{OcrEngine, OcrFailure, system_engine},
+        windows::{window, window_target::WindowTargets},
+    },
 };
 
 pub(super) fn start_capture(main: slint::Weak<MainWindow>, state: Rc<RefCell<AppController>>) {
@@ -37,19 +40,19 @@ pub(super) fn start_capture(main: slint::Weak<MainWindow>, state: Rc<RefCell<App
         set_status(&main, &mut state, "正在准备截图...".to_owned());
     }
 
-    Timer::single_shot(Duration::from_millis(90), move || {
-        let result = capture::capture_virtual_desktop();
+    let delay = if main_window.window().is_visible() {
+        Duration::from_millis(16)
+    } else {
+        Duration::ZERO
+    };
+    Timer::single_shot(delay, move || {
+        let result = capture::virtual_desktop_bounds();
         state.borrow_mut().capturing = false;
 
         match result {
-            Ok(image) => {
-                logging::info("desktop captured");
-                if state.borrow().restore_main_after_capture
-                    && let Some(main_window) = main.upgrade()
-                {
-                    let _ = main_window.hide();
-                }
-                if let Err(error) = open_overlay(main.clone(), Rc::clone(&state), image) {
+            Ok(bounds) => {
+                logging::info("capture overlay prepared");
+                if let Err(error) = open_overlay(main.clone(), Rc::clone(&state), bounds) {
                     set_error_status(
                         &main,
                         &mut state.borrow_mut(),
@@ -70,16 +73,22 @@ pub(super) fn start_capture(main: slint::Weak<MainWindow>, state: Rc<RefCell<App
 fn open_overlay(
     main: slint::Weak<MainWindow>,
     state: Rc<RefCell<AppController>>,
-    desktop: CapturedImage,
+    bounds: DesktopBounds,
 ) -> Result<()> {
     let overlay = OverlayWindow::new()?;
-    let bounds = desktop.bounds;
+    let targets = WindowTargets::snapshot(bounds)?;
+    let initial_target = targets.target_at_cursor();
     let output_mode = completion_action_index(state.borrow().config.capture.completion_action);
 
-    overlay.set_desktop_image(desktop.slint_image());
+    overlay.set_capture_width(bounds.width);
+    overlay.set_capture_height(bounds.height);
     overlay.set_annotations(empty_annotation_model());
     overlay.set_output_mode(output_mode);
     overlay.set_ocr_available(cfg!(windows));
+    set_hover_target(
+        &overlay,
+        initial_target.map(|target| relative_bounds(bounds, target)),
+    );
     overlay
         .window()
         .set_position(PhysicalPosition::new(bounds.left, bounds.top));
@@ -89,7 +98,8 @@ fn open_overlay(
 
     bind_overlay(&overlay, main.clone(), Rc::clone(&state));
     state.borrow_mut().session = Some(CaptureSession {
-        desktop,
+        desktop_bounds: bounds,
+        window_targets: targets,
         selected: None,
         annotations: AnnotationHistory::default(),
         _overlay: overlay.clone_strong(),
@@ -99,6 +109,11 @@ fn open_overlay(
         state.borrow_mut().session = None;
         return Err(error.into());
     }
+    if let Err(error) = window::set_excluded_from_capture(overlay.window(), true) {
+        let _ = overlay.hide();
+        state.borrow_mut().session = None;
+        return Err(anyhow!("无法将截图遮罩排除在截图外：{error}"));
+    }
     Ok(())
 }
 
@@ -107,6 +122,16 @@ fn bind_overlay(
     main: slint::Weak<MainWindow>,
     state: Rc<RefCell<AppController>>,
 ) {
+    {
+        let overlay = overlay.as_weak();
+        let state = Rc::clone(&state);
+        overlay.unwrap().on_probe_window(move |x, y| {
+            let target = state.borrow().window_target_at(x, y);
+            if let Some(overlay) = overlay.upgrade() {
+                set_hover_target(&overlay, target);
+            }
+        });
+    }
     {
         let overlay = overlay.as_weak();
         let state = Rc::clone(&state);
@@ -124,6 +149,7 @@ fn bind_overlay(
                     }
                     Err(error) => {
                         if let Some(overlay) = overlay.upgrade() {
+                            overlay.set_completed(false);
                             overlay.set_selection_info(format!("选区无效：{error}").into());
                         }
                     }
@@ -453,6 +479,25 @@ fn restore_main_after_capture(main: &slint::Weak<MainWindow>, state: &Rc<RefCell
 }
 
 impl AppController {
+    fn window_target_at(&self, x: f32, y: f32) -> Option<DesktopBounds> {
+        let session = self.session.as_ref()?;
+        let local_x = x
+            .round()
+            .clamp(0.0, session.desktop_bounds.width.saturating_sub(1) as f32)
+            as i32;
+        let local_y = y
+            .round()
+            .clamp(0.0, session.desktop_bounds.height.saturating_sub(1) as f32)
+            as i32;
+        session
+            .window_targets
+            .target_at(
+                session.desktop_bounds.left + local_x,
+                session.desktop_bounds.top + local_y,
+            )
+            .map(|target| relative_bounds(session.desktop_bounds, target))
+    }
+
     fn select_area(
         &mut self,
         left: f32,
@@ -469,14 +514,16 @@ impl AppController {
             top,
             right,
             bottom,
-            session.desktop.bounds.width as u32,
-            session.desktop.bounds.height as u32,
+            session.desktop_bounds.width as u32,
+            session.desktop_bounds.height as u32,
         )
         .ok_or_else(|| anyhow!("选区过小"))?;
-        let selected = session
-            .desktop
-            .crop(left, top, width, height)
-            .ok_or_else(|| anyhow!("选区过小"))?;
+        let selected = capture::capture_region(DesktopBounds {
+            left: session.desktop_bounds.left + left as i32,
+            top: session.desktop_bounds.top + top as i32,
+            width: width as i32,
+            height: height as i32,
+        })?;
         let image = selected.slint_image();
         session.selected = Some(selected);
         session.annotations.clear();
@@ -590,8 +637,31 @@ pub(super) fn normalized_selection(
 }
 
 pub(super) struct CaptureSession {
-    desktop: CapturedImage,
+    desktop_bounds: DesktopBounds,
+    window_targets: WindowTargets,
     selected: Option<CapturedImage>,
     annotations: AnnotationHistory,
     _overlay: OverlayWindow,
+}
+
+fn relative_bounds(desktop: DesktopBounds, target: DesktopBounds) -> DesktopBounds {
+    DesktopBounds {
+        left: target.left - desktop.left,
+        top: target.top - desktop.top,
+        width: target.width,
+        height: target.height,
+    }
+}
+
+fn set_hover_target(overlay: &OverlayWindow, target: Option<DesktopBounds>) {
+    let target = target.unwrap_or(DesktopBounds {
+        left: 0,
+        top: 0,
+        width: 0,
+        height: 0,
+    });
+    overlay.set_hover_left(target.left as f32);
+    overlay.set_hover_top(target.top as f32);
+    overlay.set_hover_right((target.left + target.width) as f32);
+    overlay.set_hover_bottom((target.top + target.height) as f32);
 }

@@ -9,16 +9,21 @@ export struct AnnotationView {
 
 export component OverlayWindow inherits Window {
     title: "选择截图区域";
-    background: #000000;
+    background: transparent;
     no-frame: true;
     always-on-top: true;
 
-    in property <image> desktop-image;
+    in property <int> capture-width: 1;
+    in property <int> capture-height: 1;
     in property <image> selected-image;
     in property <[AnnotationView]> annotations;
     in property <string> selection-info;
     in property <int> output-mode: 0;
     in property <bool> ocr-available: false;
+    in-out property <float> hover-left: 0;
+    in-out property <float> hover-top: 0;
+    in-out property <float> hover-right: 0;
+    in-out property <float> hover-bottom: 0;
 
     in-out property <float> start-x: 0;
     in-out property <float> start-y: 0;
@@ -33,29 +38,42 @@ export component OverlayWindow inherits Window {
     in-out property <float> drag-start-y: 0;
     in-out property <float> drag-current-x: 0;
     in-out property <float> drag-current-y: 0;
+    in-out property <float> press-x: 0;
+    in-out property <float> press-y: 0;
+    in-out property <bool> manual-drag: false;
 
     property <length> selection-left: Math.min(root.start-x, root.current-x) * 1px;
     property <length> selection-top: Math.min(root.start-y, root.current-y) * 1px;
     property <length> selection-width: Math.abs(root.current-x - root.start-x) * 1px;
     property <length> selection-height: Math.abs(root.current-y - root.start-y) * 1px;
-    property <float> source-scale-x: root.desktop-image.width / (root.width / 1px);
-    property <float> source-scale-y: root.desktop-image.height / (root.height / 1px);
+    property <float> source-scale-x: Math.max(1, root.capture-width) / (root.width / 1px);
+    property <float> source-scale-y: Math.max(1, root.capture-height) / (root.height / 1px);
     property <int> source-left: Math.max(
         0,
-        Math.min(root.desktop-image.width - 1, Math.round(root.selection-left / 1px * root.source-scale-x))
+        Math.min(root.capture-width - 1, Math.round(root.selection-left / 1px * root.source-scale-x))
     );
     property <int> source-top: Math.max(
         0,
-        Math.min(root.desktop-image.height - 1, Math.round(root.selection-top / 1px * root.source-scale-y))
+        Math.min(root.capture-height - 1, Math.round(root.selection-top / 1px * root.source-scale-y))
     );
     property <int> source-width: Math.min(
-        root.desktop-image.width - root.source-left,
+        root.capture-width - root.source-left,
         Math.max(1, Math.round(root.selection-width / 1px * root.source-scale-x))
     );
     property <int> source-height: Math.min(
-        root.desktop-image.height - root.source-top,
+        root.capture-height - root.source-top,
         Math.max(1, Math.round(root.selection-height / 1px * root.source-scale-y))
     );
+    property <bool> hover-valid: root.hover-right > root.hover-left && root.hover-bottom > root.hover-top;
+    property <length> hover-view-left: root.hover-left / root.source-scale-x * 1px;
+    property <length> hover-view-top: root.hover-top / root.source-scale-y * 1px;
+    property <length> hover-view-width: (root.hover-right - root.hover-left) / root.source-scale-x * 1px;
+    property <length> hover-view-height: (root.hover-bottom - root.hover-top) / root.source-scale-y * 1px;
+    property <bool> focus-visible: root.selecting || root.hover-valid;
+    property <length> focus-left: root.selecting ? root.selection-left : root.hover-view-left;
+    property <length> focus-top: root.selecting ? root.selection-top : root.hover-view-top;
+    property <length> focus-width: root.selecting ? root.selection-width : root.hover-view-width;
+    property <length> focus-height: root.selecting ? root.selection-height : root.hover-view-height;
     property <length> toolbar-x: Math.max(
         8px,
         Math.min(root.width - root.toolbar-width - 8px, root.selection-left)
@@ -65,6 +83,7 @@ export component OverlayWindow inherits Window {
         ? root.selection-top + root.selection-height + 12px
         : Math.max(8px, root.selection-top - 50px);
 
+    callback probe-window(float, float);
     callback selected(float, float, float, float);
     callback begin-annotation(float, float, int);
     callback update-annotation(float, float);
@@ -107,30 +126,45 @@ export component OverlayWindow inherits Window {
         }
     }
 
-    Image {
-        width: parent.width;
-        height: parent.height;
-        source: root.desktop-image;
-        image-fit: fill;
-    }
-
-    if !root.completed: Rectangle {
+    if !root.completed && !root.focus-visible: Rectangle {
         width: parent.width;
         height: parent.height;
         background: #00000088;
     }
 
-    if root.selecting: Image {
-        x: root.selection-left;
-        y: root.selection-top;
-        width: root.selection-width;
-        height: root.selection-height;
-        source: root.desktop-image;
-        source-clip-x: root.source-left;
-        source-clip-y: root.source-top;
-        source-clip-width: root.source-width;
-        source-clip-height: root.source-height;
-        image-fit: fill;
+    if !root.completed && root.focus-visible: Rectangle {
+        width: parent.width;
+        height: Math.max(0px, root.focus-top);
+        background: #00000088;
+    }
+    if !root.completed && root.focus-visible: Rectangle {
+        y: root.focus-top;
+        width: Math.max(0px, root.focus-left);
+        height: Math.max(0px, root.focus-height);
+        background: #00000088;
+    }
+    if !root.completed && root.focus-visible: Rectangle {
+        x: root.focus-left + root.focus-width;
+        y: root.focus-top;
+        width: Math.max(0px, parent.width - self.x);
+        height: Math.max(0px, root.focus-height);
+        background: #00000088;
+    }
+    if !root.completed && root.focus-visible: Rectangle {
+        y: root.focus-top + root.focus-height;
+        width: parent.width;
+        height: Math.max(0px, parent.height - self.y);
+        background: #00000088;
+    }
+
+    if !root.completed && root.hover-valid && !root.selecting: Rectangle {
+        x: root.focus-left;
+        y: root.focus-top;
+        width: Math.max(1px, root.focus-width);
+        height: Math.max(1px, root.focus-height);
+        border-width: 2px;
+        border-color: #54a5ff;
+        background: transparent;
     }
 
     TouchArea {
@@ -140,29 +174,58 @@ export component OverlayWindow inherits Window {
         mouse-cursor: crosshair;
 
         moved => {
-            if self.pressed && root.selecting {
-                root.current-x = self.mouse-x / 1px;
-                root.current-y = self.mouse-y / 1px;
+            let mouse-x = self.mouse-x / 1px;
+            let mouse-y = self.mouse-y / 1px;
+            if self.pressed {
+                let moved-x = Math.abs(mouse-x - root.press-x);
+                let moved-y = Math.abs(mouse-y - root.press-y);
+                if !root.manual-drag && (moved-x >= 4 || moved-y >= 4) {
+                    root.manual-drag = true;
+                    root.selecting = true;
+                    root.start-x = root.press-x;
+                    root.start-y = root.press-y;
+                }
+                if root.manual-drag {
+                    root.current-x = mouse-x;
+                    root.current-y = mouse-y;
+                }
+            } else {
+                root.probe-window(
+                    mouse-x * root.source-scale-x,
+                    mouse-y * root.source-scale-y
+                );
             }
         }
 
         pointer-event(event) => {
             if event.kind == PointerEventKind.down {
-                root.selecting = true;
-                root.start-x = self.mouse-x / 1px;
-                root.start-y = self.mouse-y / 1px;
-                root.current-x = self.mouse-x / 1px;
-                root.current-y = self.mouse-y / 1px;
-            } else if event.kind == PointerEventKind.up && root.selecting {
-                root.current-x = self.mouse-x / 1px;
-                root.current-y = self.mouse-y / 1px;
+                root.press-x = self.mouse-x / 1px;
+                root.press-y = self.mouse-y / 1px;
+                root.start-x = root.press-x;
+                root.start-y = root.press-y;
+                root.current-x = root.press-x;
+                root.current-y = root.press-y;
+                root.manual-drag = false;
                 root.selecting = false;
+            } else if event.kind == PointerEventKind.up {
+                if root.manual-drag {
+                    root.current-x = self.mouse-x / 1px;
+                    root.current-y = self.mouse-y / 1px;
+                    root.selecting = false;
+                    root.manual-drag = false;
+                } else if root.hover-valid {
+                    root.start-x = root.hover-view-left / 1px;
+                    root.start-y = root.hover-view-top / 1px;
+                    root.current-x = (root.hover-view-left + root.hover-view-width) / 1px;
+                    root.current-y = (root.hover-view-top + root.hover-view-height) / 1px;
+                }
                 if root.selection-width >= 3px && root.selection-height >= 3px {
                     root.completed = true;
                     root.commit-selection();
                 }
             } else if event.kind == PointerEventKind.cancel {
                 root.selecting = false;
+                root.manual-drag = false;
             }
         }
     }
