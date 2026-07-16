@@ -1,21 +1,25 @@
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use slint::{PhysicalPosition, PhysicalSize, Window};
 use windows::Win32::{
-    Foundation::{COLORREF, HWND, LPARAM, RECT, WPARAM},
+    Foundation::{COLORREF, HWND, LPARAM, POINT, RECT, WPARAM},
     Graphics::{
         Dwm::{
             DWMNCRENDERINGPOLICY, DWMNCRP_DISABLED, DWMNCRP_ENABLED, DWMWA_NCRENDERING_POLICY,
             DwmSetWindowAttribute,
         },
-        Gdi::{GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow},
+        Gdi::{
+            GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromPoint,
+            MonitorFromWindow,
+        },
     },
     UI::{
         Input::KeyboardAndMouse::ReleaseCapture,
         WindowsAndMessaging::{
-            GWL_EXSTYLE, GetWindowLongPtrW, HTCAPTION, HWND_NOTOPMOST, HWND_TOPMOST, LWA_ALPHA,
-            SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SendMessageW,
-            SetForegroundWindow, SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos,
-            WM_NCLBUTTONDOWN, WS_EX_LAYERED, WS_EX_TOPMOST,
+            GWL_EXSTYLE, GWLP_HWNDPARENT, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW,
+            HTCAPTION, HWND_NOTOPMOST, HWND_TOPMOST, LWA_ALPHA, SWP_FRAMECHANGED, SWP_NOMOVE,
+            SWP_NOSIZE, SWP_NOZORDER, SendMessageW, SetForegroundWindow,
+            SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, WM_NCLBUTTONDOWN,
+            WS_EX_APPWINDOW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
         },
     },
 };
@@ -37,6 +41,71 @@ pub fn activate(window: &Window) {
             let _ = SetForegroundWindow(hwnd);
         }
     }
+}
+
+pub fn configure_context_menu(window: &Window, owner: &Window) {
+    let (Some(menu_hwnd), Some(owner_hwnd)) = (hwnd(window), hwnd(owner)) else {
+        return;
+    };
+    unsafe {
+        let mut style = GetWindowLongPtrW(menu_hwnd, GWL_EXSTYLE) as u32;
+        style |= WS_EX_TOOLWINDOW.0 | WS_EX_TOPMOST.0;
+        style &= !WS_EX_APPWINDOW.0;
+        SetWindowLongPtrW(menu_hwnd, GWL_EXSTYLE, style as isize);
+        SetWindowLongPtrW(menu_hwnd, GWLP_HWNDPARENT, owner_hwnd.0 as isize);
+        let _ = SetWindowPos(
+            menu_hwnd,
+            Some(HWND_TOPMOST),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE,
+        );
+    }
+}
+
+pub fn place_context_menu_at_cursor(window: &Window) {
+    let mut cursor = POINT::default();
+    if unsafe { GetCursorPos(&mut cursor) }.is_err() {
+        return;
+    }
+
+    let monitor = unsafe { MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST) };
+    let mut info = MONITORINFO {
+        cbSize: size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+    if !unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
+        return;
+    }
+
+    let size = window.size();
+    let width = size.width as i32;
+    let height = size.height as i32;
+    let RECT {
+        left,
+        top,
+        right,
+        bottom,
+    } = info.rcWork;
+    let x = if cursor.x + width + 2 <= right {
+        cursor.x + 2
+    } else {
+        cursor.x - width - 2
+    }
+    .clamp(left, (right - width).max(left));
+    let y = if cursor.y + height + 2 <= bottom {
+        cursor.y + 2
+    } else {
+        cursor.y - height - 2
+    }
+    .clamp(top, (bottom - height).max(top));
+    window.set_position(PhysicalPosition::new(x, y));
+}
+
+pub fn is_foreground(window: &Window) -> bool {
+    hwnd(window).is_some_and(|handle| unsafe { GetForegroundWindow() } == handle)
 }
 
 pub fn drag(window: &Window) {

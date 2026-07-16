@@ -77,17 +77,6 @@ fn bind_main_window(main: &MainWindow, state: Rc<RefCell<AppController>>) {
         main.unwrap()
             .on_capture(move || start_capture(main.clone(), Rc::clone(&state)));
     }
-    {
-        let main = main.as_weak();
-        main.unwrap().on_hide_to_tray(move || {
-            if let Some(main) = main.upgrade() {
-                let _ = main.hide();
-            }
-        });
-    }
-    main.on_quit(|| {
-        let _ = slint::quit_event_loop();
-    });
 }
 
 fn bind_settings(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
@@ -98,16 +87,6 @@ fn bind_settings(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
         let state = Rc::clone(&state);
         settings.unwrap().on_apply_settings(move || {
             apply_settings(&settings, &main, &state);
-        });
-    }
-    {
-        let settings = settings.as_weak();
-        let state = Rc::clone(&state);
-        settings.unwrap().on_cancel_settings(move || {
-            if let Some(settings) = settings.upgrade() {
-                populate_settings(&settings, &state.borrow());
-                settings.set_settings_status("已撤销未保存修改".into());
-            }
         });
     }
     {
@@ -252,7 +231,6 @@ fn refresh_main(main: &MainWindow, state: &AppController) {
     main.set_theme_mode(appearance_index(state.config.appearance));
     main.set_hotkey_text(state.config.hotkey.clone().unwrap_or_default().into());
     main.set_status_text(state.status.as_str().into());
-    main.set_output_summary(output_summary(&state.config.capture).into());
     main.set_ocr_available(cfg!(windows));
 }
 
@@ -1119,6 +1097,20 @@ impl PinRegistry {
         {
             let pin = pin.as_weak();
             let window_state = Rc::clone(&window_state);
+            let main = main.clone();
+            let app = app.clone();
+            pin.unwrap().on_open_menu(move || {
+                let Some(pin) = pin.upgrade() else {
+                    return;
+                };
+                if let Err(error) = open_pin_menu(&pin, &window_state) {
+                    update_app_status(&main, &app, format!("打开钉住菜单失败：{error}"));
+                }
+            });
+        }
+        {
+            let pin = pin.as_weak();
+            let window_state = Rc::clone(&window_state);
             pin.unwrap().on_scale_pin(move |direction| {
                 if let Some(pin) = pin.upgrade() {
                     let current = window_state.borrow().scale_percent;
@@ -1361,6 +1353,191 @@ impl PinRegistry {
     }
 }
 
+fn open_pin_menu(pin: &PinWindow, state: &Rc<RefCell<PinnedWindowState>>) -> Result<()> {
+    let menu = PinMenuWindow::new()?;
+    {
+        let state = state.borrow();
+        menu.set_alpha_percent(state.opacity as i32);
+        menu.set_shadow_enabled(state.shadow);
+        menu.set_top_enabled(state.always_on_top);
+        menu.set_scale_percent(state.scale_percent);
+        menu.set_original_size_text(
+            format!("{} × {}", state.image.width(), state.image.height()).into(),
+        );
+        menu.set_has_source_file(state.source_path.is_some());
+    }
+    menu.set_toolbar_visible(pin.get_toolbar_visible());
+
+    {
+        let menu = menu.as_weak();
+        menu.unwrap().on_close_menu(move || {
+            if let Some(menu) = menu.upgrade() {
+                let _ = menu.hide();
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_close_pin(move || {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_close_pin();
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_set_toolbar(move |enabled| {
+            if let Some(pin) = pin.upgrade() {
+                pin.set_toolbar_visible(enabled);
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_copy_image(move || {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_copy_image();
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_save_image(move || {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_save_image();
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_recognize_text(move || {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_recognize_text();
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_set_opacity(move |percent| {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_set_opacity(percent);
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_set_shadow(move |enabled| {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_set_shadow(enabled);
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_set_top(move |enabled| {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_set_top(enabled);
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_set_scale(move |percent| {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_set_scale(percent);
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_fit_screen(move || {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_fit_screen();
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_replace_clipboard(move || {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_replace_clipboard();
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_replace_file(move || {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_replace_file();
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_reveal_file(move || {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_reveal_file();
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_rotate_left(move || {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_rotate_left();
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_rotate_right(move || {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_rotate_right();
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_flip_horizontal(move || {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_flip_horizontal();
+            }
+        });
+    }
+    {
+        let pin = pin.as_weak();
+        menu.on_flip_vertical(move || {
+            if let Some(pin) = pin.upgrade() {
+                pin.invoke_flip_vertical();
+            }
+        });
+    }
+
+    menu.show()?;
+    window::configure_context_menu(menu.window(), pin.window());
+    window::place_context_menu_at_cursor(menu.window());
+    window::activate(menu.window());
+    monitor_pin_menu(menu.as_weak());
+    logging::info("independent pin context menu opened");
+    Ok(())
+}
+
+fn monitor_pin_menu(menu: slint::Weak<PinMenuWindow>) {
+    Timer::single_shot(Duration::from_millis(120), move || {
+        let Some(menu) = menu.upgrade() else {
+            return;
+        };
+        if !menu.window().is_visible() {
+            return;
+        }
+        if window::is_foreground(menu.window()) {
+            monitor_pin_menu(menu.as_weak());
+        } else {
+            let _ = menu.hide();
+        }
+    });
+}
+
 #[derive(Clone, Copy)]
 enum PinTransform {
     RotateLeft,
@@ -1570,25 +1747,6 @@ fn image_format_from_index(index: i32) -> ImageFormat {
     } else {
         ImageFormat::Png
     }
-}
-
-fn output_summary(config: &CaptureConfig) -> String {
-    let action = match config.completion_action {
-        CompletionAction::Copy => {
-            if config.auto_save {
-                "复制并自动保存"
-            } else {
-                "复制到剪贴板"
-            }
-        }
-        CompletionAction::Save => "保存到文件",
-        CompletionAction::CopyAndSave => "复制并保存",
-    };
-    let format = match config.format {
-        ImageFormat::Png => "PNG",
-        ImageFormat::Jpeg => "JPEG",
-    };
-    format!("{action} · {format}")
 }
 
 #[cfg(test)]

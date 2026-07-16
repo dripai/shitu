@@ -68,7 +68,7 @@ export component SettingsPanel inherits Rectangle {
     in property <string> config-path;
 
     callback apply-settings();
-    callback cancel-settings();
+    callback capture();
     callback restore-defaults(int);
     callback choose-save-directory();
     callback open-save-directory();
@@ -333,21 +333,14 @@ export component SettingsPanel inherits Rectangle {
 
         HorizontalLayout {
             height: 28px;
-            Text {
-                text: root.settings-status;
-                color: Palette.alternate-foreground;
-                font-size: 10px;
-                vertical-alignment: center;
-                overflow: elide;
+            Button {
+                text: "开始截图";
+                clicked => { root.capture(); }
             }
             Rectangle { }
             Button {
                 text: "恢复默认";
                 clicked => { root.restore-defaults(root.current-tab); }
-            }
-            Button {
-                text: "撤销更改";
-                clicked => { root.cancel-settings(); }
             }
             Button {
                 text: "保存";

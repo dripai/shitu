@@ -1,17 +1,16 @@
-import { Button, Palette } from "std-widgets.slint";
+import { Palette } from "std-widgets.slint";
 import { SettingsPanel } from "settings-panel.slint";
 
 export component MainWindow inherits Window {
     title: "截图工具";
     preferred-width: 468px;
-    preferred-height: 492px;
+    preferred-height: 453px;
     min-width: 448px;
-    min-height: 462px;
+    min-height: 423px;
     max-width: 620px;
     background: Palette.background;
 
     in property <string> status-text: "就绪";
-    in property <string> output-summary: "复制到剪贴板 · PNG";
     in property <bool> ocr-available: false;
 
     in-out property <int> current-tab: 0;
@@ -39,10 +38,7 @@ export component MainWindow inherits Window {
     in property <string> config-path;
 
     callback capture();
-    callback hide-to-tray();
-    callback quit();
     callback apply-settings();
-    callback cancel-settings();
     callback restore-defaults(int);
     callback choose-save-directory();
     callback open-save-directory();
@@ -65,39 +61,6 @@ export component MainWindow inherits Window {
     VerticalLayout {
         padding: 8px;
         spacing: 7px;
-
-        HorizontalLayout {
-            height: 32px;
-            spacing: 8px;
-            Text {
-                text: "截图工具";
-                color: Palette.foreground;
-                font-size: 17px;
-                font-weight: 700;
-                vertical-alignment: center;
-            }
-            Text {
-                text: root.output-summary;
-                width: 142px;
-                color: Palette.alternate-foreground;
-                font-size: 10px;
-                vertical-alignment: center;
-                overflow: elide;
-            }
-            Rectangle { }
-            Button {
-                text: "开始截图";
-                clicked => { root.capture(); }
-            }
-            Button {
-                text: "隐藏";
-                clicked => { root.hide-to-tray(); }
-            }
-            Button {
-                text: "退出";
-                clicked => { root.quit(); }
-            }
-        }
 
         SettingsPanel {
             current-tab <=> root.current-tab;
@@ -124,8 +87,8 @@ export component MainWindow inherits Window {
             build-text: root.build-text;
             config-path: root.config-path;
 
+            capture => { root.capture(); }
             apply-settings => { root.apply-settings(); }
-            cancel-settings => { root.cancel-settings(); }
             restore-defaults(tab) => { root.restore-defaults(tab); }
             choose-save-directory => { root.choose-save-directory(); }
             open-save-directory => { root.open-save-directory(); }

@@ -1,71 +1,4 @@
-import { Palette } from "std-widgets.slint";
-
-component MenuRow inherits Rectangle {
-    in property <string> text;
-    in property <bool> checked: false;
-    in property <bool> submenu: false;
-    in property <bool> enabled: true;
-    callback activated();
-
-    height: 25px;
-    background: root.enabled && touch.has-hover ? Palette.selection-background : transparent;
-
-    if root.checked: Image {
-        x: 8px;
-        y: 6px;
-        width: 13px;
-        height: 13px;
-        source: @image-url("../src/icons/check.svg");
-        image-fit: contain;
-    }
-    Text {
-        x: 28px;
-        width: parent.width - 48px;
-        text: root.text;
-        color: !root.enabled
-            ? Palette.alternate-foreground
-            : touch.has-hover ? Palette.selection-foreground : Palette.foreground;
-        font-size: 12px;
-        vertical-alignment: center;
-    }
-    Text {
-        x: parent.width - 18px;
-        width: 12px;
-        text: root.submenu ? "›" : "";
-        color: touch.has-hover ? Palette.selection-foreground : Palette.foreground;
-        font-size: 15px;
-        vertical-alignment: center;
-    }
-    touch := TouchArea {
-        enabled: root.enabled;
-        mouse-cursor: pointer;
-        clicked => { root.activated(); }
-    }
-}
-
-component PinToolCell inherits Rectangle {
-    in property <image> icon;
-    in property <string> tip;
-    callback activated();
-
-    width: 28px;
-    height: 28px;
-    border-radius: 2px;
-    background: touch.has-hover ? #e7ebf0 : transparent;
-    Image {
-        x: 6px;
-        y: 6px;
-        width: 16px;
-        height: 16px;
-        source: root.icon;
-        image-fit: contain;
-    }
-    touch := TouchArea {
-        mouse-cursor: pointer;
-        clicked => { root.activated(); }
-    }
-    Tooltip { text: @markdown("\{root.tip}"); }
-}
+import { CaptureToolbar } from "capture-toolbar.slint";
 
 export component PinWindow inherits Window {
     title: "钉住";
@@ -86,11 +19,9 @@ export component PinWindow inherits Window {
     in property <string> original-size-text;
     in property <bool> has-source-file: false;
     in-out property <bool> toolbar-visible: false;
-    in-out property <int> menu-page: 0;
-    in-out property <float> menu-x: 0;
-    in-out property <float> menu-y: 0;
 
     callback close-pin();
+    callback open-menu();
     callback drag-pin();
     callback scale-pin(int);
     callback set-scale(int);
@@ -138,10 +69,7 @@ export component PinWindow inherits Window {
                 if event.button == PointerEventButton.left {
                     root.drag-pin();
                 } else if event.button == PointerEventButton.right {
-                    root.menu-page = 0;
-                    root.menu-x = Math.max(0, Math.min(root.width / 1px - 220, self.mouse-x / 1px));
-                    root.menu-y = Math.max(0, Math.min(root.height / 1px - 20, self.mouse-y / 1px));
-                    context-menu.show();
+                    root.open-menu();
                 }
             }
         }
@@ -164,51 +92,18 @@ export component PinWindow inherits Window {
         }
     }
 
-    if root.toolbar-visible: Rectangle {
-        x: Math.max(4px, (parent.width - 184px) / 2);
-        y: parent.height - 34px;
-        width: 184px;
-        height: 32px;
-        border-width: 1px;
-        border-color: #aeb6c2;
-        border-radius: 3px;
-        background: #f7f8faee;
-
-        HorizontalLayout {
-            padding: 2px;
-            spacing: 2px;
-            alignment: center;
-            PinToolCell {
-                icon: @image-url("../src/icons/copy.svg");
-                tip: "复制图像";
-                activated => { root.copy-image(); }
-            }
-            PinToolCell {
-                icon: @image-url("../src/icons/save.svg");
-                tip: "图像另存为";
-                activated => { root.save-image(); }
-            }
-            PinToolCell {
-                icon: @image-url("../src/icons/scan-text.svg");
-                tip: "识别图像文字";
-                activated => { root.recognize-text(); }
-            }
-            PinToolCell {
-                icon: @image-url("../src/icons/rotate-ccw.svg");
-                tip: "向左旋转";
-                activated => { root.rotate-left(); }
-            }
-            PinToolCell {
-                icon: @image-url("../src/icons/rotate-cw.svg");
-                tip: "向右旋转";
-                activated => { root.rotate-right(); }
-            }
-            PinToolCell {
-                icon: @image-url("../src/icons/x.svg");
-                tip: "关闭钉住";
-                activated => { root.close-pin(); }
-            }
-        }
+    if root.toolbar-visible: CaptureToolbar {
+        x: Math.max(4px, (parent.width - self.width) / 2);
+        y: parent.height - self.height - 4px;
+        annotation-tools-visible: false;
+        ocr-available: true;
+        pin-action-visible: false;
+        output-mode: 0;
+        output-tip-override: "复制图像";
+        cancel-tip: "关闭钉住";
+        complete-output => { root.copy-image(); }
+        recognize-text => { root.recognize-text(); }
+        cancel-action => { root.close-pin(); }
     }
 
     Rectangle {
@@ -217,120 +112,5 @@ export component PinWindow inherits Window {
         border-width: 1px;
         border-color: #54a5ff;
         background: transparent;
-    }
-
-    context-menu := PopupWindow {
-        x: root.menu-x * 1px;
-        y: root.menu-y * 1px;
-        width: 220px;
-        height: root.menu-page == 0
-            ? (root.has-source-file ? 342px : 317px)
-            : root.menu-page == 1 ? 160px
-            : root.menu-page == 2 ? 268px
-            : root.menu-page == 3 ? 93px
-            : 143px;
-        close-policy: PopupClosePolicy.close-on-click-outside;
-
-        Rectangle {
-            border-width: 1px;
-            border-color: Palette.border;
-            border-radius: 2px;
-            background: Palette.background;
-
-            if root.menu-page == 0: VerticalLayout {
-                padding: 4px;
-                spacing: 0px;
-                MenuRow { text: "复制图像"; activated => { context-menu.close(); root.copy-image(); } }
-                MenuRow { text: "图像另存为..."; activated => { context-menu.close(); root.save-image(); } }
-                MenuRow { text: "OCR 识别"; activated => { context-menu.close(); root.recognize-text(); } }
-                Rectangle { height: 1px; background: Palette.border; }
-                MenuRow {
-                    text: "显示工具栏";
-                    checked: root.toolbar-visible;
-                    activated => {
-                        root.toolbar-visible = !root.toolbar-visible;
-                        context-menu.close();
-                    }
-                }
-                MenuRow {
-                    text: "窗口阴影";
-                    checked: root.shadow-enabled;
-                    activated => {
-                        root.shadow-enabled = !root.shadow-enabled;
-                        root.set-shadow(root.shadow-enabled);
-                        context-menu.close();
-                    }
-                }
-                MenuRow {
-                    text: "始终置顶";
-                    checked: root.top-enabled;
-                    activated => {
-                        root.top-enabled = !root.top-enabled;
-                        root.set-top(root.top-enabled);
-                        context-menu.close();
-                    }
-                }
-                MenuRow { text: "不透明度"; submenu: true; activated => { root.menu-page = 1; } }
-                MenuRow { text: "缩放（\{root.scale-percent}%）"; submenu: true; activated => { root.menu-page = 2; } }
-                Rectangle { height: 1px; background: Palette.border; }
-                MenuRow { text: "图像处理"; submenu: true; activated => { root.menu-page = 4; } }
-                MenuRow { text: "替换图像"; submenu: true; activated => { root.menu-page = 3; } }
-                if root.has-source-file: MenuRow {
-                    text: "在文件夹中显示";
-                    activated => { context-menu.close(); root.reveal-file(); }
-                }
-                Rectangle { height: 1px; background: Palette.border; }
-                MenuRow { text: "关闭"; activated => { context-menu.close(); root.close-pin(); } }
-                Text {
-                    height: 22px;
-                    text: "原始尺寸：\{root.original-size-text}";
-                    color: Palette.alternate-foreground;
-                    font-size: 10px;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
-                }
-            }
-
-            if root.menu-page == 1: VerticalLayout {
-                padding: 4px;
-                MenuRow { text: "‹ 返回"; activated => { root.menu-page = 0; } }
-                MenuRow { text: "25%"; checked: root.alpha-percent == 25; activated => { root.alpha-percent = 25; root.set-opacity(25); context-menu.close(); } }
-                MenuRow { text: "50%"; checked: root.alpha-percent == 50; activated => { root.alpha-percent = 50; root.set-opacity(50); context-menu.close(); } }
-                MenuRow { text: "75%"; checked: root.alpha-percent == 75; activated => { root.alpha-percent = 75; root.set-opacity(75); context-menu.close(); } }
-                MenuRow { text: "90%"; checked: root.alpha-percent == 90; activated => { root.alpha-percent = 90; root.set-opacity(90); context-menu.close(); } }
-                MenuRow { text: "100%"; checked: root.alpha-percent == 100; activated => { root.alpha-percent = 100; root.set-opacity(100); context-menu.close(); } }
-            }
-
-            if root.menu-page == 2: VerticalLayout {
-                padding: 4px;
-                MenuRow { text: "‹ 返回"; activated => { root.menu-page = 0; } }
-                MenuRow { text: "25%"; checked: root.scale-percent == 25; activated => { root.set-scale(25); context-menu.close(); } }
-                MenuRow { text: "50%"; checked: root.scale-percent == 50; activated => { root.set-scale(50); context-menu.close(); } }
-                MenuRow { text: "75%"; checked: root.scale-percent == 75; activated => { root.set-scale(75); context-menu.close(); } }
-                MenuRow { text: "100%"; checked: root.scale-percent == 100; activated => { root.set-scale(100); context-menu.close(); } }
-                MenuRow { text: "125%"; checked: root.scale-percent == 125; activated => { root.set-scale(125); context-menu.close(); } }
-                MenuRow { text: "150%"; checked: root.scale-percent == 150; activated => { root.set-scale(150); context-menu.close(); } }
-                MenuRow { text: "200%"; checked: root.scale-percent == 200; activated => { root.set-scale(200); context-menu.close(); } }
-                Rectangle { height: 1px; background: Palette.border; }
-                MenuRow { text: "适合屏幕"; activated => { root.fit-screen(); context-menu.close(); } }
-                MenuRow { text: "恢复原始大小"; activated => { root.set-scale(100); context-menu.close(); } }
-            }
-
-            if root.menu-page == 3: VerticalLayout {
-                padding: 4px;
-                MenuRow { text: "‹ 返回"; activated => { root.menu-page = 0; } }
-                MenuRow { text: "从剪贴板"; activated => { context-menu.close(); root.replace-clipboard(); } }
-                MenuRow { text: "从文件..."; activated => { context-menu.close(); root.replace-file(); } }
-            }
-
-            if root.menu-page == 4: VerticalLayout {
-                padding: 4px;
-                MenuRow { text: "‹ 返回"; activated => { root.menu-page = 0; } }
-                MenuRow { text: "向左旋转 90°"; activated => { context-menu.close(); root.rotate-left(); } }
-                MenuRow { text: "向右旋转 90°"; activated => { context-menu.close(); root.rotate-right(); } }
-                MenuRow { text: "水平翻转"; activated => { context-menu.close(); root.flip-horizontal(); } }
-                MenuRow { text: "垂直翻转"; activated => { context-menu.close(); root.flip-vertical(); } }
-            }
-        }
     }
 }
