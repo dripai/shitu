@@ -1,0 +1,38 @@
+import { Palette } from "std-widgets.slint";
+
+export component StatusBar inherits Rectangle {
+    in property <string> status-text: "就绪";
+    in property <int> status-level: 0;
+
+    height: 22px;
+    background: Palette.alternate-background;
+
+    Rectangle {
+        height: 1px;
+        background: Palette.border;
+    }
+
+    HorizontalLayout {
+        padding-left: 7px;
+        padding-right: 7px;
+        spacing: 6px;
+
+        Rectangle {
+            width: 8px;
+            height: 8px;
+            border-radius: 4px;
+            background: root.status-level == 2
+                ? #cf222e
+                : root.status-level == 1 ? #238636 : Palette.alternate-foreground;
+        }
+        Text {
+            text: root.status-text;
+            color: root.status-level == 2 ? #cf222e : Palette.foreground;
+            font-size: 10px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+
+    Tooltip { text: @markdown("\{root.status-text}"); }
+}

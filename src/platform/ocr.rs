@@ -1,4 +1,4 @@
-use crate::capture::CapturedImage;
+use crate::image::CapturedImage;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OcrFailure {

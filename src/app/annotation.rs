@@ -3,7 +3,7 @@ use std::fmt::Write as _;
 use slint::Color;
 
 use super::AnnotationView;
-use crate::capture::{self, CapturedImage, DrawStyle};
+use crate::image::{CapturedImage, DrawStyle, arrow_head};
 
 #[derive(Default)]
 pub struct AnnotationHistory {
@@ -174,7 +174,7 @@ fn rectangle_path(start: (u32, u32), end: (u32, u32)) -> String {
 
 fn arrow_path(start: (u32, u32), end: (u32, u32)) -> String {
     let mut path = format!("M {} {} L {} {}", start.0, start.1, end.0, end.1);
-    if let Some((left, right)) = capture::arrow_head(start, end) {
+    if let Some((left, right)) = arrow_head(start, end) {
         let _ = write!(
             path,
             " M {} {} L {} {} M {} {} L {} {}",

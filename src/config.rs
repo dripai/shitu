@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::{fs, io::Write, path::PathBuf};
 
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
@@ -141,7 +137,7 @@ impl Config {
                 .with_context(|| format!("写入临时配置失败：{}", temp_path.display()))?;
             file.sync_all()
                 .with_context(|| format!("同步临时配置失败：{}", temp_path.display()))?;
-            atomic_replace(&temp_path, &path)
+            crate::platform::replace_file(&temp_path, &path)
         })();
 
         if write_result.is_err() {
@@ -205,36 +201,6 @@ pub fn default_picture_directory() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."))
         .join("Pictures")
-}
-
-#[cfg(windows)]
-fn atomic_replace(source: &Path, target: &Path) -> Result<()> {
-    use std::os::windows::ffi::OsStrExt;
-    use windows::{
-        Win32::Storage::FileSystem::{
-            MOVE_FILE_FLAGS, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
-        },
-        core::PCWSTR,
-    };
-
-    let source: Vec<u16> = source
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect();
-    let target: Vec<u16> = target
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect();
-    let flags = MOVE_FILE_FLAGS(MOVEFILE_REPLACE_EXISTING.0 | MOVEFILE_WRITE_THROUGH.0);
-    unsafe { MoveFileExW(PCWSTR(source.as_ptr()), PCWSTR(target.as_ptr()), flags) }
-        .with_context(|| format!("替换配置文件失败：{}", Config::path().display()))
-}
-
-#[cfg(not(windows))]
-fn atomic_replace(source: &Path, target: &Path) -> Result<()> {
-    fs::rename(source, target).with_context(|| format!("替换配置文件失败：{}", target.display()))
 }
 
 #[cfg(test)]

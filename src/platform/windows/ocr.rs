@@ -6,7 +6,7 @@ use windows::{
 };
 
 use crate::{
-    capture::CapturedImage,
+    image::CapturedImage,
     platform::ocr::{OcrEngine, OcrFailure},
 };
 

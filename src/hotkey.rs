@@ -1,3 +1,8 @@
+use std::sync::{
+    Arc,
+    atomic::{AtomicU32, Ordering},
+};
+
 use global_hotkey::{
     GlobalHotKeyManager,
     hotkey::{Code, HotKey, Modifiers},
@@ -25,6 +30,7 @@ pub struct HotkeyState {
     registered: Option<HotKey>,
     binding: Option<String>,
     error: Option<HotkeyFailure>,
+    active_id: Arc<AtomicU32>,
 }
 
 impl HotkeyState {
@@ -35,6 +41,7 @@ impl HotkeyState {
             registered: None,
             binding: None,
             error: None,
+            active_id: Arc::new(AtomicU32::new(0)),
         };
         if let Err(error) = state.set_binding(binding) {
             state.error = Some(error);
@@ -59,6 +66,7 @@ impl HotkeyState {
         if candidate.is_none() && self.registered.is_none() {
             self.binding = None;
             self.error = None;
+            self.active_id.store(0, Ordering::Relaxed);
             return Ok(());
         }
         let manager = self.manager.as_ref().ok_or(HotkeyFailure::SystemRejected)?;
@@ -80,11 +88,19 @@ impl HotkeyState {
         self.registered = candidate;
         self.binding = normalized;
         self.error = None;
+        self.active_id.store(
+            candidate.map(|hotkey| hotkey.id()).unwrap_or(0),
+            Ordering::Relaxed,
+        );
         Ok(())
     }
 
     pub fn error(&self) -> Option<&HotkeyFailure> {
         self.error.as_ref()
+    }
+
+    pub fn active_id_handle(&self) -> Arc<AtomicU32> {
+        Arc::clone(&self.active_id)
     }
 }
 

@@ -1,8 +1,9 @@
 use std::{
     fs,
     fs::File,
-    io::BufWriter,
+    io::{BufWriter, Write},
     path::{Path, PathBuf},
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 use anyhow::{Context, Result};
@@ -12,8 +13,8 @@ use image::{
 };
 
 use crate::{
-    capture::CapturedImage,
     config::{CaptureConfig, ImageFormat},
+    image::CapturedImage,
 };
 
 pub fn save_quick(image: &CapturedImage, config: &CaptureConfig) -> Result<PathBuf> {
@@ -67,6 +68,21 @@ pub fn save_to_path(
         fs::create_dir_all(parent)
             .with_context(|| format!("创建目录失败：{}", parent.display()))?;
     }
+    let temp_path = temporary_path(path);
+    let result = encode_to_path(image, &temp_path, format, jpeg_quality)
+        .and_then(|_| crate::platform::replace_file(&temp_path, path));
+    if result.is_err() {
+        let _ = fs::remove_file(&temp_path);
+    }
+    result
+}
+
+fn encode_to_path(
+    image: &CapturedImage,
+    path: &Path,
+    format: ImageFormat,
+    jpeg_quality: u8,
+) -> Result<()> {
     let file =
         File::create(path).with_context(|| format!("创建图像文件失败：{}", path.display()))?;
     let mut writer = BufWriter::new(file);
@@ -95,7 +111,20 @@ pub fn save_to_path(
                 .context("JPEG 编码失败")?;
         }
     }
+    writer.flush().context("写入图像文件失败")?;
+    writer.get_ref().sync_all().context("同步图像文件失败")?;
     Ok(())
+}
+
+fn temporary_path(path: &Path) -> PathBuf {
+    static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+
+    let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    let file_name = path
+        .file_name()
+        .map(|value| value.to_string_lossy())
+        .unwrap_or_else(|| "image".into());
+    path.with_file_name(format!(".{file_name}.{}.{}.tmp", std::process::id(), id))
 }
 
 pub fn format_from_path(path: &Path) -> Option<ImageFormat> {
@@ -112,7 +141,7 @@ pub fn format_from_path(path: &Path) -> Option<ImageFormat> {
 }
 
 pub fn render_filename(template: &str) -> String {
-    let now = local_time();
+    let now = crate::platform::clock::local_time();
     template
         .replace("{yyyy}", &format!("{:04}", now.year))
         .replace("{MM}", &format!("{:02}", now.month))
@@ -145,47 +174,10 @@ fn extension(format: ImageFormat) -> &'static str {
     }
 }
 
-#[derive(Clone, Copy)]
-struct LocalTime {
-    year: u16,
-    month: u16,
-    day: u16,
-    hour: u16,
-    minute: u16,
-    second: u16,
-}
-
-#[cfg(windows)]
-fn local_time() -> LocalTime {
-    use windows::Win32::System::SystemInformation::GetLocalTime;
-
-    let value = unsafe { GetLocalTime() };
-    LocalTime {
-        year: value.wYear,
-        month: value.wMonth,
-        day: value.wDay,
-        hour: value.wHour,
-        minute: value.wMinute,
-        second: value.wSecond,
-    }
-}
-
-#[cfg(not(windows))]
-fn local_time() -> LocalTime {
-    LocalTime {
-        year: 1970,
-        month: 1,
-        day: 1,
-        hour: 0,
-        minute: 0,
-        second: 0,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{render_filename, save_to_path};
-    use crate::{capture::CapturedImage, config::ImageFormat};
+    use crate::{config::ImageFormat, image::CapturedImage};
 
     #[test]
     fn filename_template_replaces_all_supported_tokens() {

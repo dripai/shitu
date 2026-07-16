@@ -1,16 +1,19 @@
 import { Palette } from "std-widgets.slint";
 import { SettingsPanel } from "settings-panel.slint";
+import { StatusBar } from "status-bar.slint";
 
 export component MainWindow inherits Window {
     title: "截图工具";
+    icon: @image-url("icons/tray.svg");
     preferred-width: 468px;
-    preferred-height: 453px;
+    preferred-height: 475px;
     min-width: 448px;
-    min-height: 423px;
+    min-height: 445px;
     max-width: 620px;
     background: Palette.background;
 
     in property <string> status-text: "就绪";
+    in property <int> status-level: 0;
     in property <bool> ocr-available: false;
 
     in-out property <int> current-tab: 0;
@@ -32,7 +35,6 @@ export component MainWindow inherits Window {
     in-out property <string> hotkey-text;
     in property <int> hotkey-status: 0;
     in property <string> hotkey-status-tip;
-    in property <string> settings-status;
     in property <string> version-text;
     in property <string> build-text;
     in property <string> config-path;
@@ -59,43 +61,54 @@ export component MainWindow inherits Window {
     }
 
     VerticalLayout {
-        padding: 8px;
-        spacing: 7px;
+        spacing: 0px;
 
-        SettingsPanel {
-            current-tab <=> root.current-tab;
-            theme-mode <=> root.theme-mode;
-            launch-at-startup <=> root.launch-at-startup;
-            completion-action <=> root.completion-action;
-            image-format <=> root.image-format;
-            jpeg-quality <=> root.jpeg-quality;
-            save-directory <=> root.save-directory;
-            filename-template <=> root.filename-template;
-            auto-save <=> root.auto-save;
-            save-notification <=> root.save-notification;
-            pin-opacity <=> root.pin-opacity;
-            pin-shadow <=> root.pin-shadow;
-            pin-always-on-top <=> root.pin-always-on-top;
-            pin-wheel-zoom <=> root.pin-wheel-zoom;
-            pin-zoom-step <=> root.pin-zoom-step;
-            pin-double-click-close <=> root.pin-double-click-close;
-            hotkey-text <=> root.hotkey-text;
-            hotkey-status: root.hotkey-status;
-            hotkey-status-tip: root.hotkey-status-tip;
-            settings-status: root.settings-status == "" ? root.status-text : root.settings-status;
-            version-text: root.version-text;
-            build-text: root.build-text;
-            config-path: root.config-path;
+        Rectangle {
+            background: Palette.background;
 
-            capture => { root.capture(); }
-            apply-settings => { root.apply-settings(); }
-            restore-defaults(tab) => { root.restore-defaults(tab); }
-            choose-save-directory => { root.choose-save-directory(); }
-            open-save-directory => { root.open-save-directory(); }
-            open-log-directory => { root.open-log-directory(); }
-            open-config-file => { root.open-config-file(); }
-            open-licenses => { root.open-licenses(); }
-            clear-hotkey => { root.clear-hotkey(); }
+            VerticalLayout {
+                padding: 8px;
+
+                SettingsPanel {
+                    current-tab <=> root.current-tab;
+                    theme-mode <=> root.theme-mode;
+                    launch-at-startup <=> root.launch-at-startup;
+                    completion-action <=> root.completion-action;
+                    image-format <=> root.image-format;
+                    jpeg-quality <=> root.jpeg-quality;
+                    save-directory <=> root.save-directory;
+                    filename-template <=> root.filename-template;
+                    auto-save <=> root.auto-save;
+                    save-notification <=> root.save-notification;
+                    pin-opacity <=> root.pin-opacity;
+                    pin-shadow <=> root.pin-shadow;
+                    pin-always-on-top <=> root.pin-always-on-top;
+                    pin-wheel-zoom <=> root.pin-wheel-zoom;
+                    pin-zoom-step <=> root.pin-zoom-step;
+                    pin-double-click-close <=> root.pin-double-click-close;
+                    hotkey-text <=> root.hotkey-text;
+                    hotkey-status: root.hotkey-status;
+                    hotkey-status-tip: root.hotkey-status-tip;
+                    version-text: root.version-text;
+                    build-text: root.build-text;
+                    config-path: root.config-path;
+
+                    capture => { root.capture(); }
+                    apply-settings => { root.apply-settings(); }
+                    restore-defaults(tab) => { root.restore-defaults(tab); }
+                    choose-save-directory => { root.choose-save-directory(); }
+                    open-save-directory => { root.open-save-directory(); }
+                    open-log-directory => { root.open-log-directory(); }
+                    open-config-file => { root.open-config-file(); }
+                    open-licenses => { root.open-licenses(); }
+                    clear-hotkey => { root.clear-hotkey(); }
+                }
+            }
+        }
+
+        StatusBar {
+            status-text: root.status-text;
+            status-level: root.status-level;
         }
     }
 }

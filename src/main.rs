@@ -4,6 +4,7 @@ mod app;
 mod capture;
 mod config;
 mod hotkey;
+mod image;
 mod logging;
 mod output;
 mod platform;
