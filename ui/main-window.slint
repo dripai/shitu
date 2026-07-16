@@ -1,0 +1,151 @@
+import { Button, LineEdit, Palette } from "std-widgets.slint";
+
+export component MainWindow inherits Window {
+    title: "截图工具";
+    preferred-width: 420px;
+    preferred-height: 286px;
+    min-width: 380px;
+    min-height: 260px;
+    background: Palette.background;
+
+    in-out property <string> status-text: "就绪";
+    in-out property <bool> settings-open: false;
+    in-out property <string> hotkey-text;
+
+    callback capture();
+    callback save-settings(string);
+    callback hide-to-tray();
+    callback quit();
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+
+        HorizontalLayout {
+            height: 30px;
+            Text {
+                text: "截图工具";
+                color: Palette.foreground;
+                font-size: 20px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+            Rectangle { }
+            Button {
+                text: "设置";
+                clicked => { root.settings-open = true; }
+            }
+        }
+
+        Rectangle {
+            height: 112px;
+            border-radius: 6px;
+            border-width: 1px;
+            border-color: Palette.border;
+            background: Palette.control-background;
+
+            VerticalLayout {
+                padding: 14px;
+                spacing: 8px;
+
+                Text {
+                    text: "区域截图";
+                    color: Palette.control-foreground;
+                    font-size: 16px;
+                    font-weight: 700;
+                }
+                Text {
+                    text: "截取全部显示器，并框选需要的区域。";
+                    color: Palette.alternate-foreground;
+                    font-size: 12px;
+                }
+                HorizontalLayout {
+                    Button {
+                        text: "开始截图";
+                        clicked => { root.capture(); }
+                    }
+                    Text {
+                        text: root.hotkey-text == "" ? "快捷键未设置" : root.hotkey-text;
+                        color: Palette.alternate-foreground;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        Text {
+            text: "输出：Windows 剪贴板（CF_DIB）";
+            color: Palette.alternate-foreground;
+            font-size: 12px;
+        }
+
+        HorizontalLayout {
+            Text {
+                text: root.status-text;
+                color: Palette.alternate-foreground;
+                font-size: 12px;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            Rectangle { }
+            Button {
+                text: "隐藏到托盘";
+                clicked => { root.hide-to-tray(); }
+            }
+            Button {
+                text: "退出";
+                clicked => { root.quit(); }
+            }
+        }
+    }
+
+    if root.settings-open: Rectangle {
+        x: 30px;
+        y: 48px;
+        width: parent.width - 60px;
+        height: 164px;
+        border-radius: 6px;
+        border-width: 1px;
+        border-color: Palette.border;
+        background: Palette.background;
+        drop-shadow-blur: 16px;
+        drop-shadow-color: #00000038;
+        drop-shadow-offset-y: 4px;
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 9px;
+
+            Text {
+                text: "设置";
+                color: Palette.foreground;
+                font-size: 16px;
+                font-weight: 700;
+            }
+            Text {
+                text: "全局截图快捷键";
+                color: Palette.alternate-foreground;
+                font-size: 12px;
+            }
+            hotkey-input := LineEdit {
+                text <=> root.hotkey-text;
+                placeholder-text: "例如 Ctrl+Alt+A；留空则关闭";
+            }
+            HorizontalLayout {
+                Rectangle { }
+                Button {
+                    text: "取消";
+                    clicked => { root.settings-open = false; }
+                }
+                Button {
+                    text: "保存";
+                    clicked => {
+                        root.save-settings(hotkey-input.text);
+                        root.settings-open = false;
+                    }
+                }
+            }
+        }
+    }
+}

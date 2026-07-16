@@ -1,0 +1,580 @@
+import { Palette } from "std-widgets.slint";
+
+export struct AnnotationView {
+    commands: string,
+    stroke-color: color,
+    stroke-width: float,
+}
+
+component ToolCell inherits Rectangle {
+    in property <image> icon;
+    in property <string> tip;
+    in property <bool> selected: false;
+    callback activated();
+
+    width: 28px;
+    height: 28px;
+    border-radius: 3px;
+    border-width: root.selected ? 1px : 0px;
+    border-color: #6ba4dc;
+    background: root.selected ? #dcecff : (touch.has-hover ? #e7ebf0 : transparent);
+    accessible-role: button;
+    accessible-label: root.tip;
+
+    Image {
+        x: 6px;
+        y: 6px;
+        width: 16px;
+        height: 16px;
+        source: root.icon;
+        image-fit: contain;
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.activated(); }
+    }
+
+    Tooltip { text: @markdown("\{root.tip}"); }
+}
+
+component ColorCell inherits Rectangle {
+    in property <color> swatch-color;
+    in property <string> tip;
+    in property <bool> selected: false;
+    callback activated();
+
+    width: 24px;
+    height: 28px;
+    border-radius: 3px;
+    background: touch.has-hover ? #e7ebf0 : transparent;
+    accessible-role: button;
+    accessible-label: root.tip;
+
+    Rectangle {
+        x: 4px;
+        y: 6px;
+        width: 16px;
+        height: 16px;
+        border-width: root.selected ? 2px : 1px;
+        border-color: root.selected ? #343a43 : #ffffff;
+        background: root.swatch-color;
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.activated(); }
+    }
+
+    Tooltip { text: @markdown("\{root.tip}"); }
+}
+
+component StrokeCell inherits Rectangle {
+    in property <int> stroke-size;
+    in property <string> tip;
+    in property <bool> selected: false;
+    callback activated();
+
+    width: 28px;
+    height: 28px;
+    border-radius: 3px;
+    border-width: root.selected ? 1px : 0px;
+    border-color: #6ba4dc;
+    background: root.selected ? #dcecff : (touch.has-hover ? #e7ebf0 : transparent);
+    accessible-role: button;
+    accessible-label: root.tip;
+
+    Rectangle {
+        x: 6px;
+        y: (parent.height - self.height) / 2;
+        width: 16px;
+        height: root.stroke-size * 1px;
+        border-radius: self.height / 2;
+        background: #343a43;
+    }
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.activated(); }
+    }
+
+    Tooltip { text: @markdown("\{root.tip}"); }
+}
+
+export component OverlayWindow inherits Window {
+    title: "选择截图区域";
+    background: #000000;
+    no-frame: true;
+    always-on-top: true;
+
+    in property <image> desktop-image;
+    in property <image> selected-image;
+    in property <[AnnotationView]> annotations;
+    in property <string> selection-info;
+
+    in-out property <float> start-x: 0;
+    in-out property <float> start-y: 0;
+    in-out property <float> current-x: 0;
+    in-out property <float> current-y: 0;
+    in-out property <bool> selecting: false;
+    in-out property <bool> completed: false;
+    in-out property <int> active-tool: 0;
+    in-out property <int> color-index: 0;
+    in-out property <int> stroke-radius: 2;
+    in-out property <float> drag-start-x: 0;
+    in-out property <float> drag-start-y: 0;
+    in-out property <float> drag-current-x: 0;
+    in-out property <float> drag-current-y: 0;
+
+    property <length> selection-left: Math.min(root.start-x, root.current-x) * 1px;
+    property <length> selection-top: Math.min(root.start-y, root.current-y) * 1px;
+    property <length> selection-width: Math.abs(root.current-x - root.start-x) * 1px;
+    property <length> selection-height: Math.abs(root.current-y - root.start-y) * 1px;
+    property <float> source-scale-x: root.desktop-image.width / (root.width / 1px);
+    property <float> source-scale-y: root.desktop-image.height / (root.height / 1px);
+    property <int> source-left: Math.max(
+        0,
+        Math.min(root.desktop-image.width - 1, Math.round(root.selection-left / 1px * root.source-scale-x))
+    );
+    property <int> source-top: Math.max(
+        0,
+        Math.min(root.desktop-image.height - 1, Math.round(root.selection-top / 1px * root.source-scale-y))
+    );
+    property <int> source-width: Math.min(
+        root.desktop-image.width - root.source-left,
+        Math.max(1, Math.round(root.selection-width / 1px * root.source-scale-x))
+    );
+    property <int> source-height: Math.min(
+        root.desktop-image.height - root.source-top,
+        Math.max(1, Math.round(root.selection-height / 1px * root.source-scale-y))
+    );
+    property <length> toolbar-x: Math.max(
+        8px,
+        Math.min(root.width - 464px, root.selection-left)
+    );
+    property <length> toolbar-y: root.selection-top + root.selection-height + 52px <= root.height
+        ? root.selection-top + root.selection-height + 12px
+        : Math.max(8px, root.selection-top - 50px);
+
+    callback selected(float, float, float, float);
+    callback begin-annotation(float, float, int);
+    callback update-annotation(float, float);
+    callback finish-annotation();
+    callback select-color(int);
+    callback select-width(int);
+    callback undo();
+    callback redo();
+    callback copy-selection();
+    callback pin-selection();
+    callback cancel-selection();
+
+    function commit-selection() {
+        let left = Math.max(0, Math.min(root.start-x, root.current-x));
+        let top = Math.max(0, Math.min(root.start-y, root.current-y));
+        let right = Math.min(root.width / 1px, Math.max(root.start-x, root.current-x));
+        let bottom = Math.min(root.height / 1px, Math.max(root.start-y, root.current-y));
+        root.start-x = left;
+        root.start-y = top;
+        root.current-x = right;
+        root.current-y = bottom;
+        root.selected(
+            root.source-left,
+            root.source-top,
+            root.source-left + root.source-width,
+            root.source-top + root.source-height
+        );
+    }
+
+    FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Escape {
+                root.cancel-selection();
+                accept
+            } else {
+                reject
+            }
+        }
+    }
+
+    Image {
+        width: parent.width;
+        height: parent.height;
+        source: root.desktop-image;
+        image-fit: fill;
+    }
+
+    if !root.completed: Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: #00000088;
+    }
+
+    if root.selecting: Image {
+        x: root.selection-left;
+        y: root.selection-top;
+        width: root.selection-width;
+        height: root.selection-height;
+        source: root.desktop-image;
+        source-clip-x: root.source-left;
+        source-clip-y: root.source-top;
+        source-clip-width: root.source-width;
+        source-clip-height: root.source-height;
+        image-fit: fill;
+    }
+
+    TouchArea {
+        width: parent.width;
+        height: parent.height;
+        enabled: !root.completed;
+        mouse-cursor: crosshair;
+
+        moved => {
+            if self.pressed && root.selecting {
+                root.current-x = self.mouse-x / 1px;
+                root.current-y = self.mouse-y / 1px;
+            }
+        }
+
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                root.selecting = true;
+                root.start-x = self.mouse-x / 1px;
+                root.start-y = self.mouse-y / 1px;
+                root.current-x = self.mouse-x / 1px;
+                root.current-y = self.mouse-y / 1px;
+            } else if event.kind == PointerEventKind.up && root.selecting {
+                root.current-x = self.mouse-x / 1px;
+                root.current-y = self.mouse-y / 1px;
+                root.selecting = false;
+                if root.selection-width >= 3px && root.selection-height >= 3px {
+                    root.completed = true;
+                    root.commit-selection();
+                }
+            } else if event.kind == PointerEventKind.cancel {
+                root.selecting = false;
+            }
+        }
+    }
+
+    if root.selecting || root.completed: Rectangle {
+        x: root.selection-left;
+        y: root.selection-top;
+        width: Math.max(1px, root.selection-width);
+        height: Math.max(1px, root.selection-height);
+        border-width: 2px;
+        border-color: #54a5ff;
+        background: transparent;
+        clip: true;
+
+        if root.completed: Image {
+            width: parent.width;
+            height: parent.height;
+            source: root.selected-image;
+            image-fit: fill;
+        }
+
+        for annotation in root.annotations: Path {
+            width: parent.width;
+            height: parent.height;
+            commands: annotation.commands;
+            viewbox-width: root.selected-image.width;
+            viewbox-height: root.selected-image.height;
+            fit: fill;
+            clip: true;
+            fill: transparent;
+            stroke: annotation.stroke-color;
+            stroke-width: Math.max(
+                1,
+                annotation.stroke-width * parent.width / 1px / root.selected-image.width
+            ) * 1px;
+            stroke-line-cap: round;
+        }
+
+        if root.completed && root.active-tool > 0: TouchArea {
+            width: parent.width;
+            height: parent.height;
+            mouse-cursor: crosshair;
+
+            pointer-event(event) => {
+                let image-x = self.mouse-x / self.width * root.selected-image.width;
+                let image-y = self.mouse-y / self.height * root.selected-image.height;
+                if event.kind == PointerEventKind.down {
+                    root.begin-annotation(image-x, image-y, root.active-tool);
+                } else if event.kind == PointerEventKind.move && self.pressed {
+                    root.update-annotation(image-x, image-y);
+                } else if event.kind == PointerEventKind.up {
+                    root.update-annotation(image-x, image-y);
+                    root.finish-annotation();
+                } else if event.kind == PointerEventKind.cancel {
+                    root.finish-annotation();
+                }
+            }
+        }
+
+        if root.completed && root.active-tool == 0: TouchArea {
+            width: parent.width;
+            height: parent.height;
+            mouse-cursor: move;
+
+            pointer-event(event) => {
+                if event.kind == PointerEventKind.down {
+                    root.drag-start-x = root.start-x;
+                    root.drag-start-y = root.start-y;
+                    root.drag-current-x = root.current-x;
+                    root.drag-current-y = root.current-y;
+                } else if event.kind == PointerEventKind.move && self.pressed {
+                    let delta-x = (self.mouse-x - self.pressed-x) / 1px;
+                    let delta-y = (self.mouse-y - self.pressed-y) / 1px;
+                    let selected-width = root.drag-current-x - root.drag-start-x;
+                    let selected-height = root.drag-current-y - root.drag-start-y;
+                    let next-left = Math.max(
+                        0,
+                        Math.min(root.width / 1px - selected-width, root.drag-start-x + delta-x)
+                    );
+                    let next-top = Math.max(
+                        0,
+                        Math.min(root.height / 1px - selected-height, root.drag-start-y + delta-y)
+                    );
+                    root.start-x = next-left;
+                    root.start-y = next-top;
+                    root.current-x = next-left + selected-width;
+                    root.current-y = next-top + selected-height;
+                } else if event.kind == PointerEventKind.up {
+                    root.commit-selection();
+                }
+            }
+        }
+    }
+
+    if root.completed && root.active-tool == 0: TouchArea {
+        x: root.selection-left - 7px;
+        y: root.selection-top - 7px;
+        width: 14px;
+        height: 14px;
+        mouse-cursor: nwse-resize;
+
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                root.drag-start-x = root.start-x;
+                root.drag-start-y = root.start-y;
+            } else if event.kind == PointerEventKind.move && self.pressed {
+                root.start-x = Math.max(0, Math.min(
+                    root.current-x - 3,
+                    root.drag-start-x + (self.mouse-x - self.pressed-x) / 1px
+                ));
+                root.start-y = Math.max(0, Math.min(
+                    root.current-y - 3,
+                    root.drag-start-y + (self.mouse-y - self.pressed-y) / 1px
+                ));
+            } else if event.kind == PointerEventKind.up {
+                root.commit-selection();
+            }
+        }
+    }
+
+    if root.completed && root.active-tool == 0: TouchArea {
+        x: root.selection-left + root.selection-width - 7px;
+        y: root.selection-top - 7px;
+        width: 14px;
+        height: 14px;
+        mouse-cursor: nesw-resize;
+
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                root.drag-current-x = root.current-x;
+                root.drag-start-y = root.start-y;
+            } else if event.kind == PointerEventKind.move && self.pressed {
+                root.current-x = Math.min(root.width / 1px, Math.max(
+                    root.start-x + 3,
+                    root.drag-current-x + (self.mouse-x - self.pressed-x) / 1px
+                ));
+                root.start-y = Math.max(0, Math.min(
+                    root.current-y - 3,
+                    root.drag-start-y + (self.mouse-y - self.pressed-y) / 1px
+                ));
+            } else if event.kind == PointerEventKind.up {
+                root.commit-selection();
+            }
+        }
+    }
+
+    if root.completed && root.active-tool == 0: TouchArea {
+        x: root.selection-left - 7px;
+        y: root.selection-top + root.selection-height - 7px;
+        width: 14px;
+        height: 14px;
+        mouse-cursor: nesw-resize;
+
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                root.drag-start-x = root.start-x;
+                root.drag-current-y = root.current-y;
+            } else if event.kind == PointerEventKind.move && self.pressed {
+                root.start-x = Math.max(0, Math.min(
+                    root.current-x - 3,
+                    root.drag-start-x + (self.mouse-x - self.pressed-x) / 1px
+                ));
+                root.current-y = Math.min(root.height / 1px, Math.max(
+                    root.start-y + 3,
+                    root.drag-current-y + (self.mouse-y - self.pressed-y) / 1px
+                ));
+            } else if event.kind == PointerEventKind.up {
+                root.commit-selection();
+            }
+        }
+    }
+
+    if root.completed && root.active-tool == 0: TouchArea {
+        x: root.selection-left + root.selection-width - 7px;
+        y: root.selection-top + root.selection-height - 7px;
+        width: 14px;
+        height: 14px;
+        mouse-cursor: nwse-resize;
+
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                root.drag-current-x = root.current-x;
+                root.drag-current-y = root.current-y;
+            } else if event.kind == PointerEventKind.move && self.pressed {
+                root.current-x = Math.min(root.width / 1px, Math.max(
+                    root.start-x + 3,
+                    root.drag-current-x + (self.mouse-x - self.pressed-x) / 1px
+                ));
+                root.current-y = Math.min(root.height / 1px, Math.max(
+                    root.start-y + 3,
+                    root.drag-current-y + (self.mouse-y - self.pressed-y) / 1px
+                ));
+            } else if event.kind == PointerEventKind.up {
+                root.commit-selection();
+            }
+        }
+    }
+
+    if root.completed: Rectangle {
+        x: root.selection-left;
+        y: root.selection-top >= 28px ? root.selection-top - 26px : root.selection-top + 4px;
+        width: 118px;
+        height: 22px;
+        border-radius: 4px;
+        background: #1f2329e8;
+
+        Text {
+            text: root.selection-info;
+            color: #ffffff;
+            font-size: 11px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    if root.completed: Rectangle {
+        x: root.toolbar-x;
+        y: root.toolbar-y;
+        width: 456px;
+        height: 38px;
+        border-radius: 4px;
+        border-width: 1px;
+        border-color: #aeb6c2;
+        background: #f7f8fa;
+
+        HorizontalLayout {
+            padding: 4px;
+            spacing: 2px;
+            alignment: center;
+
+            ToolCell {
+                icon: @image-url("../src/icons/undo-2.svg");
+                tip: "撤销上一步操作";
+                activated => { root.undo(); }
+            }
+            ToolCell {
+                icon: @image-url("../src/icons/redo-2.svg");
+                tip: "重做上一步操作";
+                activated => { root.redo(); }
+            }
+            Rectangle { width: 1px; height: 20px; background: #c7cdd5; }
+
+            ToolCell {
+                icon: @image-url("../src/icons/pencil.svg");
+                tip: "画笔标注";
+                selected: root.active-tool == 1;
+                activated => { root.active-tool = root.active-tool == 1 ? 0 : 1; }
+            }
+            ToolCell {
+                icon: @image-url("../src/icons/square.svg");
+                tip: "绘制矩形";
+                selected: root.active-tool == 2;
+                activated => { root.active-tool = root.active-tool == 2 ? 0 : 2; }
+            }
+            ToolCell {
+                icon: @image-url("../src/icons/arrow-up-right.svg");
+                tip: "绘制箭头";
+                selected: root.active-tool == 3;
+                activated => { root.active-tool = root.active-tool == 3 ? 0 : 3; }
+            }
+            Rectangle { width: 1px; height: 20px; background: #c7cdd5; }
+
+            ToolCell {
+                icon: @image-url("../src/icons/copy.svg");
+                tip: "复制截图到剪贴板";
+                activated => { root.copy-selection(); }
+            }
+            ToolCell {
+                icon: @image-url("../src/icons/pin.svg");
+                tip: "将截图贴到屏幕上";
+                activated => { root.pin-selection(); }
+            }
+            ToolCell {
+                icon: @image-url("../src/icons/x.svg");
+                tip: "取消截图";
+                activated => { root.cancel-selection(); }
+            }
+            Rectangle { width: 1px; height: 20px; background: #c7cdd5; }
+
+            ColorCell {
+                swatch-color: #ec5c66;
+                tip: "红色";
+                selected: root.color-index == 0;
+                activated => { root.color-index = 0; root.select-color(0); }
+            }
+            ColorCell {
+                swatch-color: #4a90e2;
+                tip: "蓝色";
+                selected: root.color-index == 1;
+                activated => { root.color-index = 1; root.select-color(1); }
+            }
+            ColorCell {
+                swatch-color: #31a36b;
+                tip: "绿色";
+                selected: root.color-index == 2;
+                activated => { root.color-index = 2; root.select-color(2); }
+            }
+            ColorCell {
+                swatch-color: #f5c542;
+                tip: "黄色";
+                selected: root.color-index == 3;
+                activated => { root.color-index = 3; root.select-color(3); }
+            }
+            Rectangle { width: 1px; height: 20px; background: #c7cdd5; }
+
+            StrokeCell {
+                stroke-size: 1;
+                tip: "细线";
+                selected: root.stroke-radius == 1;
+                activated => { root.stroke-radius = 1; root.select-width(1); }
+            }
+            StrokeCell {
+                stroke-size: 2;
+                tip: "中等线宽";
+                selected: root.stroke-radius == 2;
+                activated => { root.stroke-radius = 2; root.select-width(2); }
+            }
+            StrokeCell {
+                stroke-size: 4;
+                tip: "粗线";
+                selected: root.stroke-radius == 4;
+                activated => { root.stroke-radius = 4; root.select-width(4); }
+            }
+        }
+    }
+}

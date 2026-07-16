@@ -1,0 +1,77 @@
+export component PinWindow inherits Window {
+    title: "贴图";
+    preferred-width: 360px;
+    preferred-height: 240px;
+    background: #000000;
+    no-frame: true;
+    always-on-top: true;
+
+    in property <image> screenshot;
+    in-out property <int> alpha-percent: 100;
+    in-out property <bool> click-through: false;
+
+    callback close-pin();
+    callback drag-pin();
+    callback scale-pin(int);
+    callback cycle-opacity();
+    callback toggle-click-through();
+
+    FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Escape {
+                root.close-pin();
+                accept
+            } else {
+                reject
+            }
+        }
+    }
+
+    Image {
+        width: parent.width;
+        height: parent.height;
+        source: root.screenshot;
+        image-fit: fill;
+    }
+
+    TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: move;
+
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                if event.button == PointerEventButton.left {
+                    root.drag-pin();
+                } else if event.button == PointerEventButton.right {
+                    root.cycle-opacity();
+                } else if event.button == PointerEventButton.middle {
+                    root.toggle-click-through();
+                }
+            }
+        }
+
+        double-clicked => { root.close-pin(); }
+
+        scroll-event(event) => {
+            if event.delta-y < 0 {
+                root.scale-pin(1);
+            } else if event.delta-y > 0 {
+                root.scale-pin(-1);
+            }
+            accept
+        }
+
+        Tooltip {
+            text: @markdown("拖动移动，滚轮缩放，右键调整透明度，双击关闭");
+        }
+    }
+
+    Rectangle {
+        width: parent.width;
+        height: parent.height;
+        border-width: 1px;
+        border-color: #54a5ff;
+        background: transparent;
+    }
+}

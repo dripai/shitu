@@ -1,0 +1,44 @@
+export component CaptureTray inherits SystemTrayIcon {
+    icon: @image-url("icons/tray.svg");
+    tooltip: "截图工具";
+    title: "截图工具";
+
+    callback capture();
+    callback show-main();
+    callback open-settings();
+    callback hide-main();
+    callback disable-pin-passthrough();
+    callback quit();
+
+    clicked => { root.show-main(); }
+
+    Menu {
+        MenuItem {
+            title: "区域截图";
+            activated => { root.capture(); }
+        }
+        MenuSeparator { }
+        MenuItem {
+            title: "关闭全部贴图鼠标穿透";
+            activated => { root.disable-pin-passthrough(); }
+        }
+        MenuSeparator { }
+        MenuItem {
+            title: "显示控制面板";
+            activated => { root.show-main(); }
+        }
+        MenuItem {
+            title: "设置...";
+            activated => { root.open-settings(); }
+        }
+        MenuItem {
+            title: "隐藏控制面板";
+            activated => { root.hide-main(); }
+        }
+        MenuSeparator { }
+        MenuItem {
+            title: "退出";
+            activated => { root.quit(); }
+        }
+    }
+}
