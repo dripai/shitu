@@ -3,10 +3,28 @@ use global_hotkey::{
     hotkey::{Code, HotKey, Modifiers},
 };
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum HotkeyFailure {
+    Invalid,
+    Occupied,
+    SystemRejected,
+}
+
+impl HotkeyFailure {
+    pub fn message(&self) -> &'static str {
+        match self {
+            Self::Invalid => "组合键无效",
+            Self::Occupied => "已被占用",
+            Self::SystemRejected => "系统拒绝注册",
+        }
+    }
+}
+
 pub struct HotkeyState {
     manager: Option<GlobalHotKeyManager>,
     registered: Option<HotKey>,
-    error: Option<String>,
+    binding: Option<String>,
+    error: Option<HotkeyFailure>,
 }
 
 impl HotkeyState {
@@ -15,39 +33,79 @@ impl HotkeyState {
         let mut state = Self {
             manager,
             registered: None,
+            binding: None,
             error: None,
         };
-        state.set_binding(binding);
+        if let Err(error) = state.set_binding(binding) {
+            state.error = Some(error);
+        }
         state
     }
 
-    pub fn set_binding(&mut self, binding: Option<&str>) {
-        if let (Some(manager), Some(hotkey)) = (&self.manager, self.registered) {
-            let _ = manager.unregister(hotkey);
+    pub fn set_binding(&mut self, binding: Option<&str>) -> Result<(), HotkeyFailure> {
+        let normalized = binding
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned);
+        if normalized == self.binding {
+            self.error = None;
+            return Ok(());
         }
-        self.registered = None;
-        self.error = None;
 
-        let Some(binding) = binding.filter(|value| !value.trim().is_empty()) else {
-            return;
+        let candidate = match normalized.as_deref() {
+            Some(value) => Some(parse_hotkey(value).ok_or(HotkeyFailure::Invalid)?),
+            None => None,
         };
-        let Some(hotkey) = parse_hotkey(binding) else {
-            self.error = Some("Invalid hotkey".to_owned());
-            return;
-        };
-        let Some(manager) = &self.manager else {
-            self.error = Some("Global hotkey manager unavailable".to_owned());
-            return;
-        };
-        if let Err(err) = manager.register(hotkey) {
-            self.error = Some(err.to_string());
-            return;
+        if candidate.is_none() && self.registered.is_none() {
+            self.binding = None;
+            self.error = None;
+            return Ok(());
         }
-        self.registered = Some(hotkey);
+        let manager = self.manager.as_ref().ok_or(HotkeyFailure::SystemRejected)?;
+
+        if let Some(candidate) = candidate {
+            manager
+                .register(candidate)
+                .map_err(classify_registration_error)?;
+        }
+        if let Some(previous) = self.registered
+            && let Err(error) = manager.unregister(previous)
+        {
+            if let Some(candidate) = candidate {
+                let _ = manager.unregister(candidate);
+            }
+            return Err(classify_registration_error(error));
+        }
+
+        self.registered = candidate;
+        self.binding = normalized;
+        self.error = None;
+        Ok(())
     }
 
-    pub fn error(&self) -> Option<&str> {
-        self.error.as_deref()
+    pub fn error(&self) -> Option<&HotkeyFailure> {
+        self.error.as_ref()
+    }
+}
+
+fn classify_registration_error(error: impl ToString) -> HotkeyFailure {
+    let message = error.to_string().to_ascii_lowercase();
+    if message.contains("already")
+        || message.contains("registered")
+        || message.contains("occupied")
+        || message.contains("占用")
+    {
+        HotkeyFailure::Occupied
+    } else {
+        HotkeyFailure::SystemRejected
+    }
+}
+
+pub fn validate_binding(value: &str) -> Result<(), HotkeyFailure> {
+    if value.trim().is_empty() || parse_hotkey(value).is_some() {
+        Ok(())
+    } else {
+        Err(HotkeyFailure::Invalid)
     }
 }
 
@@ -106,8 +164,23 @@ pub fn parse_hotkey(value: &str) -> Option<HotKey> {
                 };
             }
             "space" => code = Some(Code::Space),
+            "f1" => code = Some(Code::F1),
+            "f2" => code = Some(Code::F2),
+            "f3" => code = Some(Code::F3),
+            "f4" => code = Some(Code::F4),
+            "f5" => code = Some(Code::F5),
+            "f6" => code = Some(Code::F6),
+            "f7" => code = Some(Code::F7),
+            "f8" => code = Some(Code::F8),
+            "f9" => code = Some(Code::F9),
+            "f10" => code = Some(Code::F10),
+            "f11" => code = Some(Code::F11),
+            "f12" => code = Some(Code::F12),
             _ => return None,
         }
+    }
+    if modifiers.is_empty() {
+        return None;
     }
     code.map(|code| HotKey::new(Some(modifiers), code))
 }
@@ -120,11 +193,13 @@ mod tests {
     fn parses_modifier_key_binding() {
         assert!(parse_hotkey("Ctrl+Alt+Space").is_some());
         assert!(parse_hotkey("Win+Shift+K").is_some());
+        assert!(parse_hotkey("Ctrl+F3").is_some());
     }
 
     #[test]
-    fn rejects_unknown_key_binding() {
+    fn rejects_unknown_or_unmodified_key_binding() {
         assert!(parse_hotkey("Ctrl+Alt+Unknown").is_none());
         assert!(parse_hotkey("Ctrl++").is_none());
+        assert!(parse_hotkey("A").is_none());
     }
 }

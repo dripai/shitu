@@ -1,17 +1,20 @@
-use std::{ffi::c_void, mem::size_of, ptr};
+use std::{ffi::c_void, mem::size_of, path::Path, ptr};
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 use windows::Win32::{
-    Foundation::{GlobalFree, HANDLE},
+    Foundation::{GlobalFree, HANDLE, HGLOBAL},
     Graphics::Gdi::{
         BI_RGB, BITMAPINFO, BITMAPINFOHEADER, BitBlt, CAPTUREBLT, CreateCompatibleDC,
         CreateDIBSection, DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDC, ReleaseDC, SRCCOPY,
         SelectObject,
     },
     System::{
-        DataExchange::{CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData},
-        Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock},
+        DataExchange::{
+            CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
+            OpenClipboard, SetClipboardData,
+        },
+        Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock},
     },
     UI::WindowsAndMessaging::{
         GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
@@ -20,6 +23,7 @@ use windows::Win32::{
 };
 
 const CF_DIB: u32 = 8;
+const CF_UNICODETEXT: u32 = 13;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DesktopBounds {
@@ -42,6 +46,60 @@ pub struct DrawStyle {
 }
 
 impl CapturedImage {
+    pub fn from_rgba(left: i32, top: i32, width: u32, height: u32, rgba: &[u8]) -> Result<Self> {
+        let expected = width as usize * height as usize * 4;
+        if width == 0 || height == 0 || rgba.len() != expected {
+            return Err(anyhow!("图像像素尺寸无效"));
+        }
+        let mut pixels = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
+        for (source, target) in rgba.chunks_exact(4).zip(pixels.make_mut_slice()) {
+            *target = Rgba8Pixel {
+                r: source[0],
+                g: source[1],
+                b: source[2],
+                a: source[3],
+            };
+        }
+        Ok(Self {
+            bounds: DesktopBounds {
+                left,
+                top,
+                width: width as i32,
+                height: height as i32,
+            },
+            pixels,
+        })
+    }
+
+    pub fn from_file(path: &Path, left: i32, top: i32) -> Result<Self> {
+        let image = image::open(path)
+            .with_context(|| format!("无法读取图像：{}", path.display()))?
+            .to_rgba8();
+        Self::from_rgba(left, top, image.width(), image.height(), image.as_raw())
+    }
+
+    pub fn width(&self) -> u32 {
+        self.bounds.width as u32
+    }
+
+    pub fn height(&self) -> u32 {
+        self.bounds.height as u32
+    }
+
+    pub fn rgba_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(self.pixels.as_slice().len() * 4);
+        for pixel in self.pixels.as_slice() {
+            bytes.extend_from_slice(&[pixel.r, pixel.g, pixel.b, pixel.a]);
+        }
+        bytes
+    }
+
+    pub fn with_origin(mut self, left: i32, top: i32) -> Self {
+        self.bounds.left = left;
+        self.bounds.top = top;
+        self
+    }
+
     pub fn crop(&self, left: u32, top: u32, width: u32, height: u32) -> Option<Self> {
         if width == 0
             || height == 0
@@ -77,6 +135,94 @@ impl CapturedImage {
 
     pub fn slint_image(&self) -> Image {
         Image::from_rgba8(self.pixels.clone())
+    }
+
+    pub fn rotate_left(&self) -> Self {
+        let source_width = self.width();
+        let source_height = self.height();
+        let mut pixels = SharedPixelBuffer::<Rgba8Pixel>::new(source_height, source_width);
+        let source = self.pixels.as_slice();
+        let target = pixels.make_mut_slice();
+
+        for y in 0..source_height {
+            for x in 0..source_width {
+                let target_x = y;
+                let target_y = source_width - 1 - x;
+                target[(target_y * source_height + target_x) as usize] =
+                    source[(y * source_width + x) as usize];
+            }
+        }
+        Self {
+            bounds: DesktopBounds {
+                left: self.bounds.left,
+                top: self.bounds.top,
+                width: source_height as i32,
+                height: source_width as i32,
+            },
+            pixels,
+        }
+    }
+
+    pub fn rotate_right(&self) -> Self {
+        let source_width = self.width();
+        let source_height = self.height();
+        let mut pixels = SharedPixelBuffer::<Rgba8Pixel>::new(source_height, source_width);
+        let source = self.pixels.as_slice();
+        let target = pixels.make_mut_slice();
+
+        for y in 0..source_height {
+            for x in 0..source_width {
+                let target_x = source_height - 1 - y;
+                let target_y = x;
+                target[(target_y * source_height + target_x) as usize] =
+                    source[(y * source_width + x) as usize];
+            }
+        }
+        Self {
+            bounds: DesktopBounds {
+                left: self.bounds.left,
+                top: self.bounds.top,
+                width: source_height as i32,
+                height: source_width as i32,
+            },
+            pixels,
+        }
+    }
+
+    pub fn flip_horizontal(&self) -> Self {
+        let width = self.width();
+        let height = self.height();
+        let mut pixels = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
+        let source = self.pixels.as_slice();
+        let target = pixels.make_mut_slice();
+        for y in 0..height {
+            for x in 0..width {
+                target[(y * width + x) as usize] = source[(y * width + (width - 1 - x)) as usize];
+            }
+        }
+        Self {
+            bounds: self.bounds,
+            pixels,
+        }
+    }
+
+    pub fn flip_vertical(&self) -> Self {
+        let width = self.width();
+        let height = self.height();
+        let mut pixels = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
+        let source = self.pixels.as_slice();
+        let target = pixels.make_mut_slice();
+        for y in 0..height {
+            let source_y = height - 1 - y;
+            let target_start = (y * width) as usize;
+            let source_start = (source_y * width) as usize;
+            target[target_start..target_start + width as usize]
+                .copy_from_slice(&source[source_start..source_start + width as usize]);
+        }
+        Self {
+            bounds: self.bounds,
+            pixels,
+        }
     }
 
     pub fn draw_line(&mut self, from: (u32, u32), to: (u32, u32), style: DrawStyle) {
@@ -166,6 +312,14 @@ pub fn capture_virtual_desktop() -> Result<CapturedImage> {
 
 pub fn copy_to_clipboard(image: &CapturedImage) -> Result<()> {
     unsafe { write_clipboard(image) }
+}
+
+pub fn copy_text_to_clipboard(text: &str) -> Result<()> {
+    unsafe { write_text_clipboard(text) }
+}
+
+pub fn image_from_clipboard(left: i32, top: i32) -> Result<CapturedImage> {
+    unsafe { read_clipboard_image(left, top) }
 }
 
 pub fn arrow_head(start: (u32, u32), end: (u32, u32)) -> Option<((u32, u32), (u32, u32))> {
@@ -306,6 +460,103 @@ unsafe fn write_clipboard(image: &CapturedImage) -> Result<()> {
         return Err(error.into());
     }
     Ok(())
+}
+
+#[allow(unsafe_op_in_unsafe_fn)]
+unsafe fn write_text_clipboard(text: &str) -> Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+
+    let wide: Vec<u16> = std::ffi::OsStr::new(text)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let byte_len = wide.len() * size_of::<u16>();
+    let allocation = GlobalAlloc(GMEM_MOVEABLE, byte_len)?;
+    let target = GlobalLock(allocation);
+    if target.is_null() {
+        let _ = GlobalFree(Some(allocation));
+        return Err(anyhow!("GlobalLock failed"));
+    }
+    ptr::copy_nonoverlapping(wide.as_ptr().cast::<u8>(), target.cast::<u8>(), byte_len);
+    let _ = GlobalUnlock(allocation);
+
+    if let Err(error) = OpenClipboard(None) {
+        let _ = GlobalFree(Some(allocation));
+        return Err(error.into());
+    }
+    let result = (|| -> windows::core::Result<()> {
+        EmptyClipboard()?;
+        SetClipboardData(CF_UNICODETEXT, Some(HANDLE(allocation.0)))?;
+        Ok(())
+    })();
+    let _ = CloseClipboard();
+    if let Err(error) = result {
+        let _ = GlobalFree(Some(allocation));
+        return Err(error.into());
+    }
+    Ok(())
+}
+
+#[allow(unsafe_op_in_unsafe_fn)]
+unsafe fn read_clipboard_image(left: i32, top: i32) -> Result<CapturedImage> {
+    if IsClipboardFormatAvailable(CF_DIB).is_err() {
+        return Err(anyhow!("剪贴板中没有可用图像"));
+    }
+    OpenClipboard(None)?;
+    let result = (|| -> Result<CapturedImage> {
+        let handle = GetClipboardData(CF_DIB)?;
+        let global = HGLOBAL(handle.0);
+        let size = GlobalSize(global);
+        let data = GlobalLock(global);
+        if data.is_null() || size < size_of::<BITMAPINFOHEADER>() {
+            return Err(anyhow!("剪贴板图像数据无效"));
+        }
+
+        let bytes = std::slice::from_raw_parts(data.cast::<u8>(), size);
+        let header = ptr::read_unaligned(bytes.as_ptr().cast::<BITMAPINFOHEADER>());
+        let width = header.biWidth.unsigned_abs();
+        let height = header.biHeight.unsigned_abs();
+        if width == 0 || height == 0 || !matches!(header.biBitCount, 24 | 32) {
+            let _ = GlobalUnlock(global);
+            return Err(anyhow!("暂不支持该剪贴板图像格式"));
+        }
+
+        let header_size = header.biSize as usize;
+        let stride = (width as usize * header.biBitCount as usize).div_ceil(32) * 4;
+        let required = header_size.saturating_add(stride.saturating_mul(height as usize));
+        if header_size < size_of::<BITMAPINFOHEADER>() || required > bytes.len() {
+            let _ = GlobalUnlock(global);
+            return Err(anyhow!("剪贴板图像数据不完整"));
+        }
+
+        let pixels = &bytes[header_size..required];
+        let mut rgba = vec![0_u8; width as usize * height as usize * 4];
+        for output_y in 0..height as usize {
+            let source_y = if header.biHeight > 0 {
+                height as usize - 1 - output_y
+            } else {
+                output_y
+            };
+            let row = &pixels[source_y * stride..source_y * stride + stride];
+            for x in 0..width as usize {
+                let source = x * (header.biBitCount as usize / 8);
+                let target = (output_y * width as usize + x) * 4;
+                rgba[target] = row[source + 2];
+                rgba[target + 1] = row[source + 1];
+                rgba[target + 2] = row[source];
+                rgba[target + 3] = if header.biBitCount == 32 {
+                    let alpha = row[source + 3];
+                    if alpha == 0 { 255 } else { alpha }
+                } else {
+                    255
+                };
+            }
+        }
+        let _ = GlobalUnlock(global);
+        CapturedImage::from_rgba(left, top, width, height, &rgba)
+    })();
+    let _ = CloseClipboard();
+    result
 }
 
 fn bitmap_info(width: i32, height: i32) -> BITMAPINFO {

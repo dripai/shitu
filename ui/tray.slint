@@ -5,9 +5,7 @@ export component CaptureTray inherits SystemTrayIcon {
 
     callback capture();
     callback show-main();
-    callback open-settings();
     callback hide-main();
-    callback disable-pin-passthrough();
     callback quit();
 
     clicked => { root.show-main(); }
@@ -19,17 +17,8 @@ export component CaptureTray inherits SystemTrayIcon {
         }
         MenuSeparator { }
         MenuItem {
-            title: "关闭全部贴图鼠标穿透";
-            activated => { root.disable-pin-passthrough(); }
-        }
-        MenuSeparator { }
-        MenuItem {
             title: "显示控制面板";
             activated => { root.show-main(); }
-        }
-        MenuItem {
-            title: "设置...";
-            activated => { root.open-settings(); }
         }
         MenuItem {
             title: "隐藏控制面板";

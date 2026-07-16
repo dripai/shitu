@@ -1,6 +1,8 @@
+mod annotation;
+
 use std::{
     cell::RefCell,
-    fmt::Write as _,
+    path::PathBuf,
     rc::{Rc, Weak as RcWeak},
     thread,
     time::Duration,
@@ -9,36 +11,60 @@ use std::{
 use anyhow::{Result, anyhow};
 use global_hotkey::GlobalHotKeyEvent;
 use slint::{
-    CloseRequestResponse, Color, ComponentHandle, ModelRc, PhysicalPosition, PhysicalSize,
-    SharedString, Timer, VecModel,
+    CloseRequestResponse, ComponentHandle, ModelRc, PhysicalPosition, PhysicalSize, SharedString,
+    Timer, VecModel,
 };
 
 use crate::{
     capture::{self, CapturedImage, DrawStyle},
-    config::Config,
-    hotkey::HotkeyState,
+    config::{AppearanceMode, CaptureConfig, CompletionAction, Config, ImageFormat, PinConfig},
+    hotkey::{HotkeyState, validate_binding},
+    logging, output,
+    platform::{
+        ocr::{OcrEngine, OcrFailure, system_engine},
+        windows::{shell, startup, window},
+    },
 };
+use annotation::AnnotationHistory;
 
 slint::include_modules!();
 
 pub fn run() -> Result<(), slint::PlatformError> {
+    logging::initialize();
+    if !system_engine().is_available() {
+        logging::info("Windows system OCR is not currently available");
+    }
+
     let main = MainWindow::new()?;
     let tray = CaptureTray::new()?;
     let pins = Rc::new(RefCell::new(PinRegistry::default()));
-    let state = Rc::new(RefCell::new(AppController::new(Rc::clone(&pins))));
 
-    {
-        let state = state.borrow();
-        main.set_hotkey_text(state.config.hotkey.clone().unwrap_or_default().into());
-        main.set_status_text(state.status.as_str().into());
-    }
+    let (config, initial_status) = match Config::load() {
+        Ok(config) => (config, "就绪。右键托盘图标可打开菜单。".to_owned()),
+        Err(error) => {
+            logging::error(error.to_string());
+            (
+                Config::default(),
+                format!("配置加载失败，已使用默认值：{error}"),
+            )
+        }
+    };
+    let state = Rc::new(RefCell::new(AppController::new(
+        config,
+        initial_status,
+        Rc::clone(&pins),
+    )));
 
+    refresh_main(&main, &state.borrow());
+    populate_settings(&main, &state.borrow());
     bind_main_window(&main, Rc::clone(&state));
+    bind_settings(&main, Rc::clone(&state));
     bind_tray(&tray, main.as_weak(), Rc::clone(&state));
     bind_hotkey_events(main.as_weak());
 
     main.window()
         .on_close_requested(|| CloseRequestResponse::HideWindow);
+
     main.show()?;
     tray.show()?;
     slint::run_event_loop()
@@ -59,30 +85,111 @@ fn bind_main_window(main: &MainWindow, state: Rc<RefCell<AppController>>) {
             }
         });
     }
+    main.on_quit(|| {
+        let _ = slint::quit_event_loop();
+    });
+}
+
+fn bind_settings(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
+    let main = settings.as_weak();
     {
-        main.on_quit(|| {
-            let _ = slint::quit_event_loop();
+        let settings = settings.as_weak();
+        let main = main.clone();
+        let state = Rc::clone(&state);
+        settings.unwrap().on_apply_settings(move || {
+            apply_settings(&settings, &main, &state);
         });
     }
     {
-        let main = main.as_weak();
-        main.unwrap().on_save_settings(move |hotkey| {
-            let status = {
-                let mut state = state.borrow_mut();
-                state.set_hotkey(hotkey.to_string());
-                state.status.clone()
+        let settings = settings.as_weak();
+        let state = Rc::clone(&state);
+        settings.unwrap().on_cancel_settings(move || {
+            if let Some(settings) = settings.upgrade() {
+                populate_settings(&settings, &state.borrow());
+                settings.set_settings_status("已撤销未保存修改".into());
+            }
+        });
+    }
+    {
+        let settings = settings.as_weak();
+        settings.unwrap().on_restore_defaults(move |tab| {
+            if let Some(settings) = settings.upgrade() {
+                restore_settings_page(&settings, tab);
+                settings.set_settings_status("已恢复当前页默认值，尚未保存".into());
+            }
+        });
+    }
+    {
+        let settings = settings.as_weak();
+        settings.unwrap().on_choose_save_directory(move || {
+            let Some(settings) = settings.upgrade() else {
+                return;
             };
-            if let Some(main) = main.upgrade() {
-                main.set_hotkey_text(
-                    state
-                        .borrow()
-                        .config
-                        .hotkey
-                        .clone()
-                        .unwrap_or_default()
-                        .into(),
-                );
-                main.set_status_text(status.into());
+            let current = PathBuf::from(settings.get_save_directory().as_str());
+            if let Some(path) = rfd::FileDialog::new().set_directory(current).pick_folder() {
+                settings.set_save_directory(path.to_string_lossy().into_owned().into());
+            }
+        });
+    }
+    {
+        let settings = settings.as_weak();
+        settings.unwrap().on_open_save_directory(move || {
+            let Some(settings) = settings.upgrade() else {
+                return;
+            };
+            let path = PathBuf::from(settings.get_save_directory().as_str());
+            let result = std::fs::create_dir_all(&path).map_err(anyhow::Error::from);
+            let result = result.and_then(|_| shell::open_path(&path));
+            set_settings_result(&settings, result, "已打开保存目录");
+        });
+    }
+    {
+        let settings = settings.as_weak();
+        settings.unwrap().on_open_log_directory(move || {
+            let Some(settings) = settings.upgrade() else {
+                return;
+            };
+            let path = Config::log_directory();
+            let result = std::fs::create_dir_all(&path).map_err(anyhow::Error::from);
+            let result = result.and_then(|_| shell::open_path(&path));
+            set_settings_result(&settings, result, "已打开日志文件夹");
+        });
+    }
+    {
+        let settings = settings.as_weak();
+        let state = Rc::clone(&state);
+        settings.unwrap().on_open_config_file(move || {
+            let Some(settings) = settings.upgrade() else {
+                return;
+            };
+            let path = Config::path();
+            let result = if path.exists() {
+                Ok(())
+            } else {
+                state.borrow().config.save()
+            };
+            let result = result.and_then(|_| shell::open_path(&path));
+            set_settings_result(&settings, result, "已打开配置文件，修改后请重启应用");
+        });
+    }
+    {
+        let settings = settings.as_weak();
+        settings.unwrap().on_open_licenses(move || {
+            let Some(settings) = settings.upgrade() else {
+                return;
+            };
+            let path = Config::third_party_licenses_path();
+            let result = write_third_party_licenses(&path).and_then(|_| shell::open_path(&path));
+            set_settings_result(&settings, result, "已打开第三方许可");
+        });
+    }
+    {
+        let settings = settings.as_weak();
+        settings.unwrap().on_clear_hotkey(move || {
+            if let Some(settings) = settings.upgrade() {
+                settings.set_hotkey_text("".into());
+                settings.set_hotkey_status(0);
+                settings.set_hotkey_status_tip("".into());
             }
         });
     }
@@ -100,32 +207,10 @@ fn bind_tray(tray: &CaptureTray, main: slint::Weak<MainWindow>, state: Rc<RefCel
     }
     {
         let main = main.clone();
-        tray.on_open_settings(move || {
-            if let Some(main) = main.upgrade() {
-                main.set_settings_open(true);
-            }
-            show_main_window(&main);
-        });
-    }
-    {
-        let main = main.clone();
         tray.on_hide_main(move || {
             if let Some(main) = main.upgrade() {
                 let _ = main.hide();
             }
-        });
-    }
-    {
-        let main = main.clone();
-        let pins = state.borrow().pins.clone();
-        tray.on_disable_pin_passthrough(move || {
-            let changed = pins.borrow_mut().disable_passthrough();
-            let status = if changed == 0 {
-                "当前没有开启鼠标穿透的贴图".to_owned()
-            } else {
-                format!("已关闭 {changed} 个贴图的鼠标穿透")
-            };
-            set_status(&main, &mut state.borrow_mut(), status);
         });
     }
     tray.on_quit(|| {
@@ -153,7 +238,7 @@ fn show_main_window(main: &slint::Weak<MainWindow>) {
     main.window().set_minimized(false);
     let _ = main.show();
     main.window().request_redraw();
-    crate::pin::activate(main.window());
+    window::activate(main.window());
 
     let main = main.as_weak();
     Timer::single_shot(Duration::from_millis(16), move || {
@@ -161,6 +246,219 @@ fn show_main_window(main: &slint::Weak<MainWindow>) {
             main.window().request_redraw();
         }
     });
+}
+
+fn refresh_main(main: &MainWindow, state: &AppController) {
+    main.set_theme_mode(appearance_index(state.config.appearance));
+    main.set_hotkey_text(state.config.hotkey.clone().unwrap_or_default().into());
+    main.set_status_text(state.status.as_str().into());
+    main.set_output_summary(output_summary(&state.config.capture).into());
+    main.set_ocr_available(cfg!(windows));
+}
+
+fn populate_settings(settings: &MainWindow, state: &AppController) {
+    settings.set_theme_mode(appearance_index(state.config.appearance));
+    settings.set_launch_at_startup(state.config.launch_at_startup);
+    settings.set_completion_action(completion_action_index(
+        state.config.capture.completion_action,
+    ));
+    settings.set_image_format(image_format_index(state.config.capture.format));
+    settings.set_jpeg_quality(state.config.capture.jpeg_quality as i32);
+    settings.set_save_directory(
+        state
+            .config
+            .capture
+            .save_directory
+            .to_string_lossy()
+            .into_owned()
+            .into(),
+    );
+    settings.set_filename_template(state.config.capture.filename_template.clone().into());
+    settings.set_auto_save(state.config.capture.auto_save);
+    settings.set_save_notification(state.config.capture.save_notification);
+    settings.set_pin_opacity(state.config.pin.default_opacity as i32);
+    settings.set_pin_shadow(state.config.pin.shadow);
+    settings.set_pin_always_on_top(state.config.pin.always_on_top);
+    settings.set_pin_wheel_zoom(state.config.pin.wheel_zoom);
+    settings.set_pin_zoom_step(state.config.pin.zoom_step as i32);
+    settings.set_pin_double_click_close(state.config.pin.double_click_close);
+    settings.set_hotkey_text(state.config.hotkey.clone().unwrap_or_default().into());
+    set_hotkey_indicator(settings, state);
+    settings.set_settings_status("".into());
+    settings.set_version_text(format!("版本 {}", env!("CARGO_PKG_VERSION")).into());
+    settings.set_build_text(build_information().into());
+    settings.set_config_path(Config::path().to_string_lossy().into_owned().into());
+}
+
+fn set_hotkey_indicator(settings: &MainWindow, state: &AppController) {
+    if state.config.hotkey.is_none() {
+        settings.set_hotkey_status(0);
+        settings.set_hotkey_status_tip("".into());
+    } else if let Some(error) = state.hotkey.error() {
+        settings.set_hotkey_status(2);
+        settings.set_hotkey_status_tip(error.message().into());
+    } else {
+        settings.set_hotkey_status(1);
+        settings.set_hotkey_status_tip("有效".into());
+    }
+}
+
+fn apply_settings(
+    settings: &slint::Weak<MainWindow>,
+    main: &slint::Weak<MainWindow>,
+    state: &Rc<RefCell<AppController>>,
+) {
+    let Some(settings) = settings.upgrade() else {
+        return;
+    };
+    let mut candidate = config_from_settings(&settings);
+    if let Err(error) = candidate.validate() {
+        settings.set_settings_status(format!("设置无效：{error}").into());
+        return;
+    }
+    if let Some(binding) = candidate.hotkey.as_deref()
+        && let Err(error) = validate_binding(binding)
+    {
+        settings.set_hotkey_status(2);
+        settings.set_hotkey_status_tip(error.message().into());
+        settings.set_settings_status(format!("快捷键无效：{}", error.message()).into());
+        return;
+    }
+
+    let old = state.borrow().config.clone();
+    if let Err(error) = startup::set_enabled(candidate.launch_at_startup) {
+        settings.set_settings_status(format!("开机启动设置失败：{error}").into());
+        return;
+    }
+
+    {
+        let mut state = state.borrow_mut();
+        if let Err(error) = state.hotkey.set_binding(candidate.hotkey.as_deref()) {
+            let _ = startup::set_enabled(old.launch_at_startup);
+            settings.set_hotkey_status(2);
+            settings.set_hotkey_status_tip(error.message().into());
+            settings.set_settings_status(format!("快捷键设置失败：{}", error.message()).into());
+            return;
+        }
+    }
+
+    if let Err(error) = candidate.save() {
+        let _ = startup::set_enabled(old.launch_at_startup);
+        let _ = state.borrow_mut().hotkey.set_binding(old.hotkey.as_deref());
+        settings.set_settings_status(format!("配置保存失败：{error}").into());
+        logging::error(error.to_string());
+        return;
+    }
+
+    {
+        let mut state = state.borrow_mut();
+        state.config = candidate;
+        state.status = "设置已保存".to_owned();
+        refresh_main_if_available(main, &state);
+        populate_settings(&settings, &state);
+    }
+    settings.set_settings_status("设置已保存".into());
+    logging::info("settings saved");
+}
+
+fn config_from_settings(settings: &MainWindow) -> Config {
+    Config {
+        appearance: appearance_from_index(settings.get_theme_mode()),
+        launch_at_startup: settings.get_launch_at_startup(),
+        hotkey: {
+            let value = settings.get_hotkey_text().trim().to_owned();
+            (!value.is_empty()).then_some(value)
+        },
+        capture: CaptureConfig {
+            completion_action: completion_action_from_index(settings.get_completion_action()),
+            format: image_format_from_index(settings.get_image_format()),
+            jpeg_quality: settings.get_jpeg_quality().clamp(1, 100) as u8,
+            save_directory: PathBuf::from(settings.get_save_directory().as_str()),
+            filename_template: settings.get_filename_template().to_string(),
+            auto_save: settings.get_auto_save(),
+            save_notification: settings.get_save_notification(),
+        },
+        pin: PinConfig {
+            default_opacity: settings.get_pin_opacity().clamp(25, 100) as u8,
+            shadow: settings.get_pin_shadow(),
+            always_on_top: settings.get_pin_always_on_top(),
+            wheel_zoom: settings.get_pin_wheel_zoom(),
+            zoom_step: settings.get_pin_zoom_step().clamp(5, 100) as u8,
+            double_click_close: settings.get_pin_double_click_close(),
+        },
+    }
+}
+
+fn restore_settings_page(settings: &MainWindow, tab: i32) {
+    let defaults = Config::default();
+    match tab {
+        0 => {
+            settings.set_theme_mode(appearance_index(defaults.appearance));
+            settings.set_launch_at_startup(defaults.launch_at_startup);
+        }
+        1 => {
+            settings
+                .set_completion_action(completion_action_index(defaults.capture.completion_action));
+            settings.set_image_format(image_format_index(defaults.capture.format));
+            settings.set_jpeg_quality(defaults.capture.jpeg_quality as i32);
+            settings.set_save_directory(
+                defaults
+                    .capture
+                    .save_directory
+                    .to_string_lossy()
+                    .into_owned()
+                    .into(),
+            );
+            settings.set_filename_template(defaults.capture.filename_template.into());
+            settings.set_auto_save(defaults.capture.auto_save);
+            settings.set_save_notification(defaults.capture.save_notification);
+        }
+        2 => {
+            settings.set_pin_opacity(defaults.pin.default_opacity as i32);
+            settings.set_pin_shadow(defaults.pin.shadow);
+            settings.set_pin_always_on_top(defaults.pin.always_on_top);
+            settings.set_pin_wheel_zoom(defaults.pin.wheel_zoom);
+            settings.set_pin_zoom_step(defaults.pin.zoom_step as i32);
+            settings.set_pin_double_click_close(defaults.pin.double_click_close);
+        }
+        3 => {
+            settings.set_hotkey_text("".into());
+            settings.set_hotkey_status(0);
+            settings.set_hotkey_status_tip("".into());
+        }
+        _ => {}
+    }
+}
+
+fn set_settings_result(settings: &MainWindow, result: Result<()>, success: &str) {
+    match result {
+        Ok(()) => settings.set_settings_status(success.into()),
+        Err(error) => {
+            logging::error(error.to_string());
+            settings.set_settings_status(format!("操作失败：{error}").into());
+        }
+    }
+}
+
+fn write_third_party_licenses(path: &std::path::Path) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(path, include_str!("../docs/third-party-licenses.md"))?;
+    Ok(())
+}
+
+fn build_information() -> String {
+    format!(
+        "Windows {} · {} · Slint 1.17.0 · {}",
+        std::env::consts::ARCH,
+        env!("RUSTC_VERSION"),
+        if cfg!(debug_assertions) {
+            "Debug"
+        } else {
+            "Release"
+        }
+    )
 }
 
 fn start_capture(main: slint::Weak<MainWindow>, state: Rc<RefCell<AppController>>) {
@@ -193,6 +491,7 @@ fn start_capture(main: slint::Weak<MainWindow>, state: Rc<RefCell<AppController>
 
         match result {
             Ok(image) => {
+                logging::info("desktop captured");
                 if let Err(error) = open_overlay(main.clone(), Rc::clone(&state), image) {
                     set_status(
                         &main,
@@ -203,6 +502,7 @@ fn start_capture(main: slint::Weak<MainWindow>, state: Rc<RefCell<AppController>
                 }
             }
             Err(error) => {
+                logging::error(error.to_string());
                 set_status(&main, &mut state.borrow_mut(), format!("截图失败：{error}"));
                 restore_main_after_capture(&main, &state);
             }
@@ -217,9 +517,12 @@ fn open_overlay(
 ) -> Result<()> {
     let overlay = OverlayWindow::new()?;
     let bounds = desktop.bounds;
+    let output_mode = completion_action_index(state.borrow().config.capture.completion_action);
 
     overlay.set_desktop_image(desktop.slint_image());
     overlay.set_annotations(empty_annotation_model());
+    overlay.set_output_mode(output_mode);
+    overlay.set_ocr_available(cfg!(windows));
     overlay
         .window()
         .set_position(PhysicalPosition::new(bounds.left, bounds.top));
@@ -318,15 +621,36 @@ fn bind_overlay(
         let overlay = overlay.as_weak();
         let main = main.clone();
         let state = Rc::clone(&state);
-        overlay.unwrap().on_copy_selection(move || {
-            let result = state
-                .borrow()
-                .rendered_selection()
-                .and_then(|image| capture::copy_to_clipboard(&image));
-            match result {
-                Ok(()) => finish_capture(&overlay, &main, &state, "已复制到剪贴板".to_owned()),
+        overlay.unwrap().on_complete_output(move || {
+            let (image, config) = {
+                let state = state.borrow();
+                (state.rendered_selection(), state.config.capture.clone())
+            };
+            match image.and_then(|image| execute_output(&image, &config)) {
+                Ok(status) => finish_capture(&overlay, &main, &state, status),
                 Err(error) => {
-                    set_status(&main, &mut state.borrow_mut(), format!("复制失败：{error}"))
+                    logging::error(error.to_string());
+                    set_status(&main, &mut state.borrow_mut(), format!("输出失败：{error}"));
+                }
+            }
+        });
+    }
+    {
+        let overlay = overlay.as_weak();
+        let state = Rc::clone(&state);
+        overlay.unwrap().on_recognize_text(move || {
+            let image = state.borrow().original_selection();
+            match image {
+                Ok(image) => {
+                    if let Some(overlay) = overlay.upgrade() {
+                        overlay.set_selection_info("正在识别文字...".into());
+                    }
+                    spawn_overlay_ocr(overlay.clone(), image);
+                }
+                Err(error) => {
+                    if let Some(overlay) = overlay.upgrade() {
+                        overlay.set_selection_info(format!("OCR 失败：{error}").into());
+                    }
                 }
             }
         });
@@ -335,13 +659,64 @@ fn bind_overlay(
         let overlay = overlay.as_weak();
         let main = main.clone();
         let state = Rc::clone(&state);
+        overlay.unwrap().on_ocr_result(move |code, text| {
+            handle_overlay_ocr_result(code, text.as_str(), &overlay, &main, &state);
+        });
+    }
+    {
+        let overlay = overlay.as_weak();
+        let main = main.clone();
+        let state = Rc::clone(&state);
+        let app_state = Rc::downgrade(&state);
         overlay.unwrap().on_pin_selection(move || {
-            let image = state.borrow().rendered_selection();
-            let pins = state.borrow().pins.clone();
-            match image.and_then(|image| PinRegistry::add(&pins, image)) {
-                Ok(()) => finish_capture(&overlay, &main, &state, "已将截图贴到屏幕上".to_owned()),
+            let (image, pin_config, capture_config, pins) = {
+                let state = state.borrow();
+                (
+                    state.rendered_selection(),
+                    state.config.pin.clone(),
+                    state.config.capture.clone(),
+                    state.pins.clone(),
+                )
+            };
+            let image = match image {
+                Ok(image) => image,
                 Err(error) => {
-                    set_status(&main, &mut state.borrow_mut(), format!("贴图失败：{error}"))
+                    set_status(&main, &mut state.borrow_mut(), format!("钉住失败：{error}"));
+                    return;
+                }
+            };
+            let (source_path, auto_save_error) = if capture_config.auto_save {
+                match output::save_quick(&image, &capture_config) {
+                    Ok(path) => (Some(path), None),
+                    Err(error) => {
+                        logging::error(error.to_string());
+                        (None, Some(error.to_string()))
+                    }
+                }
+            } else {
+                (None, None)
+            };
+            let show_save_result = capture_config.save_notification;
+            match PinRegistry::add(
+                &pins,
+                image,
+                source_path,
+                pin_config,
+                capture_config,
+                main.clone(),
+                app_state.clone(),
+            ) {
+                Ok(()) => {
+                    let status = match auto_save_error {
+                        Some(error) if show_save_result => {
+                            format!("已钉住，但自动保存失败：{error}")
+                        }
+                        _ => "已将截图钉在屏幕上".to_owned(),
+                    };
+                    finish_capture(&overlay, &main, &state, status);
+                }
+                Err(error) => {
+                    set_status(&main, &mut state.borrow_mut(), format!("钉住失败：{error}"));
                 }
             }
         });
@@ -352,6 +727,101 @@ fn bind_overlay(
             finish_capture(&overlay, &main, &state, "已取消截图".to_owned());
         });
     }
+}
+
+fn spawn_overlay_ocr(overlay: slint::Weak<OverlayWindow>, image: CapturedImage) {
+    let width = image.width();
+    let height = image.height();
+    let bounds = image.bounds;
+    let rgba = image.rgba_bytes();
+    thread::spawn(move || {
+        let result = CapturedImage::from_rgba(bounds.left, bounds.top, width, height, &rgba)
+            .map_err(|error| OcrFailure::Failed(error.to_string()))
+            .and_then(|image| system_engine().recognize(&image));
+        let (code, text) = ocr_result_payload(result);
+        let _ = overlay.upgrade_in_event_loop(move |overlay| {
+            overlay.invoke_ocr_result(code, text.into());
+        });
+    });
+}
+
+fn handle_overlay_ocr_result(
+    code: i32,
+    text: &str,
+    overlay: &slint::Weak<OverlayWindow>,
+    main: &slint::Weak<MainWindow>,
+    state: &Rc<RefCell<AppController>>,
+) {
+    match code {
+        0 => match capture::copy_text_to_clipboard(text) {
+            Ok(()) => finish_capture(overlay, main, state, "已识别并复制文字".to_owned()),
+            Err(error) => {
+                set_status(
+                    main,
+                    &mut state.borrow_mut(),
+                    format!("OCR 文字复制失败：{error}"),
+                );
+            }
+        },
+        1 => set_overlay_message(overlay, main, state, "未识别到文字"),
+        2 => set_overlay_message(overlay, main, state, "缺少中文 OCR 语言包"),
+        3 => set_overlay_message(overlay, main, state, "当前平台不支持系统 OCR"),
+        _ => set_overlay_message(overlay, main, state, "OCR 识别失败"),
+    }
+}
+
+fn set_overlay_message(
+    overlay: &slint::Weak<OverlayWindow>,
+    main: &slint::Weak<MainWindow>,
+    state: &Rc<RefCell<AppController>>,
+    message: &str,
+) {
+    if let Some(overlay) = overlay.upgrade() {
+        overlay.set_selection_info(message.into());
+    }
+    set_status(main, &mut state.borrow_mut(), message.to_owned());
+}
+
+fn ocr_result_payload(result: Result<String, OcrFailure>) -> (i32, String) {
+    match result {
+        Ok(text) if text.trim().is_empty() => (1, String::new()),
+        Ok(text) => (0, text),
+        Err(OcrFailure::MissingLanguagePack) => (2, String::new()),
+        Err(OcrFailure::Unsupported) => (3, String::new()),
+        Err(OcrFailure::Failed(message)) => {
+            logging::error(message);
+            (4, String::new())
+        }
+    }
+}
+
+fn execute_output(image: &CapturedImage, config: &CaptureConfig) -> Result<String> {
+    let should_copy = matches!(
+        config.completion_action,
+        CompletionAction::Copy | CompletionAction::CopyAndSave
+    );
+    let should_save = config.auto_save
+        || matches!(
+            config.completion_action,
+            CompletionAction::Save | CompletionAction::CopyAndSave
+        );
+
+    if should_copy {
+        capture::copy_to_clipboard(image)?;
+    }
+    let saved = if should_save {
+        Some(output::save_quick(image, config)?)
+    } else {
+        None
+    };
+
+    Ok(match (should_copy, saved, config.save_notification) {
+        (true, Some(path), true) => format!("已复制并保存到 {}", path.display()),
+        (false, Some(path), true) => format!("已保存到 {}", path.display()),
+        (_, Some(_), false) => "截图已完成".to_owned(),
+        (true, None, _) => "已复制到剪贴板".to_owned(),
+        (false, None, _) => "截图已完成".to_owned(),
+    })
 }
 
 fn refresh_annotations(overlay: &slint::Weak<OverlayWindow>, state: &Rc<RefCell<AppController>>) {
@@ -395,6 +865,12 @@ fn set_status(main: &slint::Weak<MainWindow>, state: &mut AppController, status:
     }
 }
 
+fn refresh_main_if_available(main: &slint::Weak<MainWindow>, state: &AppController) {
+    if let Some(main) = main.upgrade() {
+        refresh_main(&main, state);
+    }
+}
+
 struct AppController {
     config: Config,
     hotkey: HotkeyState,
@@ -407,13 +883,15 @@ struct AppController {
 }
 
 impl AppController {
-    fn new(pins: Rc<RefCell<PinRegistry>>) -> Self {
-        let config = Config::load();
+    fn new(config: Config, mut status: String, pins: Rc<RefCell<PinRegistry>>) -> Self {
         let hotkey = HotkeyState::new(config.hotkey.as_deref());
+        if let Some(error) = hotkey.error() {
+            status = format!("快捷键无效：{}", error.message());
+        }
         Self {
             config,
             hotkey,
-            status: "就绪。右键托盘图标可打开菜单。".to_owned(),
+            status,
             capturing: false,
             restore_main_after_capture: false,
             session: None,
@@ -423,21 +901,6 @@ impl AppController {
                 radius: 2,
             },
         }
-    }
-
-    fn set_hotkey(&mut self, value: String) {
-        let value = value.trim().to_owned();
-        self.config.hotkey = (!value.is_empty()).then_some(value);
-        self.hotkey.set_binding(self.config.hotkey.as_deref());
-        self.status = if let Some(error) = self.hotkey.error() {
-            format!("快捷键设置失败：{error}")
-        } else if let Err(error) = self.config.save() {
-            format!("设置保存失败：{error}")
-        } else if self.config.hotkey.is_some() {
-            "快捷键已保存".to_owned()
-        } else {
-            "全局快捷键已关闭".to_owned()
-        };
     }
 
     fn select_area(
@@ -543,6 +1006,13 @@ impl AppController {
             .ok_or_else(|| anyhow!("尚未选择截图区域"))?;
         Ok(session.annotations.render(selected))
     }
+
+    fn original_selection(&self) -> Result<CapturedImage> {
+        self.session
+            .as_ref()
+            .and_then(|session| session.selected.clone())
+            .ok_or_else(|| anyhow!("尚未选择截图区域"))
+    }
 }
 
 fn clamp_point(x: f32, y: f32, image: &CapturedImage) -> (u32, u32) {
@@ -577,200 +1047,37 @@ struct CaptureSession {
 }
 
 #[derive(Default)]
-struct AnnotationHistory {
-    commands: Vec<AnnotationCommand>,
-    redo: Vec<AnnotationCommand>,
-    active: bool,
-}
-
-impl AnnotationHistory {
-    fn clear(&mut self) {
-        self.commands.clear();
-        self.redo.clear();
-        self.active = false;
-    }
-
-    fn begin(&mut self, tool: i32, point: (u32, u32), style: DrawStyle) {
-        self.finish();
-        let command = match tool {
-            1 => AnnotationCommand::Pen {
-                points: vec![point],
-                style,
-            },
-            2 => AnnotationCommand::Rectangle {
-                start: point,
-                end: point,
-                style,
-            },
-            3 => AnnotationCommand::Arrow {
-                start: point,
-                end: point,
-                style,
-            },
-            _ => return,
-        };
-        self.redo.clear();
-        self.commands.push(command);
-        self.active = true;
-    }
-
-    fn update(&mut self, point: (u32, u32)) {
-        if !self.active {
-            return;
-        }
-        match self.commands.last_mut() {
-            Some(AnnotationCommand::Pen { points, .. }) => {
-                if points.last().copied() != Some(point) {
-                    points.push(point);
-                }
-            }
-            Some(AnnotationCommand::Rectangle { end, .. })
-            | Some(AnnotationCommand::Arrow { end, .. }) => {
-                *end = point;
-            }
-            None => {}
-        }
-    }
-
-    fn finish(&mut self) {
-        self.active = false;
-    }
-
-    fn undo(&mut self) {
-        self.finish();
-        if let Some(command) = self.commands.pop() {
-            self.redo.push(command);
-        }
-    }
-
-    fn redo(&mut self) {
-        self.finish();
-        if let Some(command) = self.redo.pop() {
-            self.commands.push(command);
-        }
-    }
-
-    fn views(&self) -> Vec<AnnotationView> {
-        self.commands.iter().map(AnnotationCommand::view).collect()
-    }
-
-    fn render(&self, base: &CapturedImage) -> CapturedImage {
-        let mut image = base.clone();
-        for command in &self.commands {
-            command.render(&mut image);
-        }
-        image
-    }
-}
-
-#[derive(Clone)]
-enum AnnotationCommand {
-    Pen {
-        points: Vec<(u32, u32)>,
-        style: DrawStyle,
-    },
-    Rectangle {
-        start: (u32, u32),
-        end: (u32, u32),
-        style: DrawStyle,
-    },
-    Arrow {
-        start: (u32, u32),
-        end: (u32, u32),
-        style: DrawStyle,
-    },
-}
-
-impl AnnotationCommand {
-    fn view(&self) -> AnnotationView {
-        let (commands, style) = match self {
-            Self::Pen { points, style } => (pen_path(points), *style),
-            Self::Rectangle { start, end, style } => (rectangle_path(*start, *end), *style),
-            Self::Arrow { start, end, style } => (arrow_path(*start, *end), *style),
-        };
-        AnnotationView {
-            commands: commands.into(),
-            stroke_color: Color::from_argb_u8(
-                style.rgba[3],
-                style.rgba[0],
-                style.rgba[1],
-                style.rgba[2],
-            ),
-            stroke_width: (style.radius * 2) as f32,
-        }
-    }
-
-    fn render(&self, image: &mut CapturedImage) {
-        match self {
-            Self::Pen { points, style } => {
-                if points.len() == 1 {
-                    image.draw_line(points[0], points[0], *style);
-                } else {
-                    for pair in points.windows(2) {
-                        image.draw_line(pair[0], pair[1], *style);
-                    }
-                }
-            }
-            Self::Rectangle { start, end, style } => {
-                image.draw_rectangle(*start, *end, *style);
-            }
-            Self::Arrow { start, end, style } => {
-                image.draw_arrow(*start, *end, *style);
-            }
-        }
-    }
-}
-
-fn pen_path(points: &[(u32, u32)]) -> String {
-    let Some(first) = points.first() else {
-        return String::new();
-    };
-    let mut path = format!("M {} {}", first.0, first.1);
-    for point in &points[1..] {
-        let _ = write!(path, " L {} {}", point.0, point.1);
-    }
-    if points.len() == 1 {
-        let _ = write!(path, " L {} {}", first.0, first.1);
-    }
-    path
-}
-
-fn rectangle_path(start: (u32, u32), end: (u32, u32)) -> String {
-    let left = start.0.min(end.0);
-    let right = start.0.max(end.0);
-    let top = start.1.min(end.1);
-    let bottom = start.1.max(end.1);
-    format!("M {left} {top} L {right} {top} L {right} {bottom} L {left} {bottom} Z")
-}
-
-fn arrow_path(start: (u32, u32), end: (u32, u32)) -> String {
-    let mut path = format!("M {} {} L {} {}", start.0, start.1, end.0, end.1);
-    if let Some((left, right)) = capture::arrow_head(start, end) {
-        let _ = write!(
-            path,
-            " M {} {} L {} {} M {} {} L {} {}",
-            end.0, end.1, left.0, left.1, end.0, end.1, right.0, right.1
-        );
-    }
-    path
-}
-
-#[derive(Default)]
 struct PinRegistry {
     next_id: u64,
     windows: Vec<PinnedWindow>,
 }
 
 impl PinRegistry {
-    fn add(registry: &Rc<RefCell<Self>>, image: CapturedImage) -> Result<()> {
+    #[allow(clippy::too_many_arguments)]
+    fn add(
+        registry: &Rc<RefCell<Self>>,
+        image: CapturedImage,
+        source_path: Option<PathBuf>,
+        config: PinConfig,
+        capture_config: CaptureConfig,
+        main: slint::Weak<MainWindow>,
+        app: RcWeak<RefCell<AppController>>,
+    ) -> Result<()> {
         let pin = PinWindow::new()?;
         pin.set_screenshot(image.slint_image());
+        pin.set_alpha_percent(config.default_opacity as i32);
+        pin.set_shadow_enabled(config.shadow);
+        pin.set_top_enabled(config.always_on_top);
+        pin.set_wheel_zoom(config.wheel_zoom);
+        pin.set_zoom_step(config.zoom_step as i32);
+        pin.set_double_click_close(config.double_click_close);
+        pin.set_scale_percent(100);
+        pin.set_original_size_text(format!("{} × {}", image.width(), image.height()).into());
+        pin.set_has_source_file(source_path.is_some());
         pin.window()
             .set_position(PhysicalPosition::new(image.bounds.left, image.bounds.top));
-        pin.window().set_size(PhysicalSize::new(
-            image.bounds.width as u32,
-            image.bounds.height as u32,
-        ));
+        pin.window()
+            .set_size(PhysicalSize::new(image.width(), image.height()));
 
         let id = {
             let mut registry = registry.borrow_mut();
@@ -779,8 +1086,14 @@ impl PinRegistry {
             id
         };
         let window_state = Rc::new(RefCell::new(PinnedWindowState {
-            opacity: 255,
-            click_through: false,
+            image,
+            source_path,
+            opacity: config.default_opacity,
+            shadow: config.shadow,
+            always_on_top: config.always_on_top,
+            scale_percent: 100,
+            zoom_step: config.zoom_step,
+            capture_config,
         }));
 
         {
@@ -799,53 +1112,246 @@ impl PinRegistry {
             let pin = pin.as_weak();
             pin.unwrap().on_drag_pin(move || {
                 if let Some(pin) = pin.upgrade() {
-                    crate::pin::drag(pin.window());
+                    window::drag(pin.window());
                 }
             });
         }
         {
             let pin = pin.as_weak();
+            let window_state = Rc::clone(&window_state);
             pin.unwrap().on_scale_pin(move |direction| {
                 if let Some(pin) = pin.upgrade() {
-                    let current = pin.window().size();
-                    let factor = if direction > 0 { 1.15 } else { 1.0 / 1.15 };
-                    let width = (current.width as f32 * factor).clamp(80.0, 4000.0) as u32;
-                    let height = (current.height as f32 * factor).clamp(60.0, 3000.0) as u32;
-                    pin.window().set_size(PhysicalSize::new(width, height));
+                    let current = window_state.borrow().scale_percent;
+                    let step = window_state.borrow().zoom_step as i32;
+                    set_pin_scale(&pin, &window_state, current + direction.signum() * step);
                 }
             });
         }
         {
             let pin = pin.as_weak();
             let window_state = Rc::clone(&window_state);
-            pin.unwrap().on_cycle_opacity(move || {
+            pin.unwrap().on_set_scale(move |percent| {
                 if let Some(pin) = pin.upgrade() {
-                    let mut state = window_state.borrow_mut();
-                    state.opacity = match state.opacity {
-                        255 => 217,
-                        217 => 179,
-                        _ => 255,
-                    };
-                    pin.set_alpha_percent(((state.opacity as u16 * 100) / 255) as i32);
-                    crate::pin::apply(pin.window(), state.opacity, state.click_through);
+                    set_pin_scale(&pin, &window_state, percent);
                 }
             });
         }
         {
             let pin = pin.as_weak();
             let window_state = Rc::clone(&window_state);
-            pin.unwrap().on_toggle_click_through(move || {
+            pin.unwrap().on_fit_screen(move || {
                 if let Some(pin) = pin.upgrade() {
-                    let mut state = window_state.borrow_mut();
-                    state.click_through = !state.click_through;
-                    pin.set_click_through(state.click_through);
-                    crate::pin::apply(pin.window(), state.opacity, state.click_through);
+                    let state = window_state.borrow();
+                    window::fit_to_work_area(
+                        pin.window(),
+                        state.image.width(),
+                        state.image.height(),
+                    );
+                    let size = pin.window().size();
+                    let scale =
+                        ((size.width as f64 / state.image.width() as f64) * 100.0).round() as i32;
+                    drop(state);
+                    window_state.borrow_mut().scale_percent = scale;
+                    pin.set_scale_percent(scale);
                 }
             });
         }
+        {
+            let pin = pin.as_weak();
+            let window_state = Rc::clone(&window_state);
+            let main = main.clone();
+            let app = app.clone();
+            pin.unwrap().on_copy_image(move || {
+                let result = capture::copy_to_clipboard(&window_state.borrow().image);
+                report_pin_result(&main, &app, result, "已复制钉住图像");
+            });
+        }
+        {
+            let pin = pin.as_weak();
+            let window_state = Rc::clone(&window_state);
+            let main = main.clone();
+            let app = app.clone();
+            pin.unwrap().on_save_image(move || {
+                let Some(pin) = pin.upgrade() else {
+                    return;
+                };
+                let state = window_state.borrow();
+                let result = output::save_as_dialog(
+                    &state.image,
+                    &state.capture_config.save_directory,
+                    state.capture_config.format,
+                    state.capture_config.jpeg_quality,
+                );
+                drop(state);
+                match result {
+                    Ok(Some(path)) => {
+                        window_state.borrow_mut().source_path = Some(path.clone());
+                        pin.set_has_source_file(true);
+                        update_app_status(&main, &app, format!("图像已保存到 {}", path.display()));
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        update_app_status(&main, &app, format!("图像保存失败：{error}"));
+                    }
+                }
+            });
+        }
+        {
+            let pin = pin.as_weak();
+            let window_state = Rc::clone(&window_state);
+            pin.unwrap().on_recognize_text(move || {
+                let image = window_state.borrow().image.clone();
+                spawn_pin_ocr(pin.clone(), image);
+            });
+        }
+        {
+            let main = main.clone();
+            let app = app.clone();
+            pin.on_ocr_result(move |code, text| match code {
+                0 => report_pin_result(
+                    &main,
+                    &app,
+                    capture::copy_text_to_clipboard(text.as_str()),
+                    "已识别并复制文字",
+                ),
+                1 => update_app_status(&main, &app, "未识别到文字".to_owned()),
+                2 => update_app_status(&main, &app, "缺少中文 OCR 语言包".to_owned()),
+                3 => update_app_status(&main, &app, "当前平台不支持系统 OCR".to_owned()),
+                _ => update_app_status(&main, &app, "OCR 识别失败".to_owned()),
+            });
+        }
+        {
+            let pin = pin.as_weak();
+            let window_state = Rc::clone(&window_state);
+            pin.unwrap().on_set_opacity(move |percent| {
+                if let Some(pin) = pin.upgrade() {
+                    let percent = percent.clamp(25, 100) as u8;
+                    window_state.borrow_mut().opacity = percent;
+                    pin.set_alpha_percent(percent as i32);
+                    window::set_opacity(pin.window(), percent);
+                }
+            });
+        }
+        {
+            let pin = pin.as_weak();
+            let window_state = Rc::clone(&window_state);
+            pin.unwrap().on_set_shadow(move |enabled| {
+                if let Some(pin) = pin.upgrade() {
+                    window_state.borrow_mut().shadow = enabled;
+                    window::set_shadow(pin.window(), enabled);
+                }
+            });
+        }
+        {
+            let pin = pin.as_weak();
+            let window_state = Rc::clone(&window_state);
+            pin.unwrap().on_set_top(move |enabled| {
+                if let Some(pin) = pin.upgrade() {
+                    window_state.borrow_mut().always_on_top = enabled;
+                    window::set_always_on_top(pin.window(), enabled);
+                }
+            });
+        }
+        {
+            let pin = pin.as_weak();
+            let window_state = Rc::clone(&window_state);
+            let main = main.clone();
+            let app = app.clone();
+            pin.unwrap().on_replace_clipboard(move || {
+                let Some(pin) = pin.upgrade() else {
+                    return;
+                };
+                let position = pin.window().position();
+                match capture::image_from_clipboard(position.x, position.y) {
+                    Ok(image) => {
+                        replace_pin_image(&pin, &window_state, image, None);
+                        update_app_status(&main, &app, "已从剪贴板替换图像".to_owned());
+                    }
+                    Err(error) => {
+                        update_app_status(&main, &app, format!("替换图像失败：{error}"));
+                    }
+                }
+            });
+        }
+        {
+            let pin = pin.as_weak();
+            let window_state = Rc::clone(&window_state);
+            let main = main.clone();
+            let app = app.clone();
+            pin.unwrap().on_replace_file(move || {
+                let Some(pin) = pin.upgrade() else {
+                    return;
+                };
+                let Some(path) = rfd::FileDialog::new()
+                    .add_filter("图像", &["png", "jpg", "jpeg"])
+                    .pick_file()
+                else {
+                    return;
+                };
+                let position = pin.window().position();
+                match CapturedImage::from_file(&path, position.x, position.y) {
+                    Ok(image) => {
+                        replace_pin_image(&pin, &window_state, image, Some(path));
+                        update_app_status(&main, &app, "已从文件替换图像".to_owned());
+                    }
+                    Err(error) => {
+                        update_app_status(&main, &app, format!("替换图像失败：{error}"));
+                    }
+                }
+            });
+        }
+        {
+            let window_state = Rc::clone(&window_state);
+            let main = main.clone();
+            let app = app.clone();
+            pin.on_reveal_file(move || {
+                let path = window_state.borrow().source_path.clone();
+                match path {
+                    Some(path) => {
+                        report_pin_result(
+                            &main,
+                            &app,
+                            shell::reveal_in_folder(&path),
+                            "已在文件夹中显示",
+                        );
+                    }
+                    None => update_app_status(&main, &app, "当前图像尚未保存".to_owned()),
+                }
+            });
+        }
+        bind_pin_transform(
+            &pin,
+            Rc::clone(&window_state),
+            main.clone(),
+            app.clone(),
+            PinTransform::RotateLeft,
+        );
+        bind_pin_transform(
+            &pin,
+            Rc::clone(&window_state),
+            main.clone(),
+            app.clone(),
+            PinTransform::RotateRight,
+        );
+        bind_pin_transform(
+            &pin,
+            Rc::clone(&window_state),
+            main.clone(),
+            app.clone(),
+            PinTransform::FlipHorizontal,
+        );
+        bind_pin_transform(
+            &pin,
+            Rc::clone(&window_state),
+            main,
+            app,
+            PinTransform::FlipVertical,
+        );
 
         pin.show()?;
-        crate::pin::apply(pin.window(), 255, false);
+        window::set_opacity(pin.window(), config.default_opacity);
+        window::set_shadow(pin.window(), config.shadow);
+        window::set_always_on_top(pin.window(), config.always_on_top);
         registry.borrow_mut().windows.push(PinnedWindow {
             id,
             ui: pin,
@@ -853,77 +1359,241 @@ impl PinRegistry {
         });
         Ok(())
     }
+}
 
-    fn disable_passthrough(&mut self) -> usize {
-        let mut changed = 0;
-        for pin in &self.windows {
-            let mut state = pin.state.borrow_mut();
-            if !state.click_through {
-                continue;
-            }
-            state.click_through = false;
-            pin.ui.set_click_through(false);
-            crate::pin::apply(pin.ui.window(), state.opacity, false);
-            changed += 1;
+#[derive(Clone, Copy)]
+enum PinTransform {
+    RotateLeft,
+    RotateRight,
+    FlipHorizontal,
+    FlipVertical,
+}
+
+fn bind_pin_transform(
+    pin: &PinWindow,
+    state: Rc<RefCell<PinnedWindowState>>,
+    main: slint::Weak<MainWindow>,
+    app: RcWeak<RefCell<AppController>>,
+    transform: PinTransform,
+) {
+    match transform {
+        PinTransform::RotateLeft => {
+            let pin_weak = pin.as_weak();
+            pin.on_rotate_left(move || {
+                if let Some(pin) = pin_weak.upgrade() {
+                    let (image, source_path) = {
+                        let state = state.borrow();
+                        (state.image.rotate_left(), state.source_path.clone())
+                    };
+                    replace_pin_image(&pin, &state, image, source_path);
+                    update_app_status(&main, &app, "图像已向左旋转".to_owned());
+                }
+            });
         }
-        changed
+        PinTransform::RotateRight => {
+            let pin_weak = pin.as_weak();
+            pin.on_rotate_right(move || {
+                if let Some(pin) = pin_weak.upgrade() {
+                    let (image, source_path) = {
+                        let state = state.borrow();
+                        (state.image.rotate_right(), state.source_path.clone())
+                    };
+                    replace_pin_image(&pin, &state, image, source_path);
+                    update_app_status(&main, &app, "图像已向右旋转".to_owned());
+                }
+            });
+        }
+        PinTransform::FlipHorizontal => {
+            let pin_weak = pin.as_weak();
+            pin.on_flip_horizontal(move || {
+                if let Some(pin) = pin_weak.upgrade() {
+                    let (image, source_path) = {
+                        let state = state.borrow();
+                        (state.image.flip_horizontal(), state.source_path.clone())
+                    };
+                    replace_pin_image(&pin, &state, image, source_path);
+                    update_app_status(&main, &app, "图像已水平翻转".to_owned());
+                }
+            });
+        }
+        PinTransform::FlipVertical => {
+            let pin_weak = pin.as_weak();
+            pin.on_flip_vertical(move || {
+                if let Some(pin) = pin_weak.upgrade() {
+                    let (image, source_path) = {
+                        let state = state.borrow();
+                        (state.image.flip_vertical(), state.source_path.clone())
+                    };
+                    replace_pin_image(&pin, &state, image, source_path);
+                    update_app_status(&main, &app, "图像已垂直翻转".to_owned());
+                }
+            });
+        }
+    }
+}
+
+fn replace_pin_image(
+    pin: &PinWindow,
+    state: &Rc<RefCell<PinnedWindowState>>,
+    image: CapturedImage,
+    source_path: Option<PathBuf>,
+) {
+    let position = pin.window().position();
+    let image = image.with_origin(position.x, position.y);
+    let width = image.width();
+    let height = image.height();
+    {
+        let mut state = state.borrow_mut();
+        state.image = image.clone();
+        state.source_path = source_path;
+        state.scale_percent = 100;
+    }
+    pin.set_screenshot(image.slint_image());
+    pin.set_original_size_text(format!("{width} × {height}").into());
+    pin.set_scale_percent(100);
+    pin.set_has_source_file(state.borrow().source_path.is_some());
+    pin.window().set_size(PhysicalSize::new(width, height));
+}
+
+fn set_pin_scale(pin: &PinWindow, state: &Rc<RefCell<PinnedWindowState>>, percent: i32) {
+    let percent = percent.clamp(10, 800);
+    let state_ref = state.borrow();
+    let width = ((state_ref.image.width() as u64 * percent as u64) / 100).max(1) as u32;
+    let height = ((state_ref.image.height() as u64 * percent as u64) / 100).max(1) as u32;
+    drop(state_ref);
+    state.borrow_mut().scale_percent = percent;
+    pin.set_scale_percent(percent);
+    pin.window().set_size(PhysicalSize::new(width, height));
+}
+
+fn spawn_pin_ocr(pin: slint::Weak<PinWindow>, image: CapturedImage) {
+    let width = image.width();
+    let height = image.height();
+    let bounds = image.bounds;
+    let rgba = image.rgba_bytes();
+    thread::spawn(move || {
+        let result = CapturedImage::from_rgba(bounds.left, bounds.top, width, height, &rgba)
+            .map_err(|error| OcrFailure::Failed(error.to_string()))
+            .and_then(|image| system_engine().recognize(&image));
+        let (code, text) = ocr_result_payload(result);
+        let _ = pin.upgrade_in_event_loop(move |pin| {
+            pin.invoke_ocr_result(code, text.into());
+        });
+    });
+}
+
+fn report_pin_result(
+    main: &slint::Weak<MainWindow>,
+    app: &RcWeak<RefCell<AppController>>,
+    result: Result<()>,
+    success: &str,
+) {
+    match result {
+        Ok(()) => update_app_status(main, app, success.to_owned()),
+        Err(error) => update_app_status(main, app, format!("操作失败：{error}")),
+    }
+}
+
+fn update_app_status(
+    main: &slint::Weak<MainWindow>,
+    app: &RcWeak<RefCell<AppController>>,
+    message: String,
+) {
+    if let Some(app) = app.upgrade() {
+        set_status(main, &mut app.borrow_mut(), message);
+    } else if let Some(main) = main.upgrade() {
+        main.set_status_text(message.into());
     }
 }
 
 struct PinnedWindow {
     id: u64,
+    #[allow(dead_code)]
     ui: PinWindow,
+    #[allow(dead_code)]
     state: Rc<RefCell<PinnedWindowState>>,
 }
 
 struct PinnedWindowState {
+    image: CapturedImage,
+    source_path: Option<PathBuf>,
     opacity: u8,
-    click_through: bool,
+    shadow: bool,
+    always_on_top: bool,
+    scale_percent: i32,
+    zoom_step: u8,
+    capture_config: CaptureConfig,
+}
+
+fn appearance_index(mode: AppearanceMode) -> i32 {
+    match mode {
+        AppearanceMode::System => 0,
+        AppearanceMode::Light => 1,
+        AppearanceMode::Dark => 2,
+    }
+}
+
+fn appearance_from_index(index: i32) -> AppearanceMode {
+    match index {
+        1 => AppearanceMode::Light,
+        2 => AppearanceMode::Dark,
+        _ => AppearanceMode::System,
+    }
+}
+
+fn completion_action_index(action: CompletionAction) -> i32 {
+    match action {
+        CompletionAction::Copy => 0,
+        CompletionAction::Save => 1,
+        CompletionAction::CopyAndSave => 2,
+    }
+}
+
+fn completion_action_from_index(index: i32) -> CompletionAction {
+    match index {
+        1 => CompletionAction::Save,
+        2 => CompletionAction::CopyAndSave,
+        _ => CompletionAction::Copy,
+    }
+}
+
+fn image_format_index(format: ImageFormat) -> i32 {
+    match format {
+        ImageFormat::Png => 0,
+        ImageFormat::Jpeg => 1,
+    }
+}
+
+fn image_format_from_index(index: i32) -> ImageFormat {
+    if index == 1 {
+        ImageFormat::Jpeg
+    } else {
+        ImageFormat::Png
+    }
+}
+
+fn output_summary(config: &CaptureConfig) -> String {
+    let action = match config.completion_action {
+        CompletionAction::Copy => {
+            if config.auto_save {
+                "复制并自动保存"
+            } else {
+                "复制到剪贴板"
+            }
+        }
+        CompletionAction::Save => "保存到文件",
+        CompletionAction::CopyAndSave => "复制并保存",
+    };
+    let format = match config.format {
+        ImageFormat::Png => "PNG",
+        ImageFormat::Jpeg => "JPEG",
+    };
+    format!("{action} · {format}")
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        AnnotationCommand, AnnotationHistory, DrawStyle, arrow_path, normalized_selection,
-        rectangle_path,
-    };
-
-    #[test]
-    fn annotation_history_undo_and_redo_preserve_commands() {
-        let mut history = AnnotationHistory::default();
-        history.begin(
-            2,
-            (10, 20),
-            DrawStyle {
-                rgba: [255, 0, 0, 255],
-                radius: 2,
-            },
-        );
-        history.update((30, 40));
-        history.finish();
-        assert_eq!(history.commands.len(), 1);
-
-        history.undo();
-        assert!(history.commands.is_empty());
-        history.redo();
-        assert_eq!(history.commands.len(), 1);
-    }
-
-    #[test]
-    fn shape_paths_use_image_coordinates() {
-        assert_eq!(
-            rectangle_path((30, 40), (10, 20)),
-            "M 10 20 L 30 20 L 30 40 L 10 40 Z"
-        );
-        assert!(arrow_path((10, 10), (30, 20)).starts_with("M 10 10 L 30 20"));
-        let _ = AnnotationCommand::Pen {
-            points: vec![(1, 1), (2, 2)],
-            style: DrawStyle {
-                rgba: [0, 0, 0, 255],
-                radius: 1,
-            },
-        };
-    }
+    use super::normalized_selection;
 
     #[test]
     fn selection_coordinates_support_reverse_drag_and_clamping() {

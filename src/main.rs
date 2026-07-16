@@ -4,7 +4,9 @@ mod app;
 mod capture;
 mod config;
 mod hotkey;
-mod pin;
+mod logging;
+mod output;
+mod platform;
 
 fn main() -> Result<(), slint::PlatformError> {
     app::run()

@@ -2,11 +2,14 @@
 name = "gridstart"
 version = "0.1.0"
 edition = "2024"
+description = "A lightweight Windows screenshot and pinning utility built with Rust and Slint"
 
 [dependencies]
 anyhow = "1.0"
 global-hotkey = "0.8"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
 raw-window-handle = "0.6"
+rfd = { version = "0.15.4", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 slint = { version = "=1.17.0", default-features = false, features = [
@@ -18,11 +21,23 @@ slint = { version = "=1.17.0", default-features = false, features = [
     "system-tray"
 ] }
 windows = { version = "0.62", features = [
+    "Foundation",
+    "Globalization",
+    "Graphics_Imaging",
+    "Media_Ocr",
+    "Storage_Streams",
     "Win32_Foundation",
+    "Win32_Graphics_Dwm",
     "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
     "Win32_System_DataExchange",
     "Win32_System_Memory",
+    "Win32_System_Registry",
+    "Win32_System_SystemInformation",
+    "Win32_System_WinRT",
     "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging"
 ] }
 

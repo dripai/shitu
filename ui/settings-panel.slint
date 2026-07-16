@@ -1,0 +1,358 @@
+import {
+    Button, CheckBox, ComboBox, LineEdit, Palette, SpinBox
+} from "std-widgets.slint";
+
+component TabButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> selected;
+    callback activated();
+
+    height: 27px;
+    border-width: 1px;
+    border-color: root.selected ? Palette.border : transparent;
+    background: root.selected ? Palette.background : Palette.alternate-background;
+
+    Text {
+        text: root.text;
+        color: Palette.foreground;
+        font-size: 12px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.activated(); }
+    }
+}
+
+component FieldLabel inherits Text {
+    width: 92px;
+    color: Palette.foreground;
+    font-size: 12px;
+    vertical-alignment: center;
+}
+
+component SectionTitle inherits Text {
+    height: 24px;
+    color: Palette.foreground;
+    font-size: 12px;
+    font-weight: 700;
+    vertical-alignment: center;
+}
+
+export component SettingsPanel inherits Rectangle {
+    background: Palette.background;
+
+    in-out property <int> current-tab: 0;
+    in-out property <int> theme-mode: 0;
+    in-out property <bool> launch-at-startup: false;
+    in-out property <int> completion-action: 0;
+    in-out property <int> image-format: 0;
+    in-out property <int> jpeg-quality: 90;
+    in-out property <string> save-directory;
+    in-out property <string> filename-template;
+    in-out property <bool> auto-save: false;
+    in-out property <bool> save-notification: true;
+    in-out property <int> pin-opacity: 100;
+    in-out property <bool> pin-shadow: true;
+    in-out property <bool> pin-always-on-top: true;
+    in-out property <bool> pin-wheel-zoom: true;
+    in-out property <int> pin-zoom-step: 15;
+    in-out property <bool> pin-double-click-close: true;
+    in-out property <string> hotkey-text;
+    in property <int> hotkey-status: 0;
+    in property <string> hotkey-status-tip;
+    in property <string> settings-status;
+    in property <string> version-text;
+    in property <string> build-text;
+    in property <string> config-path;
+
+    callback apply-settings();
+    callback cancel-settings();
+    callback restore-defaults(int);
+    callback choose-save-directory();
+    callback open-save-directory();
+    callback open-log-directory();
+    callback open-config-file();
+    callback open-licenses();
+    callback clear-hotkey();
+
+    VerticalLayout {
+        padding: 10px;
+        spacing: 8px;
+
+        HorizontalLayout {
+            height: 27px;
+            spacing: 0px;
+            TabButton { text: "常规"; selected: root.current-tab == 0; activated => { root.current-tab = 0; } }
+            TabButton { text: "截图"; selected: root.current-tab == 1; activated => { root.current-tab = 1; } }
+            TabButton { text: "钉住"; selected: root.current-tab == 2; activated => { root.current-tab = 2; } }
+            TabButton { text: "快捷键"; selected: root.current-tab == 3; activated => { root.current-tab = 3; } }
+            TabButton { text: "关于"; selected: root.current-tab == 4; activated => { root.current-tab = 4; } }
+        }
+
+        Rectangle {
+            border-width: 1px;
+            border-color: Palette.border;
+            background: Palette.background;
+
+            if root.current-tab == 0: VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                SectionTitle { text: "应用"; }
+                CheckBox {
+                    text: "开机启动";
+                    checked <=> root.launch-at-startup;
+                }
+                HorizontalLayout {
+                    height: 26px;
+                    FieldLabel { text: "外观模式"; }
+                    ComboBox {
+                        model: ["跟随系统", "浅色", "深色"];
+                        current-index <=> root.theme-mode;
+                    }
+                }
+                Rectangle { height: 1px; background: Palette.border; }
+                SectionTitle { text: "文件与诊断"; }
+                HorizontalLayout {
+                    Button { text: "打开日志文件夹"; clicked => { root.open-log-directory(); } }
+                    Button { text: "打开配置文件"; clicked => { root.open-config-file(); } }
+                    Rectangle { }
+                }
+                Text {
+                    text: "手动修改配置文件后需要重启应用。";
+                    color: Palette.alternate-foreground;
+                    font-size: 11px;
+                }
+                Text {
+                    text: root.config-path;
+                    color: Palette.alternate-foreground;
+                    font-size: 10px;
+                    overflow: elide;
+                }
+                Rectangle { }
+            }
+
+            if root.current-tab == 1: VerticalLayout {
+                padding: 12px;
+                spacing: 7px;
+                VerticalLayout {
+                    spacing: 7px;
+                    SectionTitle { text: "输出"; }
+                    HorizontalLayout {
+                        height: 26px;
+                        FieldLabel { text: "截图完成后"; }
+                        ComboBox {
+                            width: 240px;
+                            model: ["复制到剪贴板", "保存到文件", "复制并保存"];
+                            current-index <=> root.completion-action;
+                        }
+                        Rectangle { }
+                    }
+                    HorizontalLayout {
+                        height: 26px;
+                        FieldLabel { text: "图像格式"; }
+                        ComboBox {
+                            width: 112px;
+                            model: ["PNG", "JPEG"];
+                            current-index <=> root.image-format;
+                        }
+                        Text {
+                            width: 68px;
+                            text: "JPEG 质量";
+                            color: Palette.foreground;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                        }
+                        SpinBox {
+                            width: 72px;
+                            enabled: root.image-format == 1;
+                            value <=> root.jpeg-quality;
+                            minimum: 1;
+                            maximum: 100;
+                        }
+                    }
+                    HorizontalLayout {
+                        height: 26px;
+                        FieldLabel { text: "保存目录"; }
+                        LineEdit {
+                            text <=> root.save-directory;
+                        }
+                        Button {
+                            width: 58px;
+                            text: "选择...";
+                            clicked => { root.choose-save-directory(); }
+                        }
+                    }
+                    HorizontalLayout {
+                        height: 26px;
+                        Rectangle { width: 92px; }
+                        Button { text: "打开目录"; clicked => { root.open-save-directory(); } }
+                        Rectangle { }
+                    }
+                    HorizontalLayout {
+                        height: 26px;
+                        FieldLabel { text: "文件名模板"; }
+                        LineEdit {
+                            text <=> root.filename-template;
+                        }
+                    }
+                    CheckBox {
+                        text: "自动保存（执行复制或钉住时同时保存）";
+                        checked <=> root.auto-save;
+                    }
+                    CheckBox {
+                        text: "显示保存结果";
+                        checked <=> root.save-notification;
+                    }
+                    Rectangle { }
+                }
+            }
+
+            if root.current-tab == 2: VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                SectionTitle { text: "新建钉住窗口"; }
+                HorizontalLayout {
+                    height: 26px;
+                    FieldLabel { text: "默认不透明度"; }
+                    SpinBox {
+                        value <=> root.pin-opacity;
+                        minimum: 25;
+                        maximum: 100;
+                    }
+                    Text { text: "%"; color: Palette.foreground; vertical-alignment: center; }
+                }
+                CheckBox { text: "窗口阴影"; checked <=> root.pin-shadow; }
+                CheckBox { text: "始终置顶"; checked <=> root.pin-always-on-top; }
+                CheckBox { text: "启用滚轮缩放"; checked <=> root.pin-wheel-zoom; }
+                HorizontalLayout {
+                    height: 26px;
+                    FieldLabel { text: "缩放步长"; }
+                    SpinBox {
+                        enabled: root.pin-wheel-zoom;
+                        value <=> root.pin-zoom-step;
+                        minimum: 5;
+                        maximum: 100;
+                    }
+                    Text { text: "%"; color: Palette.foreground; vertical-alignment: center; }
+                }
+                CheckBox { text: "双击关闭"; checked <=> root.pin-double-click-close; }
+                Rectangle { }
+            }
+
+            if root.current-tab == 3: VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                SectionTitle { text: "全局快捷键"; }
+                HorizontalLayout {
+                    height: 28px;
+                    FieldLabel { text: "区域截图"; }
+                    LineEdit {
+                        text <=> root.hotkey-text;
+                        placeholder-text: "例如 Ctrl+Alt+A；留空则关闭";
+                    }
+                    Button {
+                        text: "清除";
+                        clicked => { root.clear-hotkey(); }
+                    }
+                    if root.hotkey-status > 0: Rectangle {
+                        width: 22px;
+                        height: 22px;
+                        border-radius: 11px;
+                        background: root.hotkey-status == 1 ? #238636 : #cf222e;
+                        Text {
+                            text: root.hotkey-status == 1 ? "✓" : "!";
+                            color: #ffffff;
+                            font-size: 12px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        Tooltip { text: @markdown("\{root.hotkey-status-tip}"); }
+                    }
+                }
+                Text {
+                    text: root.hotkey-status == 0
+                        ? "未设置时不会注册任何全局快捷键。"
+                        : root.hotkey-status-tip;
+                    color: Palette.alternate-foreground;
+                    font-size: 11px;
+                }
+                Rectangle { }
+            }
+
+            if root.current-tab == 4: VerticalLayout {
+                padding: 12px;
+                spacing: 7px;
+                HorizontalLayout {
+                    height: 48px;
+                    Image {
+                        width: 36px;
+                        height: 36px;
+                        source: @image-url("icons/tray.svg");
+                        image-fit: contain;
+                    }
+                    VerticalLayout {
+                        spacing: 2px;
+                        Text {
+                            text: "截图工具";
+                            color: Palette.foreground;
+                            font-size: 18px;
+                            font-weight: 700;
+                        }
+                        Text {
+                            text: root.version-text;
+                            color: Palette.alternate-foreground;
+                            font-size: 11px;
+                        }
+                    }
+                    Rectangle { }
+                }
+                Text {
+                    text: root.build-text;
+                    color: Palette.foreground;
+                    font-size: 11px;
+                    wrap: word-wrap;
+                }
+                Rectangle { height: 1px; background: Palette.border; }
+                Text { text: "官网：尚未配置"; color: Palette.alternate-foreground; font-size: 11px; }
+                Text { text: "Git 项目：本地仓库（尚未配置远程）"; color: Palette.alternate-foreground; font-size: 11px; }
+                Text { text: "问题反馈：尚未配置"; color: Palette.alternate-foreground; font-size: 11px; }
+                HorizontalLayout {
+                    Button { text: "查看第三方许可"; clicked => { root.open-licenses(); } }
+                    Rectangle { }
+                }
+                Text {
+                    text: "使用 Rust 与 Slint 构建 · © 2026";
+                    color: Palette.alternate-foreground;
+                    font-size: 10px;
+                }
+                Rectangle { }
+            }
+        }
+
+        HorizontalLayout {
+            height: 28px;
+            Text {
+                text: root.settings-status;
+                color: Palette.alternate-foreground;
+                font-size: 10px;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+            Rectangle { }
+            Button {
+                text: "恢复默认";
+                clicked => { root.restore-defaults(root.current-tab); }
+            }
+            Button {
+                text: "撤销更改";
+                clicked => { root.cancel-settings(); }
+            }
+            Button {
+                text: "保存";
+                clicked => { root.apply-settings(); }
+            }
+        }
+    }
+}

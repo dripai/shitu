@@ -111,6 +111,8 @@ export component OverlayWindow inherits Window {
     in property <image> selected-image;
     in property <[AnnotationView]> annotations;
     in property <string> selection-info;
+    in property <int> output-mode: 0;
+    in property <bool> ocr-available: false;
 
     in-out property <float> start-x: 0;
     in-out property <float> start-y: 0;
@@ -150,8 +152,9 @@ export component OverlayWindow inherits Window {
     );
     property <length> toolbar-x: Math.max(
         8px,
-        Math.min(root.width - 464px, root.selection-left)
+        Math.min(root.width - root.toolbar-width - 8px, root.selection-left)
     );
+    property <length> toolbar-width: root.ocr-available ? 488px : 458px;
     property <length> toolbar-y: root.selection-top + root.selection-height + 52px <= root.height
         ? root.selection-top + root.selection-height + 12px
         : Math.max(8px, root.selection-top - 50px);
@@ -164,7 +167,9 @@ export component OverlayWindow inherits Window {
     callback select-width(int);
     callback undo();
     callback redo();
-    callback copy-selection();
+    callback complete-output();
+    callback recognize-text();
+    callback ocr-result(int, string);
     callback pin-selection();
     callback cancel-selection();
 
@@ -470,7 +475,7 @@ export component OverlayWindow inherits Window {
     if root.completed: Rectangle {
         x: root.toolbar-x;
         y: root.toolbar-y;
-        width: 456px;
+        width: root.toolbar-width;
         height: 38px;
         border-radius: 4px;
         border-width: 1px;
@@ -515,13 +520,22 @@ export component OverlayWindow inherits Window {
             Rectangle { width: 1px; height: 20px; background: #c7cdd5; }
 
             ToolCell {
-                icon: @image-url("../src/icons/copy.svg");
-                tip: "复制截图到剪贴板";
-                activated => { root.copy-selection(); }
+                icon: root.output-mode == 0
+                    ? @image-url("../src/icons/copy.svg")
+                    : @image-url("../src/icons/save.svg");
+                tip: root.output-mode == 0
+                    ? "复制截图到剪贴板"
+                    : root.output-mode == 1 ? "保存截图到文件" : "复制截图并保存";
+                activated => { root.complete-output(); }
+            }
+            if root.ocr-available: ToolCell {
+                icon: @image-url("../src/icons/scan-text.svg");
+                tip: "识别选区文字";
+                activated => { root.recognize-text(); }
             }
             ToolCell {
                 icon: @image-url("../src/icons/pin.svg");
-                tip: "将截图贴到屏幕上";
+                tip: "将截图钉在屏幕上";
                 activated => { root.pin-selection(); }
             }
             ToolCell {
