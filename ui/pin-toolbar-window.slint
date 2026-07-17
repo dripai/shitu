@@ -3,9 +3,11 @@ import { CaptureToolbar } from "capture-toolbar.slint";
 // PopupWindow shares the context menu's popup stack and is dismissed with that menu.
 // A top-level Slint window keeps the pinned-image toolbar independent and interactive.
 export component PinToolbarWindow inherits Window {
-    title: "钉住工具栏";
-    width: root.ocr-available ? 252px : 222px;
-    height: root.active-tool > 0 ? 68px : 38px;
+    title: @tr("钉住工具栏");
+    width: root.ocr-available ? 342px : 312px;
+    // Slint 1.17 Tooltip has no public placement property and is clipped by a
+    // top-level window's bounds. Reserve transparent space below this toolbar.
+    height: (root.active-tool > 0 && root.active-tool < 5 ? 68px : 38px) + 34px;
     background: transparent;
     no-frame: true;
 
@@ -16,6 +18,7 @@ export component PinToolbarWindow inherits Window {
 
     callback close-pin();
     callback copy-image();
+    callback save-image();
     callback recognize-text();
     callback undo();
     callback redo();
@@ -24,19 +27,22 @@ export component PinToolbarWindow inherits Window {
     callback select-width(int);
 
     CaptureToolbar {
+        x: 0px;
+        y: 0px;
         annotation-tools-visible: true;
         ocr-available: root.ocr-available;
         pin-action-visible: false;
-        output-mode: 0;
-        output-tip-override: "复制图像";
-        ocr-tip-override: "识别图像文字";
-        cancel-tip: "关闭钉住";
+        save-tip-override: @tr("图像另存为...");
+        copy-tip-override: @tr("复制图像");
+        ocr-tip-override: @tr("识别图像文字");
+        cancel-tip: @tr("关闭钉住");
         active-tool <=> root.active-tool;
         color-index <=> root.color-index;
         stroke-radius <=> root.stroke-radius;
         undo => { root.undo(); }
         redo => { root.redo(); }
-        complete-output => { root.copy-image(); }
+        save-output => { root.save-image(); }
+        copy-output => { root.copy-image(); }
         recognize-text => { root.recognize-text(); }
         cancel-action => { root.close-pin(); }
         select-tool(tool) => { root.set-tool(tool); }

@@ -9,11 +9,11 @@ use super::{
 };
 use crate::{
     config::{
-        AppearanceMode, CaptureConfig, CompletionAction, Config, ImageFormat, OcrConfig,
-        OcrEngineKind, PinConfig,
+        AppearanceMode, CaptureConfig, Config, ImageFormat, LanguageMode, OcrConfig, OcrEngineKind,
+        PinConfig,
     },
     hotkey::{HotkeyState, validate_binding},
-    logging,
+    i18n, logging,
     platform::{
         ocr::{AiOcrState, OcrFailure, prepare_ai},
         windows::{shell, startup},
@@ -25,6 +25,42 @@ pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
     {
         let main = main.clone();
         let state = Rc::clone(&state);
+        settings.on_preview_language(move |index| {
+            let mode = language_from_index(index);
+            match i18n::apply(mode) {
+                Ok(()) => {
+                    let mut state = state.borrow_mut();
+                    state.refresh_selected_ocr();
+                    set_status_level(
+                        &main,
+                        &mut state,
+                        i18n::text(
+                            "界面语言已预览，点击保存后生效",
+                            "Language preview applied; click Save to keep it",
+                        )
+                        .to_owned(),
+                        StatusLevel::Info,
+                    );
+                    refresh_main_if_available(&main, &state);
+                }
+                Err(error) => {
+                    logging::error(format!("language selection failed: {error}"));
+                    set_status_level(
+                        &main,
+                        &mut state.borrow_mut(),
+                        format!(
+                            "{}: {error}",
+                            i18n::text("语言切换失败", "Language switch failed")
+                        ),
+                        StatusLevel::Error,
+                    );
+                }
+            }
+        });
+    }
+    {
+        let main = main.clone();
+        let state = Rc::clone(&state);
         settings.on_prepare_ai_ocr(move || {
             {
                 let mut state = state.borrow_mut();
@@ -33,7 +69,11 @@ pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
                 set_status_level(
                     &main,
                     &mut state,
-                    "正在准备 Windows AI OCR 模型...".to_owned(),
+                    i18n::text(
+                        "正在准备 Windows AI OCR 模型...",
+                        "Preparing the Windows AI OCR model...",
+                    )
+                    .to_owned(),
                     StatusLevel::Info,
                 );
                 refresh_main_if_available(&main, &state);
@@ -111,7 +151,11 @@ pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
                 set_status_level(
                     &main,
                     &mut state.borrow_mut(),
-                    "已恢复当前页默认值，点击保存后生效".to_owned(),
+                    i18n::text(
+                        "已恢复当前页默认值，点击保存后生效",
+                        "Defaults restored for this page; click Save to apply",
+                    )
+                    .to_owned(),
                     StatusLevel::Info,
                 );
             }
@@ -141,7 +185,12 @@ pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
             let result = std::fs::create_dir_all(&path)
                 .map_err(anyhow::Error::from)
                 .and_then(|_| shell::open_path(&path));
-            report_result(&main, &state, result, "已打开保存目录");
+            report_result(
+                &main,
+                &state,
+                result,
+                i18n::text("已打开保存目录", "Opened the save folder"),
+            );
         });
     }
     {
@@ -153,7 +202,12 @@ pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
             let result = std::fs::create_dir_all(&path)
                 .map_err(anyhow::Error::from)
                 .and_then(|_| shell::open_path(&path));
-            report_result(&main, &state, result, "已打开日志文件夹");
+            report_result(
+                &main,
+                &state,
+                result,
+                i18n::text("已打开日志文件夹", "Opened the log folder"),
+            );
         });
     }
     {
@@ -169,7 +223,12 @@ pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
                 state.borrow().config.save()
             }
             .and_then(|_| shell::open_path(&directory));
-            report_result(&main, &state, result, "已打开配置文件夹");
+            report_result(
+                &main,
+                &state,
+                result,
+                i18n::text("已打开配置文件夹", "Opened the settings folder"),
+            );
         });
     }
     {
@@ -180,7 +239,13 @@ pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
                 return;
             };
             if visible {
-                main.set_status_text("手动修改配置后需要重启应用。".into());
+                main.set_status_text(
+                    i18n::text(
+                        "手动修改配置后需要重启应用。",
+                        "Restart the application after editing the settings file manually.",
+                    )
+                    .into(),
+                );
                 main.set_status_level(StatusLevel::Info as i32);
             } else {
                 let state = state.borrow();
@@ -205,14 +270,22 @@ pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
                     set_status_level(
                         &main,
                         &mut state,
-                        "快捷键已注销，点击保存后永久生效".to_owned(),
+                        i18n::text(
+                            "快捷键已注销，点击保存后永久生效",
+                            "Hotkey unregistered; click Save to make it permanent",
+                        )
+                        .to_owned(),
                         StatusLevel::Info,
                     );
                 }
                 Err(error) => set_status_level(
                     &main,
                     &mut state,
-                    format!("快捷键注销失败：{}", error.message()),
+                    format!(
+                        "{}: {}",
+                        i18n::text("快捷键注销失败", "Failed to unregister hotkey"),
+                        error.message()
+                    ),
                     StatusLevel::Error,
                 ),
             }
@@ -222,10 +295,8 @@ pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
 
 pub(super) fn populate(settings: &MainWindow, state: &AppController) {
     settings.set_theme_mode(appearance_index(state.config.appearance));
+    settings.set_language_mode(language_index(state.config.language));
     settings.set_launch_at_startup(state.config.launch_at_startup);
-    settings.set_completion_action(completion_action_index(
-        state.config.capture.completion_action,
-    ));
     settings.set_image_format(image_format_index(state.config.capture.format));
     settings.set_jpeg_quality(state.config.capture.jpeg_quality as i32);
     settings.set_save_directory(
@@ -250,7 +321,7 @@ pub(super) fn populate(settings: &MainWindow, state: &AppController) {
     settings.set_pin_double_click_close(state.config.pin.double_click_close);
     settings.set_hotkey_text(state.config.hotkey.clone().unwrap_or_default().into());
     set_hotkey_indicator(settings, state);
-    settings.set_version_text(format!("版本 v{}", env!("CARGO_PKG_VERSION")).into());
+    settings.set_version_text(format!("v{}", env!("CARGO_PKG_VERSION")).into());
     settings.set_build_text(build_information().into());
     settings.set_log_path(
         Config::log_directory()
@@ -274,7 +345,7 @@ fn apply_settings(
         set_status_level(
             main,
             &mut state.borrow_mut(),
-            format!("设置无效：{error}"),
+            format!("{}: {error}", i18n::text("设置无效", "Invalid settings")),
             StatusLevel::Error,
         );
         return;
@@ -287,7 +358,11 @@ fn apply_settings(
         set_status_level(
             main,
             &mut state.borrow_mut(),
-            format!("快捷键无效：{}", error.message()),
+            format!(
+                "{}: {}",
+                i18n::text("快捷键无效", "Invalid hotkey"),
+                error.message()
+            ),
             StatusLevel::Error,
         );
         return;
@@ -299,6 +374,7 @@ fn apply_settings(
         apply_transaction(&old, &candidate, &mut state.hotkey)
     };
     if let Err(error) = result {
+        let _ = i18n::apply(old.language);
         set_status_level(
             main,
             &mut state.borrow_mut(),
@@ -311,12 +387,15 @@ fn apply_settings(
 
     {
         let mut state = state.borrow_mut();
+        if let Err(error) = i18n::apply(candidate.language) {
+            logging::error(format!("language selection failed after save: {error}"));
+        }
         state.config = candidate;
         state.refresh_selected_ocr();
         set_status_level(
             main,
             &mut state,
-            "设置已保存".to_owned(),
+            i18n::text("设置已保存", "Settings saved").to_owned(),
             StatusLevel::Success,
         );
         refresh_main_if_available(main, &state);
@@ -326,27 +405,53 @@ fn apply_settings(
 }
 
 fn apply_transaction(old: &Config, candidate: &Config, hotkey: &mut HotkeyState) -> Result<()> {
-    startup::set_enabled(candidate.launch_at_startup)
-        .map_err(|error| anyhow!("开机启动设置失败：{error}"))?;
+    startup::set_enabled(candidate.launch_at_startup).map_err(|error| {
+        anyhow!(
+            "{}: {error}",
+            i18n::text("开机启动设置失败", "Failed to update launch-at-startup")
+        )
+    })?;
 
     if let Err(error) = hotkey.set_binding(candidate.hotkey.as_deref()) {
         let rollback = startup::set_enabled(old.launch_at_startup).err();
         return Err(with_rollback(
-            format!("快捷键设置失败：{}", error.message()),
-            rollback.map(|error| format!("恢复开机启动失败：{error}")),
+            format!(
+                "{}: {}",
+                i18n::text("快捷键设置失败", "Failed to update hotkey"),
+                error.message()
+            ),
+            rollback.map(|error| {
+                format!(
+                    "{}: {error}",
+                    i18n::text("恢复开机启动失败", "Failed to restore launch-at-startup")
+                )
+            }),
         ));
     }
 
     if let Err(error) = candidate.save() {
         let mut rollback_errors = Vec::new();
         if let Err(error) = startup::set_enabled(old.launch_at_startup) {
-            rollback_errors.push(format!("恢复开机启动失败：{error}"));
+            rollback_errors.push(format!(
+                "{}: {error}",
+                i18n::text("恢复开机启动失败", "Failed to restore launch-at-startup")
+            ));
         }
         if let Err(error) = hotkey.set_binding(old.hotkey.as_deref()) {
-            rollback_errors.push(format!("恢复快捷键失败：{}", error.message()));
+            rollback_errors.push(format!(
+                "{}: {}",
+                i18n::text("恢复快捷键失败", "Failed to restore hotkey"),
+                error.message()
+            ));
         }
         let rollback = (!rollback_errors.is_empty()).then(|| rollback_errors.join("；"));
-        return Err(with_rollback(format!("配置保存失败：{error}"), rollback));
+        return Err(with_rollback(
+            format!(
+                "{}: {error}",
+                i18n::text("配置保存失败", "Failed to save settings")
+            ),
+            rollback,
+        ));
     }
 
     Ok(())
@@ -354,7 +459,10 @@ fn apply_transaction(old: &Config, candidate: &Config, hotkey: &mut HotkeyState)
 
 fn with_rollback(message: String, rollback: Option<String>) -> anyhow::Error {
     match rollback {
-        Some(rollback) => anyhow!("{message}；回滚失败：{rollback}"),
+        Some(rollback) => anyhow!(
+            "{message}{}{rollback}",
+            i18n::text("；回滚失败：", "; rollback failed: ")
+        ),
         None => anyhow!(message),
     }
 }
@@ -368,20 +476,20 @@ fn set_hotkey_indicator(settings: &MainWindow, state: &AppController) {
         settings.set_hotkey_status_tip(error.message().into());
     } else {
         settings.set_hotkey_status(1);
-        settings.set_hotkey_status_tip("有效".into());
+        settings.set_hotkey_status_tip(i18n::text("有效", "Valid").into());
     }
 }
 
 fn config_from_settings(settings: &MainWindow) -> Config {
     Config {
         appearance: appearance_from_index(settings.get_theme_mode()),
+        language: language_from_index(settings.get_language_mode()),
         launch_at_startup: settings.get_launch_at_startup(),
         hotkey: {
             let value = settings.get_hotkey_text().trim().to_owned();
             (!value.is_empty()).then_some(value)
         },
         capture: CaptureConfig {
-            completion_action: completion_action_from_index(settings.get_completion_action()),
             format: image_format_from_index(settings.get_image_format()),
             jpeg_quality: settings.get_jpeg_quality().clamp(1, 100) as u8,
             save_directory: PathBuf::from(settings.get_save_directory().as_str()),
@@ -409,11 +517,10 @@ fn restore_settings_page(settings: &MainWindow, tab: i32) {
     match tab {
         0 => {
             settings.set_theme_mode(appearance_index(defaults.appearance));
+            settings.set_language_mode(language_index(defaults.language));
             settings.set_launch_at_startup(defaults.launch_at_startup);
         }
         1 => {
-            settings
-                .set_completion_action(completion_action_index(defaults.capture.completion_action));
             settings.set_image_format(image_format_index(defaults.capture.format));
             settings.set_jpeg_quality(defaults.capture.jpeg_quality as i32);
             settings.set_save_directory(
@@ -482,7 +589,7 @@ fn report_result(
             set_status_level(
                 main,
                 &mut state.borrow_mut(),
-                format!("操作失败：{error}"),
+                format!("{}: {error}", i18n::text("操作失败", "Operation failed")),
                 StatusLevel::Error,
             );
         }
@@ -510,19 +617,19 @@ fn appearance_from_index(index: i32) -> AppearanceMode {
     }
 }
 
-fn completion_action_index(action: CompletionAction) -> i32 {
-    match action {
-        CompletionAction::Copy => 0,
-        CompletionAction::Save => 1,
-        CompletionAction::CopyAndSave => 2,
+fn language_index(mode: LanguageMode) -> i32 {
+    match mode {
+        LanguageMode::System => 0,
+        LanguageMode::Chinese => 1,
+        LanguageMode::English => 2,
     }
 }
 
-fn completion_action_from_index(index: i32) -> CompletionAction {
+fn language_from_index(index: i32) -> LanguageMode {
     match index {
-        1 => CompletionAction::Save,
-        2 => CompletionAction::CopyAndSave,
-        _ => CompletionAction::Copy,
+        1 => LanguageMode::Chinese,
+        2 => LanguageMode::English,
+        _ => LanguageMode::System,
     }
 }
 

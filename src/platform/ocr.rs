@@ -10,6 +10,7 @@ use std::{
 
 use crate::{
     config::{OcrConfig, OcrEngineKind},
+    i18n,
     image::CapturedImage,
 };
 use serde::{Deserialize, Serialize};
@@ -310,10 +311,20 @@ impl Drop for OcrJob {
 impl OcrFailure {
     pub fn message(&self) -> String {
         match self {
-            Self::MissingLanguagePack => "缺少可用的 Windows OCR 语言包".to_owned(),
-            Self::Unsupported => "当前系统或程序安装方式不支持 Windows 系统 OCR".to_owned(),
+            Self::MissingLanguagePack => i18n::text(
+                "缺少可用的 Windows OCR 语言包",
+                "No compatible Windows OCR language pack is installed",
+            )
+            .to_owned(),
+            Self::Unsupported => i18n::text(
+                "当前系统或程序安装方式不支持 Windows 系统 OCR",
+                "Windows system OCR is not supported by this system or installation",
+            )
+            .to_owned(),
             Self::AiUnavailable(state) => state.message(),
-            Self::Failed(message) if message.trim().is_empty() => "OCR 识别失败".to_owned(),
+            Self::Failed(message) if message.trim().is_empty() => {
+                i18n::text("OCR 识别失败", "OCR failed").to_owned()
+            }
             Self::Failed(message) => message.clone(),
         }
     }
@@ -330,13 +341,40 @@ impl AiOcrState {
 
     pub fn message(&self) -> String {
         match self {
-            Self::Ready => "可用（Windows AI OCR）".to_owned(),
-            Self::Preparing => "正在下载并准备识别模型...".to_owned(),
-            Self::ModelNotInstalled => "支持，但识别模型尚未安装".to_owned(),
-            Self::Unsupported => "当前系统、硬件、驱动或策略不支持 Windows AI OCR".to_owned(),
-            Self::DisabledByUser => "Windows AI 功能已被用户禁用".to_owned(),
-            Self::ComponentMissing => "Windows AI OCR 组件或包身份不可用".to_owned(),
-            Self::Failed(message) => format!("Windows AI OCR 检测失败：{message}"),
+            Self::Ready => i18n::text(
+                "可用（Windows AI OCR）",
+                "Available (Windows AI OCR)",
+            )
+            .to_owned(),
+            Self::Preparing => i18n::text(
+                "正在下载并准备识别模型...",
+                "Downloading and preparing the recognition model...",
+            )
+            .to_owned(),
+            Self::ModelNotInstalled => i18n::text(
+                "支持，但识别模型尚未安装",
+                "Supported, but the recognition model is not installed",
+            )
+            .to_owned(),
+            Self::Unsupported => i18n::text(
+                "当前系统、硬件、驱动或策略不支持 Windows AI OCR",
+                "Windows AI OCR is not supported by the current system, hardware, driver, or policy",
+            )
+            .to_owned(),
+            Self::DisabledByUser => i18n::text(
+                "Windows AI 功能已被用户禁用",
+                "Windows AI features were disabled by the user",
+            )
+            .to_owned(),
+            Self::ComponentMissing => i18n::text(
+                "Windows AI OCR 组件或包身份不可用",
+                "The Windows AI OCR component or package identity is unavailable",
+            )
+            .to_owned(),
+            Self::Failed(message) => format!(
+                "{}: {message}",
+                i18n::text("Windows AI OCR 检测失败", "Windows AI OCR check failed")
+            ),
         }
     }
 }

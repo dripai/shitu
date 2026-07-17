@@ -65,6 +65,7 @@ component StrokeCell inherits Rectangle {
     in property <int> stroke-size;
     in property <string> tip;
     in property <bool> selected: false;
+    in property <bool> text-mode: false;
     callback activated();
 
     width: 28px;
@@ -76,13 +77,21 @@ component StrokeCell inherits Rectangle {
     accessible-role: button;
     accessible-label: root.tip;
 
-    Rectangle {
+    if !root.text-mode: Rectangle {
         x: 6px;
         y: (parent.height - self.height) / 2;
         width: 16px;
         height: root.stroke-size * 1px;
         border-radius: self.height / 2;
         background: #343a43;
+    }
+    if root.text-mode: Text {
+        text: "A";
+        color: #343a43;
+        font-size: (10 + root.stroke-size * 2) * 1px;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
     }
 
     touch := TouchArea {
@@ -97,22 +106,24 @@ export component CaptureToolbar inherits Rectangle {
     in property <bool> annotation-tools-visible: true;
     in property <bool> ocr-available: false;
     in property <bool> pin-action-visible: true;
-    in property <int> output-mode: 0;
-    in property <string> output-tip-override;
+    in property <string> save-tip-override;
+    in property <string> copy-tip-override;
     in property <string> ocr-tip-override;
-    in property <string> cancel-tip: "取消截图";
+    in property <string> cancel-tip: @tr("取消截图");
     in-out property <int> active-tool: 0;
     in-out property <int> color-index: 0;
     in-out property <int> stroke-radius: 2;
-    property <bool> tool-properties-visible: root.annotation-tools-visible && root.active-tool > 0;
+    property <bool> tool-properties-visible: root.annotation-tools-visible
+        && root.active-tool > 0 && root.active-tool < 5;
     property <length> calculated-width: root.annotation-tools-visible
-        ? 222px + (root.ocr-available ? 30px : 0px) + (root.pin-action-visible ? 30px : 0px)
-        : 66px + (root.ocr-available ? 30px : 0px) + (root.pin-action-visible ? 30px : 0px);
+        ? 312px + (root.ocr-available ? 30px : 0px) + (root.pin-action-visible ? 30px : 0px)
+        : 96px + (root.ocr-available ? 30px : 0px) + (root.pin-action-visible ? 30px : 0px);
     property <length> calculated-height: root.tool-properties-visible ? 68px : 38px;
 
     callback undo();
     callback redo();
-    callback complete-output();
+    callback save-output();
+    callback copy-output();
     callback recognize-text();
     callback pin-action();
     callback cancel-action();
@@ -139,12 +150,12 @@ export component CaptureToolbar inherits Rectangle {
 
             if root.annotation-tools-visible: ToolCell {
                 icon: @image-url("../src/icons/undo-2.svg");
-                tip: "撤销上一步操作";
+                tip: @tr("撤销上一步操作");
                 activated => { root.undo(); }
             }
             if root.annotation-tools-visible: ToolCell {
                 icon: @image-url("../src/icons/redo-2.svg");
-                tip: "重做上一步操作";
+                tip: @tr("重做上一步操作");
                 activated => { root.redo(); }
             }
             if root.annotation-tools-visible: Rectangle {
@@ -155,7 +166,7 @@ export component CaptureToolbar inherits Rectangle {
 
             if root.annotation-tools-visible: ToolCell {
                 icon: @image-url("../src/icons/pencil.svg");
-                tip: "画笔标注";
+                tip: @tr("画笔标注");
                 selected: root.active-tool == 1;
                 activated => {
                     root.active-tool = root.active-tool == 1 ? 0 : 1;
@@ -164,7 +175,7 @@ export component CaptureToolbar inherits Rectangle {
             }
             if root.annotation-tools-visible: ToolCell {
                 icon: @image-url("../src/icons/square.svg");
-                tip: "绘制矩形";
+                tip: @tr("绘制矩形");
                 selected: root.active-tool == 2;
                 activated => {
                     root.active-tool = root.active-tool == 2 ? 0 : 2;
@@ -173,10 +184,28 @@ export component CaptureToolbar inherits Rectangle {
             }
             if root.annotation-tools-visible: ToolCell {
                 icon: @image-url("../src/icons/arrow-up-right.svg");
-                tip: "绘制箭头";
+                tip: @tr("绘制箭头");
                 selected: root.active-tool == 3;
                 activated => {
                     root.active-tool = root.active-tool == 3 ? 0 : 3;
+                    root.select-tool(root.active-tool);
+                }
+            }
+            if root.annotation-tools-visible: ToolCell {
+                icon: @image-url("../src/icons/letter-t.svg");
+                tip: @tr("添加文字");
+                selected: root.active-tool == 4;
+                activated => {
+                    root.active-tool = root.active-tool == 4 ? 0 : 4;
+                    root.select-tool(root.active-tool);
+                }
+            }
+            if root.annotation-tools-visible: ToolCell {
+                icon: @image-url("../src/icons/eraser.svg");
+                tip: @tr("擦除标注");
+                selected: root.active-tool == 5;
+                activated => {
+                    root.active-tool = root.active-tool == 5 ? 0 : 5;
                     root.select-tool(root.active-tool);
                 }
             }
@@ -186,33 +215,34 @@ export component CaptureToolbar inherits Rectangle {
                 background: #c7cdd5;
             }
 
-            ToolCell {
-                icon: root.output-mode == 0
-                    ? @image-url("../src/icons/copy.svg")
-                    : @image-url("../src/icons/save.svg");
-                tip: root.output-tip-override != ""
-                    ? root.output-tip-override
-                    : root.output-mode == 0
-                        ? "复制截图到剪贴板"
-                        : root.output-mode == 1 ? "保存截图到文件" : "复制截图并保存";
-                activated => { root.complete-output(); }
-            }
             if root.ocr-available: ToolCell {
                 icon: @image-url("../src/icons/scan-text.svg");
                 tip: root.ocr-tip-override != ""
                     ? root.ocr-tip-override
-                    : root.annotation-tools-visible ? "识别选区文字" : "识别图像文字";
+                    : root.annotation-tools-visible ? @tr("识别选区文字") : @tr("识别图像文字");
                 activated => { root.recognize-text(); }
             }
             if root.pin-action-visible: ToolCell {
                 icon: @image-url("../src/icons/pin.svg");
-                tip: "将截图钉在屏幕上";
+                tip: @tr("将截图钉在屏幕上");
                 activated => { root.pin-action(); }
             }
             ToolCell {
                 icon: @image-url("../src/icons/x.svg");
                 tip: root.cancel-tip;
                 activated => { root.cancel-action(); }
+            }
+            ToolCell {
+                icon: @image-url("../src/icons/save.svg");
+                tip: root.save-tip-override != ""
+                    ? root.save-tip-override : @tr("保存截图到文件");
+                activated => { root.save-output(); }
+            }
+            ToolCell {
+                icon: @image-url("../src/icons/copy.svg");
+                tip: root.copy-tip-override != ""
+                    ? root.copy-tip-override : @tr("复制截图到剪贴板");
+                activated => { root.copy-output(); }
             }
         }
 
@@ -223,25 +253,25 @@ export component CaptureToolbar inherits Rectangle {
 
             ColorCell {
                 swatch-color: #ec5c66;
-                tip: "红色";
+                tip: @tr("红色");
                 selected: root.color-index == 0;
                 activated => { root.color-index = 0; root.select-color(0); }
             }
             ColorCell {
                 swatch-color: #4a90e2;
-                tip: "蓝色";
+                tip: @tr("蓝色");
                 selected: root.color-index == 1;
                 activated => { root.color-index = 1; root.select-color(1); }
             }
             ColorCell {
                 swatch-color: #31a36b;
-                tip: "绿色";
+                tip: @tr("绿色");
                 selected: root.color-index == 2;
                 activated => { root.color-index = 2; root.select-color(2); }
             }
             ColorCell {
                 swatch-color: #f5c542;
-                tip: "黄色";
+                tip: @tr("黄色");
                 selected: root.color-index == 3;
                 activated => { root.color-index = 3; root.select-color(3); }
             }
@@ -252,19 +282,22 @@ export component CaptureToolbar inherits Rectangle {
             }
             StrokeCell {
                 stroke-size: 1;
-                tip: "细线";
+                text-mode: root.active-tool == 4;
+                tip: root.active-tool == 4 ? @tr("小号文字") : @tr("细线");
                 selected: root.stroke-radius == 1;
                 activated => { root.stroke-radius = 1; root.select-width(1); }
             }
             StrokeCell {
                 stroke-size: 2;
-                tip: "中等线宽";
+                text-mode: root.active-tool == 4;
+                tip: root.active-tool == 4 ? @tr("中号文字") : @tr("中等线宽");
                 selected: root.stroke-radius == 2;
                 activated => { root.stroke-radius = 2; root.select-width(2); }
             }
             StrokeCell {
                 stroke-size: 4;
-                tip: "粗线";
+                text-mode: root.active-tool == 4;
+                tip: root.active-tool == 4 ? @tr("大号文字") : @tr("粗线");
                 selected: root.stroke-radius == 4;
                 activated => { root.stroke-radius = 4; root.select-width(4); }
             }

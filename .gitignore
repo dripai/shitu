@@ -1,4 +1,5 @@
 /target/
+/release-assets/
 
 # Local runtime data
 *.log

@@ -18,5 +18,8 @@ fn main() {
             .map(|value| value.trim().to_owned())
             .unwrap_or_else(|| "Rust 版本未知".to_owned());
     println!("cargo:rustc-env=RUSTC_VERSION={rustc_version}");
-    slint_build::compile("ui/app.slint").expect("compile Slint UI");
+    let config = slint_build::CompilerConfiguration::new()
+        .with_bundled_translations("translations")
+        .with_default_translation_context(slint_build::DefaultTranslationContext::None);
+    slint_build::compile_with_config("ui/app.slint", config).expect("compile Slint UI");
 }

@@ -1,0 +1,337 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: gridstart\n"
+"Language: en\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "取消截图"
+msgstr "Cancel screenshot"
+
+msgid "撤销上一步操作"
+msgstr "Undo last action"
+
+msgid "重做上一步操作"
+msgstr "Redo last action"
+
+msgid "画笔标注"
+msgstr "Pen"
+
+msgid "绘制矩形"
+msgstr "Rectangle"
+
+msgid "绘制箭头"
+msgstr "Arrow"
+
+msgid "添加文字"
+msgstr "Text"
+
+msgid "擦除标注"
+msgstr "Eraser"
+
+msgid "识别选区文字"
+msgstr "Recognize selected text"
+
+msgid "识别图像文字"
+msgstr "Recognize image text"
+
+msgid "将截图钉在屏幕上"
+msgstr "Pin screenshot"
+
+msgid "保存截图到文件"
+msgstr "Save screenshot"
+
+msgid "复制截图到剪贴板"
+msgstr "Copy screenshot to clipboard"
+
+msgid "红色"
+msgstr "Red"
+
+msgid "蓝色"
+msgstr "Blue"
+
+msgid "绿色"
+msgstr "Green"
+
+msgid "黄色"
+msgstr "Yellow"
+
+msgid "小号文字"
+msgstr "Small text"
+
+msgid "细线"
+msgstr "Thin line"
+
+msgid "中号文字"
+msgstr "Medium text"
+
+msgid "中等线宽"
+msgstr "Medium line"
+
+msgid "大号文字"
+msgstr "Large text"
+
+msgid "粗线"
+msgstr "Thick line"
+
+msgid "拾图"
+msgstr "ShiTu"
+
+msgid "就绪"
+msgstr "Ready"
+
+msgid "OCR 识别结果"
+msgstr "OCR Results"
+
+msgid "可选择文字，或复制全部内容。"
+msgstr "Select text or copy all content."
+
+msgid "识别结果"
+msgstr "Result"
+
+msgid "复制全部"
+msgstr "Copy all"
+
+msgid "关闭"
+msgstr "Close"
+
+msgid "选择截图区域"
+msgstr "Select screenshot area"
+
+msgid "钉住工具栏"
+msgstr "Pinned image toolbar"
+
+msgid "图像另存为..."
+msgstr "Save image as..."
+
+msgid "复制图像"
+msgstr "Copy image"
+
+msgid "关闭钉住"
+msgstr "Close pinned image"
+
+msgid "钉住"
+msgstr "Pin"
+
+msgid "OCR 识别"
+msgstr "OCR"
+
+msgid "显示工具栏"
+msgstr "Show toolbar"
+
+msgid "窗口阴影"
+msgstr "Window shadow"
+
+msgid "始终置顶"
+msgstr "Always on top"
+
+msgid "不透明度"
+msgstr "Opacity"
+
+msgid "缩放（{}%）"
+msgstr "Zoom ({}%)"
+
+msgid "适合屏幕"
+msgstr "Fit to screen"
+
+msgid "恢复原始大小"
+msgstr "Original size"
+
+msgid "图像处理"
+msgstr "Image transforms"
+
+msgid "向左旋转 90°"
+msgstr "Rotate left 90 degrees"
+
+msgid "向右旋转 90°"
+msgstr "Rotate right 90 degrees"
+
+msgid "水平翻转"
+msgstr "Flip horizontally"
+
+msgid "垂直翻转"
+msgstr "Flip vertically"
+
+msgid "替换图像"
+msgstr "Replace image"
+
+msgid "从剪贴板"
+msgstr "From clipboard"
+
+msgid "从文件..."
+msgstr "From file..."
+
+msgid "在文件夹中显示"
+msgstr "Show in folder"
+
+msgid "原始尺寸：{}"
+msgstr "Original size: {}"
+
+msgid "应用"
+msgstr "Application"
+
+msgid "开机启动"
+msgstr "Launch at startup"
+
+msgid "外观模式"
+msgstr "Appearance"
+
+msgid "跟随系统"
+msgstr "Follow system"
+
+msgid "浅色"
+msgstr "Light"
+
+msgid "深色"
+msgstr "Dark"
+
+msgid "界面语言"
+msgstr "Language"
+
+msgid "简体中文"
+msgstr "Simplified Chinese"
+
+msgid "文件与诊断"
+msgstr "Files and diagnostics"
+
+msgid "打开日志"
+msgstr "Open logs"
+
+msgid "打开配置"
+msgstr "Open config"
+
+msgid "输出"
+msgstr "Output"
+
+msgid "图像格式"
+msgstr "Image format"
+
+msgid "JPEG 质量"
+msgstr "JPEG quality"
+
+msgid "保存目录"
+msgstr "Save folder"
+
+msgid "选择..."
+msgstr "Browse..."
+
+msgid "打开目录"
+msgstr "Open folder"
+
+msgid "文件名模板"
+msgstr "Filename template"
+
+msgid "自动保存（执行复制或钉住时同时保存）"
+msgstr "Auto-save when copying or pinning"
+
+msgid "显示保存结果"
+msgstr "Show save result"
+
+msgid "识别引擎"
+msgstr "Recognition engine"
+
+msgid "默认引擎"
+msgstr "Default engine"
+
+msgid "兼容系统 OCR"
+msgstr "System OCR (compatible)"
+
+msgid "Windows AI OCR（增强）"
+msgstr "Windows AI OCR (enhanced)"
+
+msgid "兼容 OCR"
+msgstr "System OCR"
+
+msgid "增强 OCR"
+msgstr "Enhanced OCR"
+
+msgid "安装模型"
+msgstr "Install model"
+
+msgid "增强 OCR 输出"
+msgstr "Enhanced OCR output"
+
+msgid "最低置信度"
+msgstr "Minimum confidence"
+
+msgid "仅过滤 Windows AI OCR 返回的低置信度词语。"
+msgstr "Only filters low-confidence words returned by Windows AI OCR."
+
+msgid "新建钉住窗口"
+msgstr "New pinned image"
+
+msgid "默认不透明度"
+msgstr "Default opacity"
+
+msgid "启用滚轮缩放"
+msgstr "Enable wheel zoom"
+
+msgid "缩放步长"
+msgstr "Zoom step"
+
+msgid "双击关闭"
+msgstr "Double-click to close"
+
+msgid "全局快捷键"
+msgstr "Global hotkey"
+
+msgid "区域截图"
+msgstr "Region screenshot"
+
+msgid "默认 Ctrl+Alt+C；留空则关闭"
+msgstr "Default: Ctrl+Alt+C; leave blank to disable"
+
+msgid "清除"
+msgstr "Clear"
+
+msgid "未设置时不会注册任何全局快捷键。"
+msgstr "No global hotkey is registered when left blank."
+
+msgid "构建信息"
+msgstr "Build information"
+
+msgid "Git 项目"
+msgstr "Git repository"
+
+msgid "问题反馈"
+msgstr "Report an issue"
+
+msgid "使用 Rust 与 Slint 构建 · © 2026"
+msgstr "Built with Rust and Slint - Copyright 2026"
+
+msgid "常规"
+msgstr "General"
+
+msgid "截图"
+msgstr "Capture"
+
+msgid "快捷键"
+msgstr "Hotkey"
+
+msgid "关于"
+msgstr "About"
+
+msgid "一个便捷的截图工具"
+msgstr "A convenient screenshot tool"
+
+msgid "版本 {}"
+msgstr "Version {}"
+
+msgid "开始截图"
+msgstr "Start capture"
+
+msgid "恢复默认"
+msgstr "Restore defaults"
+
+msgid "保存"
+msgstr "Save"
+
+msgid "显示控制面板"
+msgstr "Show control panel"
+
+msgid "隐藏控制面板"
+msgstr "Hide control panel"
+
+msgid "退出"
+msgstr "Quit"

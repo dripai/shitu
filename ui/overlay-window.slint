@@ -3,7 +3,7 @@ import { AnnotationView } from "annotation-view.slint";
 import { CaptureToolbar } from "capture-toolbar.slint";
 
 export component OverlayWindow inherits Window {
-    title: "选择截图区域";
+    title: @tr("选择截图区域");
     background: transparent;
     no-frame: true;
     always-on-top: true;
@@ -14,7 +14,6 @@ export component OverlayWindow inherits Window {
     in property <image> selected-image;
     in property <[AnnotationView]> annotations;
     in property <string> selection-info;
-    in property <int> output-mode: 0;
     in property <bool> ocr-available: false;
     in-out property <bool> capture-ready: false;
     in-out property <float> hover-left: 0;
@@ -39,6 +38,10 @@ export component OverlayWindow inherits Window {
     in-out property <float> press-y: 0;
     in-out property <bool> manual-drag: false;
     in-out property <bool> adjusting-selection: false;
+    in-out property <bool> text-editing: false;
+    in-out property <float> text-editor-x: 0;
+    in-out property <float> text-editor-y: 0;
+    in-out property <string> text-editor-value;
 
     property <length> selection-left: Math.min(root.start-x, root.current-x) * 1px;
     property <length> selection-top: Math.min(root.start-y, root.current-y) * 1px;
@@ -92,8 +95,8 @@ export component OverlayWindow inherits Window {
         8px,
         Math.min(root.width - root.toolbar-width - 8px, root.selection-left)
     );
-    property <length> toolbar-width: root.ocr-available ? 282px : 252px;
-    property <length> toolbar-height: root.active-tool > 0 ? 68px : 38px;
+    property <length> toolbar-width: 342px + (root.ocr-available ? 30px : 0px);
+    property <length> toolbar-height: root.active-tool > 0 && root.active-tool < 5 ? 68px : 38px;
     property <length> toolbar-y: root.selection-top + root.selection-height + root.toolbar-height + 12px <= root.height
         ? root.selection-top + root.selection-height + 12px
         : Math.max(8px, root.selection-top - root.toolbar-height - 12px);
@@ -103,11 +106,13 @@ export component OverlayWindow inherits Window {
     callback begin-annotation(float, float, int);
     callback update-annotation(float, float);
     callback finish-annotation();
+    callback add-text(float, float, string, int);
     callback select-color(int);
     callback select-width(int);
     callback undo();
     callback redo();
-    callback complete-output();
+    callback save-output();
+    callback copy-output();
     callback recognize-text();
     callback ocr-result(int, string);
     callback pin-selection();
@@ -128,6 +133,17 @@ export component OverlayWindow inherits Window {
             root.source-left + root.source-width,
             root.source-top + root.source-height
         );
+    }
+
+    public function commit-text-editor() {
+        if root.text-editing && root.text-editor-value != "" {
+            let image-x = root.text-editor-x / (root.selection-width / 1px) * root.selected-image.width;
+            let image-y = root.text-editor-y / (root.selection-height / 1px) * root.selected-image.height;
+            let font-size = root.stroke-radius == 1 ? 16 : root.stroke-radius == 4 ? 28 : 20;
+            root.add-text(image-x, image-y, root.text-editor-value, font-size);
+        }
+        root.text-editor-value = "";
+        root.text-editing = false;
     }
 
     if root.selecting || root.completed: Image {
@@ -254,7 +270,7 @@ export component OverlayWindow inherits Window {
         }
 
         for annotation in root.annotations: Path {
-            visible: !root.adjusting-selection;
+            visible: annotation.kind == 0 && !root.adjusting-selection;
             width: parent.width;
             height: parent.height;
             commands: annotation.commands;
@@ -271,6 +287,19 @@ export component OverlayWindow inherits Window {
             stroke-line-cap: round;
         }
 
+        for annotation in root.annotations: Text {
+            visible: annotation.kind == 1 && !root.adjusting-selection;
+            x: annotation.x / root.selected-image.width * parent.width;
+            y: annotation.y / root.selected-image.height * parent.height;
+            text: annotation.text;
+            color: annotation.stroke-color;
+            font-family: "Microsoft YaHei UI";
+            font-size: Math.max(
+                1px,
+                annotation.font-size * parent.width / 1px / root.selected-image.width * 1px
+            );
+        }
+
         if root.completed && root.active-tool > 0: TouchArea {
             width: parent.width;
             height: parent.height;
@@ -282,14 +311,65 @@ export component OverlayWindow inherits Window {
                 if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
                     root.cancel-selection();
                 } else if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
-                    root.begin-annotation(image-x, image-y, root.active-tool);
+                    if root.active-tool == 4 {
+                        root.commit-text-editor();
+                        root.text-editor-x = self.mouse-x / 1px;
+                        root.text-editor-y = self.mouse-y / 1px;
+                        root.text-editor-value = "";
+                        root.text-editing = true;
+                        text-editor.focus();
+                    } else {
+                        root.begin-annotation(image-x, image-y, root.active-tool);
+                    }
                 } else if event.kind == PointerEventKind.move && self.pressed {
-                    root.update-annotation(image-x, image-y);
+                    if root.active-tool != 4 {
+                        root.update-annotation(image-x, image-y);
+                    }
                 } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
-                    root.update-annotation(image-x, image-y);
-                    root.finish-annotation();
+                    if root.active-tool != 4 {
+                        root.update-annotation(image-x, image-y);
+                        root.finish-annotation();
+                    }
                 } else if event.kind == PointerEventKind.cancel {
-                    root.finish-annotation();
+                    if root.active-tool != 4 {
+                        root.finish-annotation();
+                    }
+                }
+            }
+        }
+
+        text-editor-frame := Rectangle {
+            visible: root.text-editing;
+            x: root.text-editor-x * 1px;
+            y: root.text-editor-y * 1px;
+            width: Math.max(80px, Math.min(240px, parent.width - self.x));
+            height: 30px;
+            border-width: 1px;
+            border-color: #54a5ff;
+            background: #ffffffee;
+
+            text-editor := TextInput {
+                x: 4px;
+                y: 2px;
+                width: parent.width - 8px;
+                height: parent.height - 4px;
+                text <=> root.text-editor-value;
+                color: root.color-index == 0 ? #ec5c66
+                    : root.color-index == 1 ? #4a90e2
+                    : root.color-index == 2 ? #31a36b : #c59b00;
+                font-family: "Microsoft YaHei UI";
+                font-size: root.stroke-radius == 1 ? 16px
+                    : root.stroke-radius == 4 ? 28px : 20px;
+                single-line: true;
+                accepted => { root.commit-text-editor(); }
+                key-pressed(event) => {
+                    if event.text == Key.Escape {
+                        root.text-editor-value = "";
+                        root.text-editing = false;
+                        accept
+                    } else {
+                        reject
+                    }
                 }
             }
         }
@@ -506,16 +586,19 @@ export component OverlayWindow inherits Window {
         annotation-tools-visible: true;
         ocr-available: root.ocr-available;
         pin-action-visible: true;
-        output-mode: root.output-mode;
         active-tool <=> root.active-tool;
         color-index <=> root.color-index;
         stroke-radius <=> root.stroke-radius;
         undo => { root.undo(); }
         redo => { root.redo(); }
-        complete-output => { root.complete-output(); }
+        save-output => { root.commit-text-editor(); root.save-output(); }
+        copy-output => { root.commit-text-editor(); root.copy-output(); }
         recognize-text => { root.recognize-text(); }
         pin-action => { root.pin-selection(); }
         cancel-action => { root.cancel-selection(); }
+        select-tool(tool) => {
+            if tool != 4 { root.commit-text-editor(); }
+        }
         select-color(index) => { root.select-color(index); }
         select-width(width) => { root.select-width(width); }
     }

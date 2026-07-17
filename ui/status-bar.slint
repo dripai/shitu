@@ -1,7 +1,7 @@
 import { Palette } from "std-widgets.slint";
 
 export component StatusBar inherits Rectangle {
-    in property <string> status-text: "就绪";
+    in property <string> status-text: @tr("就绪");
     in property <int> status-level: 0;
 
     height: 22px;

@@ -1,7 +1,7 @@
 import { AnnotationView } from "annotation-view.slint";
 
 export component PinWindow inherits Window {
-    title: "钉住";
+    title: @tr("钉住");
     preferred-width: 360px;
     preferred-height: 240px;
     background: #000000;
@@ -22,7 +22,13 @@ export component PinWindow inherits Window {
     in-out property <bool> toolbar-visible: false;
     in property <[AnnotationView]> annotations;
     in-out property <int> active-tool: 0;
+    in-out property <int> color-index: 0;
+    in-out property <int> stroke-radius: 2;
     in-out property <bool> drawing: false;
+    in-out property <bool> text-editing: false;
+    in-out property <float> text-editor-x: 0;
+    in-out property <float> text-editor-y: 0;
+    in-out property <string> text-editor-value;
 
     callback close-pin();
     callback drag-pin();
@@ -47,8 +53,20 @@ export component PinWindow inherits Window {
     callback begin-annotation(float, float, int);
     callback update-annotation(float, float);
     callback finish-annotation();
+    callback add-text(float, float, string, int);
     callback undo();
     callback redo();
+
+    public function commit-text-editor() {
+        if root.text-editing && root.text-editor-value != "" {
+            let image-x = root.text-editor-x / (root.width / 1px) * root.screenshot.width;
+            let image-y = root.text-editor-y / (root.height / 1px) * root.screenshot.height;
+            let font-size = root.stroke-radius == 1 ? 16 : root.stroke-radius == 4 ? 28 : 20;
+            root.add-text(image-x, image-y, root.text-editor-value, font-size);
+        }
+        root.text-editor-value = "";
+        root.text-editing = false;
+    }
 
     FocusScope {
         key-pressed(event) => {
@@ -64,38 +82,38 @@ export component PinWindow inherits Window {
     menu-area := ContextMenuArea {
         Menu {
             MenuItem {
-                title: "复制图像";
+                title: @tr("复制图像");
                 activated => { root.copy-image(); }
             }
             MenuItem {
-                title: "图像另存为...";
+                title: @tr("图像另存为...");
                 activated => { root.save-image(); }
             }
             if root.ocr-available: MenuItem {
-                title: "OCR 识别";
+                title: @tr("OCR 识别");
                 activated => { root.recognize-text(); }
             }
             MenuSeparator {}
             MenuItem {
-                title: "显示工具栏";
+                title: @tr("显示工具栏");
                 checkable: true;
                 checked: root.toolbar-visible;
                 activated => { root.set-toolbar(!root.toolbar-visible); }
             }
             MenuItem {
-                title: "窗口阴影";
+                title: @tr("窗口阴影");
                 checkable: true;
                 checked: root.shadow-enabled;
                 activated => { root.set-shadow(!root.shadow-enabled); }
             }
             MenuItem {
-                title: "始终置顶";
+                title: @tr("始终置顶");
                 checkable: true;
                 checked: root.top-enabled;
                 activated => { root.set-top(!root.top-enabled); }
             }
             Menu {
-                title: "不透明度";
+                title: @tr("不透明度");
                 MenuItem { title: "25%"; checkable: true; checked: root.alpha-percent == 25; activated => { root.set-opacity(25); } }
                 MenuItem { title: "50%"; checkable: true; checked: root.alpha-percent == 50; activated => { root.set-opacity(50); } }
                 MenuItem { title: "75%"; checkable: true; checked: root.alpha-percent == 75; activated => { root.set-opacity(75); } }
@@ -103,7 +121,7 @@ export component PinWindow inherits Window {
                 MenuItem { title: "100%"; checkable: true; checked: root.alpha-percent == 100; activated => { root.set-opacity(100); } }
             }
             Menu {
-                title: "缩放（\{root.scale-percent}%）";
+                title: @tr("缩放（{}%）", root.scale-percent);
                 MenuItem { title: "25%"; checkable: true; checked: root.scale-percent == 25; activated => { root.set-scale(25); } }
                 MenuItem { title: "50%"; checkable: true; checked: root.scale-percent == 50; activated => { root.set-scale(50); } }
                 MenuItem { title: "75%"; checkable: true; checked: root.scale-percent == 75; activated => { root.set-scale(75); } }
@@ -112,29 +130,29 @@ export component PinWindow inherits Window {
                 MenuItem { title: "150%"; checkable: true; checked: root.scale-percent == 150; activated => { root.set-scale(150); } }
                 MenuItem { title: "200%"; checkable: true; checked: root.scale-percent == 200; activated => { root.set-scale(200); } }
                 MenuSeparator {}
-                MenuItem { title: "适合屏幕"; activated => { root.fit-screen(); } }
-                MenuItem { title: "恢复原始大小"; activated => { root.set-scale(100); } }
+                MenuItem { title: @tr("适合屏幕"); activated => { root.fit-screen(); } }
+                MenuItem { title: @tr("恢复原始大小"); activated => { root.set-scale(100); } }
             }
             MenuSeparator {}
             Menu {
-                title: "图像处理";
-                MenuItem { title: "向左旋转 90°"; activated => { root.rotate-left(); } }
-                MenuItem { title: "向右旋转 90°"; activated => { root.rotate-right(); } }
-                MenuItem { title: "水平翻转"; activated => { root.flip-horizontal(); } }
-                MenuItem { title: "垂直翻转"; activated => { root.flip-vertical(); } }
+                title: @tr("图像处理");
+                MenuItem { title: @tr("向左旋转 90°"); activated => { root.rotate-left(); } }
+                MenuItem { title: @tr("向右旋转 90°"); activated => { root.rotate-right(); } }
+                MenuItem { title: @tr("水平翻转"); activated => { root.flip-horizontal(); } }
+                MenuItem { title: @tr("垂直翻转"); activated => { root.flip-vertical(); } }
             }
             Menu {
-                title: "替换图像";
-                MenuItem { title: "从剪贴板"; activated => { root.replace-clipboard(); } }
-                MenuItem { title: "从文件..."; activated => { root.replace-file(); } }
+                title: @tr("替换图像");
+                MenuItem { title: @tr("从剪贴板"); activated => { root.replace-clipboard(); } }
+                MenuItem { title: @tr("从文件..."); activated => { root.replace-file(); } }
             }
             if root.has-source-file: MenuItem {
-                title: "在文件夹中显示";
+                title: @tr("在文件夹中显示");
                 activated => { root.reveal-file(); }
             }
             MenuSeparator {}
-            MenuItem { title: "关闭"; activated => { root.close-pin(); } }
-            MenuItem { title: "原始尺寸：\{root.original-size-text}"; enabled: false; }
+            MenuItem { title: @tr("关闭"); activated => { root.close-pin(); } }
+            MenuItem { title: @tr("原始尺寸：{}", root.original-size-text); enabled: false; }
         }
 
         Image {
@@ -179,6 +197,7 @@ export component PinWindow inherits Window {
     }
 
     for annotation in root.annotations: Path {
+        visible: annotation.kind == 0;
         width: parent.width;
         height: parent.height;
         commands: annotation.commands;
@@ -195,6 +214,19 @@ export component PinWindow inherits Window {
         stroke-line-cap: round;
     }
 
+    for annotation in root.annotations: Text {
+        visible: annotation.kind == 1;
+        x: annotation.x / root.screenshot.width * parent.width;
+        y: annotation.y / root.screenshot.height * parent.height;
+        text: annotation.text;
+        color: annotation.stroke-color;
+        font-family: "Microsoft YaHei UI";
+        font-size: Math.max(
+            1px,
+            annotation.font-size * parent.width / 1px / root.screenshot.width * 1px
+        );
+    }
+
     if root.active-tool > 0: TouchArea {
         width: parent.width;
         height: parent.height;
@@ -205,8 +237,17 @@ export component PinWindow inherits Window {
             let image-y = self.mouse-y / self.height * root.screenshot.height;
             if event.kind == PointerEventKind.down {
                 if event.button == PointerEventButton.left {
-                    root.drawing = true;
-                    root.begin-annotation(image-x, image-y, root.active-tool);
+                    if root.active-tool == 4 {
+                        root.commit-text-editor();
+                        root.text-editor-x = self.mouse-x / 1px;
+                        root.text-editor-y = self.mouse-y / 1px;
+                        root.text-editor-value = "";
+                        root.text-editing = true;
+                        text-editor.focus();
+                    } else {
+                        root.drawing = true;
+                        root.begin-annotation(image-x, image-y, root.active-tool);
+                    }
                 } else if event.button == PointerEventButton.right {
                     menu-area.show({ x: self.mouse-x, y: self.mouse-y });
                 }
@@ -219,6 +260,42 @@ export component PinWindow inherits Window {
             } else if event.kind == PointerEventKind.cancel && root.drawing {
                 root.finish-annotation();
                 root.drawing = false;
+            }
+        }
+    }
+
+    text-editor-frame := Rectangle {
+        visible: root.text-editing;
+        x: root.text-editor-x * 1px;
+        y: root.text-editor-y * 1px;
+        width: Math.max(80px, Math.min(240px, parent.width - self.x));
+        height: 30px;
+        border-width: 1px;
+        border-color: #54a5ff;
+        background: #ffffffee;
+
+        text-editor := TextInput {
+            x: 4px;
+            y: 2px;
+            width: parent.width - 8px;
+            height: parent.height - 4px;
+            text <=> root.text-editor-value;
+            color: root.color-index == 0 ? #ec5c66
+                : root.color-index == 1 ? #4a90e2
+                : root.color-index == 2 ? #31a36b : #c59b00;
+            font-family: "Microsoft YaHei UI";
+            font-size: root.stroke-radius == 1 ? 16px
+                : root.stroke-radius == 4 ? 28px : 20px;
+            single-line: true;
+            accepted => { root.commit-text-editor(); }
+            key-pressed(event) => {
+                if event.text == Key.Escape {
+                    root.text-editor-value = "";
+                    root.text-editing = false;
+                    accept
+                } else {
+                    reject
+                }
             }
         }
     }

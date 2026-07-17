@@ -1,7 +1,7 @@
 import { Button, Palette, TextEdit } from "std-widgets.slint";
 
 export component OcrResultWindow inherits Window {
-    title: "OCR 识别结果";
+    title: @tr("OCR 识别结果");
     icon: @image-url("icons/tray.svg");
     preferred-width: 520px;
     preferred-height: 360px;
@@ -11,7 +11,7 @@ export component OcrResultWindow inherits Window {
     default-font-size: 12.07px;
 
     in-out property <string> result-text;
-    in property <string> status-text: "可选择文字，或复制全部内容。";
+    in property <string> status-text: @tr("可选择文字，或复制全部内容。");
 
     callback copy-text();
     callback close-result();
@@ -32,7 +32,7 @@ export component OcrResultWindow inherits Window {
         spacing: 8px;
 
         Text {
-            text: "识别结果";
+            text: @tr("识别结果");
             color: Palette.foreground;
             font-size: 14px;
             font-weight: 700;
@@ -59,11 +59,11 @@ export component OcrResultWindow inherits Window {
             }
             Rectangle { }
             Button {
-                text: "复制全部";
+                text: @tr("复制全部");
                 clicked => { root.copy-text(); }
             }
             Button {
-                text: "关闭";
+                text: @tr("关闭");
                 clicked => { root.close-result(); }
             }
         }

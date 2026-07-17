@@ -3,7 +3,7 @@ import { SettingsPanel } from "settings-panel.slint";
 import { StatusBar } from "status-bar.slint";
 
 export component MainWindow inherits Window {
-    title: "拾图";
+    title: @tr("拾图");
     icon: @image-url("icons/tray.svg");
     // Fluent body text is 1.0769rem; this resolves native controls to 13px.
     default-font-size: 12.07px;
@@ -14,7 +14,7 @@ export component MainWindow inherits Window {
     max-width: 620px;
     background: Palette.background;
 
-    in property <string> status-text: "就绪";
+    in property <string> status-text: @tr("就绪");
     in property <int> status-level: 0;
     in property <bool> ocr-available: false;
     in property <string> ocr-status;
@@ -26,8 +26,8 @@ export component MainWindow inherits Window {
 
     in-out property <int> current-tab: 0;
     in-out property <int> theme-mode: 0;
+    in-out property <int> language-mode: 0;
     in-out property <bool> launch-at-startup: false;
-    in-out property <int> completion-action: 0;
     in-out property <int> image-format: 0;
     in-out property <int> jpeg-quality: 90;
     in-out property <string> save-directory;
@@ -60,6 +60,7 @@ export component MainWindow inherits Window {
     callback config-hint(bool);
     callback clear-hotkey();
     callback prepare-ai-ocr();
+    callback preview-language(int);
     callback ai-ocr-prepared(string);
 
     init => {
@@ -88,8 +89,8 @@ export component MainWindow inherits Window {
                 SettingsPanel {
                     current-tab <=> root.current-tab;
                     theme-mode <=> root.theme-mode;
+                    language-mode <=> root.language-mode;
                     launch-at-startup <=> root.launch-at-startup;
-                    completion-action <=> root.completion-action;
                     image-format <=> root.image-format;
                     jpeg-quality <=> root.jpeg-quality;
                     save-directory <=> root.save-directory;
@@ -129,6 +130,7 @@ export component MainWindow inherits Window {
                     config-hint(visible) => { root.config-hint(visible); }
                     clear-hotkey => { root.clear-hotkey(); }
                     prepare-ai-ocr => { root.prepare-ai-ocr(); }
+                    preview-language(mode) => { root.preview-language(mode); }
                 }
             }
         }

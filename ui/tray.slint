@@ -1,7 +1,7 @@
 export component CaptureTray inherits SystemTrayIcon {
     icon: @image-url("icons/tray.svg");
-    tooltip: "拾图";
-    title: "拾图";
+    tooltip: @tr("拾图");
+    title: @tr("拾图");
 
     callback capture();
     callback show-main();
@@ -12,21 +12,21 @@ export component CaptureTray inherits SystemTrayIcon {
 
     Menu {
         MenuItem {
-            title: "区域截图";
+            title: @tr("区域截图");
             activated => { root.capture(); }
         }
         MenuSeparator { }
         MenuItem {
-            title: "显示控制面板";
+            title: @tr("显示控制面板");
             activated => { root.show-main(); }
         }
         MenuItem {
-            title: "隐藏控制面板";
+            title: @tr("隐藏控制面板");
             activated => { root.hide-main(); }
         }
         MenuSeparator { }
         MenuItem {
-            title: "退出";
+            title: @tr("退出");
             activated => { root.quit(); }
         }
     }

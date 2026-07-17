@@ -3,6 +3,8 @@ use std::path::Path;
 use anyhow::{Context, Result, anyhow};
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 
+use crate::i18n;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DesktopBounds {
     pub left: i32,
@@ -27,7 +29,10 @@ impl CapturedImage {
     pub fn from_rgba(left: i32, top: i32, width: u32, height: u32, rgba: &[u8]) -> Result<Self> {
         let expected = width as usize * height as usize * 4;
         if width == 0 || height == 0 || rgba.len() != expected {
-            return Err(anyhow!("图像像素尺寸无效"));
+            return Err(anyhow!(i18n::text(
+                "图像像素尺寸无效",
+                "Invalid image pixel dimensions"
+            )));
         }
         let mut pixels = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
         for (source, target) in rgba.chunks_exact(4).zip(pixels.make_mut_slice()) {
@@ -51,7 +56,13 @@ impl CapturedImage {
 
     pub fn from_file(path: &Path, left: i32, top: i32) -> Result<Self> {
         let image = image::open(path)
-            .with_context(|| format!("无法读取图像：{}", path.display()))?
+            .with_context(|| {
+                format!(
+                    "{}: {}",
+                    i18n::text("无法读取图像", "Failed to read image"),
+                    path.display()
+                )
+            })?
             .to_rgba8();
         Self::from_rgba(left, top, image.width(), image.height(), image.as_raw())
     }
@@ -72,6 +83,49 @@ impl CapturedImage {
         bytes
     }
 
+    #[cfg(windows)]
+    pub fn draw_text(
+        &mut self,
+        position: (u32, u32),
+        text: &str,
+        font_size: u32,
+        rgba: [u8; 4],
+    ) -> Result<()> {
+        let mask = crate::platform::windows::text::render_text_mask(
+            self.width(),
+            self.height(),
+            position,
+            text,
+            font_size,
+        )?;
+        for (pixel, coverage) in self.pixels.make_mut_slice().iter_mut().zip(mask) {
+            let alpha = coverage as u16 * rgba[3] as u16 / 255;
+            if alpha == 0 {
+                continue;
+            }
+            let inverse = 255 - alpha;
+            pixel.r = ((rgba[0] as u16 * alpha + pixel.r as u16 * inverse) / 255) as u8;
+            pixel.g = ((rgba[1] as u16 * alpha + pixel.g as u16 * inverse) / 255) as u8;
+            pixel.b = ((rgba[2] as u16 * alpha + pixel.b as u16 * inverse) / 255) as u8;
+            pixel.a = (alpha + pixel.a as u16 * inverse / 255).min(255) as u8;
+        }
+        Ok(())
+    }
+
+    #[cfg(not(windows))]
+    pub fn draw_text(
+        &mut self,
+        _position: (u32, u32),
+        _text: &str,
+        _font_size: u32,
+        _rgba: [u8; 4],
+    ) -> Result<()> {
+        Err(anyhow!(i18n::text(
+            "当前平台尚未实现文字标注",
+            "Text annotation is not implemented on this platform"
+        )))
+    }
+
     pub fn with_origin(mut self, left: i32, top: i32) -> Self {
         self.bounds.left = left;
         self.bounds.top = top;
@@ -83,14 +137,23 @@ impl CapturedImage {
     }
 
     pub fn crop(&self, left: u32, top: u32, width: u32, height: u32) -> Result<Self> {
-        let right = left
-            .checked_add(width)
-            .ok_or_else(|| anyhow!("图像裁剪坐标溢出"))?;
-        let bottom = top
-            .checked_add(height)
-            .ok_or_else(|| anyhow!("图像裁剪坐标溢出"))?;
+        let right = left.checked_add(width).ok_or_else(|| {
+            anyhow!(i18n::text(
+                "图像裁剪坐标溢出",
+                "Image crop coordinates overflow"
+            ))
+        })?;
+        let bottom = top.checked_add(height).ok_or_else(|| {
+            anyhow!(i18n::text(
+                "图像裁剪坐标溢出",
+                "Image crop coordinates overflow"
+            ))
+        })?;
         if width == 0 || height == 0 || right > self.width() || bottom > self.height() {
-            return Err(anyhow!("图像裁剪区域无效"));
+            return Err(anyhow!(i18n::text(
+                "图像裁剪区域无效",
+                "Invalid image crop area"
+            )));
         }
 
         let mut pixels = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
@@ -333,5 +396,18 @@ mod tests {
             vec![4, 5, 6, 255, 7, 8, 9, 255, 13, 14, 15, 255, 16, 17, 18, 255]
         );
         assert!(source.crop(2, 1, 2, 1).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn text_rendering_changes_the_target_pixels() {
+        let mut image = CapturedImage::from_rgba(0, 0, 80, 40, &[0; 80 * 40 * 4]).unwrap();
+        let original = image.rgba_bytes();
+
+        image
+            .draw_text((2, 2), "Test", 20, [255, 255, 255, 255])
+            .unwrap();
+
+        assert_ne!(image.rgba_bytes(), original);
     }
 }

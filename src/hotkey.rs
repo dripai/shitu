@@ -8,6 +8,8 @@ use global_hotkey::{
     hotkey::{Code, HotKey, Modifiers},
 };
 
+use crate::i18n;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HotkeyFailure {
     Invalid,
@@ -18,9 +20,11 @@ pub enum HotkeyFailure {
 impl HotkeyFailure {
     pub fn message(&self) -> &'static str {
         match self {
-            Self::Invalid => "组合键无效",
-            Self::Occupied => "已被占用",
-            Self::SystemRejected => "系统拒绝注册",
+            Self::Invalid => i18n::text("组合键无效", "Invalid key combination"),
+            Self::Occupied => i18n::text("已被占用", "Already in use"),
+            Self::SystemRejected => {
+                i18n::text("系统拒绝注册", "Registration was rejected by the system")
+            }
         }
     }
 }

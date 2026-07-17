@@ -12,7 +12,8 @@ use super::{
 };
 use crate::{
     capture,
-    config::{CaptureConfig, CompletionAction, OcrConfig},
+    config::{CaptureConfig, OcrConfig},
+    i18n,
     image::{CapturedImage, DesktopBounds},
     logging, output,
     platform::{
@@ -32,13 +33,21 @@ pub(super) fn start_capture(main: slint::Weak<MainWindow>, state: Rc<RefCell<App
             set_status(
                 &main,
                 &mut state,
-                "已有截图任务正在进行，请先完成或取消".to_owned(),
+                i18n::text(
+                    "已有截图任务正在进行，请先完成或取消",
+                    "A screenshot is already in progress; finish or cancel it first",
+                )
+                .to_owned(),
             );
             return;
         }
         state.capturing = true;
         state.restore_main_after_capture = main_window.window().is_visible();
-        set_status(&main, &mut state, "正在准备截图...".to_owned());
+        set_status(
+            &main,
+            &mut state,
+            i18n::text("正在准备截图...", "Preparing screenshot...").to_owned(),
+        );
     }
 
     let delay = if main_window.window().is_visible() {
@@ -67,7 +76,10 @@ pub(super) fn start_capture(main: slint::Weak<MainWindow>, state: Rc<RefCell<App
                 set_error_status(
                     &main,
                     &mut state.borrow_mut(),
-                    format!("截图窗口打开失败：{error}"),
+                    format!(
+                        "{}: {error}",
+                        i18n::text("截图窗口打开失败", "Failed to open screenshot window")
+                    ),
                 );
                 restore_main_after_capture(&main, &state);
             }
@@ -84,13 +96,10 @@ fn open_overlay(
 ) -> Result<()> {
     let overlay = OverlayWindow::new()?;
     let initial_target = targets.target_at_cursor();
-    let output_mode = completion_action_index(state.borrow().config.capture.completion_action);
-
     overlay.set_capture_width(bounds.width);
     overlay.set_capture_height(bounds.height);
     overlay.set_desktop_image(desktop_snapshot.slint_image());
     overlay.set_annotations(empty_annotation_model());
-    overlay.set_output_mode(output_mode);
     overlay.set_ocr_available(state.borrow().ocr_available);
     overlay.set_capture_ready(true);
     set_hover_target(
@@ -154,7 +163,10 @@ fn bind_overlay(
                     Err(error) => {
                         if let Some(overlay) = overlay.upgrade() {
                             overlay.set_completed(false);
-                            overlay.set_selection_info(format!("选区无效：{error}").into());
+                            overlay.set_selection_info(
+                                format!("{}: {error}", i18n::text("选区无效", "Invalid selection"))
+                                    .into(),
+                            );
                         }
                     }
                 }
@@ -179,6 +191,14 @@ fn bind_overlay(
     {
         let state = Rc::clone(&state);
         overlay.on_finish_annotation(move || state.borrow_mut().finish_annotation());
+    }
+    {
+        let overlay = overlay.as_weak();
+        let state = Rc::clone(&state);
+        overlay.unwrap().on_add_text(move |x, y, text, font_size| {
+            state.borrow_mut().add_text(x, y, text.as_str(), font_size);
+            refresh_annotations(&overlay, &state);
+        });
     }
     {
         let state = Rc::clone(&state);
@@ -208,16 +228,56 @@ fn bind_overlay(
         let overlay = overlay.as_weak();
         let main = main.clone();
         let state = Rc::clone(&state);
-        overlay.unwrap().on_complete_output(move || {
+        overlay.unwrap().on_save_output(move || {
+            let (image, save_directory, format, jpeg_quality) = {
+                let state = state.borrow();
+                (
+                    state.rendered_selection(),
+                    state.config.capture.save_directory.clone(),
+                    state.config.capture.format,
+                    state.config.capture.jpeg_quality,
+                )
+            };
+            match image.and_then(|image| {
+                output::save_as_dialog(&image, &save_directory, format, jpeg_quality)
+            }) {
+                Ok(Some(path)) => finish_capture(
+                    &overlay,
+                    &main,
+                    &state,
+                    format!("{} {}", i18n::text("已保存到", "Saved to"), path.display()),
+                    StatusLevel::Success,
+                ),
+                Ok(None) => {}
+                Err(error) => {
+                    logging::error(error.to_string());
+                    set_error_status(
+                        &main,
+                        &mut state.borrow_mut(),
+                        format!("{}: {error}", i18n::text("保存失败", "Save failed")),
+                    );
+                }
+            }
+        });
+    }
+    {
+        let overlay = overlay.as_weak();
+        let main = main.clone();
+        let state = Rc::clone(&state);
+        overlay.unwrap().on_copy_output(move || {
             let (image, config) = {
                 let state = state.borrow();
                 (state.rendered_selection(), state.config.capture.clone())
             };
-            match image.and_then(|image| execute_output(&image, &config)) {
+            match image.and_then(|image| copy_output(&image, &config)) {
                 Ok(status) => finish_capture(&overlay, &main, &state, status, StatusLevel::Success),
                 Err(error) => {
                     logging::error(error.to_string());
-                    set_error_status(&main, &mut state.borrow_mut(), format!("输出失败：{error}"));
+                    set_error_status(
+                        &main,
+                        &mut state.borrow_mut(),
+                        format!("{}: {error}", i18n::text("复制失败", "Copy failed")),
+                    );
                 }
             }
         });
@@ -233,13 +293,17 @@ fn bind_overlay(
             match image {
                 Ok(image) => {
                     if let Some(overlay) = overlay.upgrade() {
-                        overlay.set_selection_info("正在识别文字...".into());
+                        overlay.set_selection_info(
+                            i18n::text("正在识别文字...", "Recognizing text...").into(),
+                        );
                     }
                     spawn_overlay_ocr(overlay.clone(), image, ocr_config);
                 }
                 Err(error) => {
                     if let Some(overlay) = overlay.upgrade() {
-                        overlay.set_selection_info(format!("OCR 失败：{error}").into());
+                        overlay.set_selection_info(
+                            format!("{}: {error}", i18n::text("OCR 失败", "OCR failed")).into(),
+                        );
                     }
                 }
             }
@@ -273,7 +337,11 @@ fn bind_overlay(
             let image = match image {
                 Ok(image) => image,
                 Err(error) => {
-                    set_error_status(&main, &mut state.borrow_mut(), format!("钉住失败：{error}"));
+                    set_error_status(
+                        &main,
+                        &mut state.borrow_mut(),
+                        format!("{}: {error}", i18n::text("钉住失败", "Pin failed")),
+                    );
                     return;
                 }
             };
@@ -305,15 +373,28 @@ fn bind_overlay(
                 Ok(()) => {
                     let (status, level) = match auto_save_error {
                         Some(error) if show_save_result => (
-                            format!("已钉住，但自动保存失败：{error}"),
+                            format!(
+                                "{}: {error}",
+                                i18n::text(
+                                    "已钉住，但自动保存失败",
+                                    "Pinned, but auto-save failed"
+                                )
+                            ),
                             StatusLevel::Error,
                         ),
-                        _ => ("已将截图钉在屏幕上".to_owned(), StatusLevel::Success),
+                        _ => (
+                            i18n::text("已将截图钉在屏幕上", "Screenshot pinned").to_owned(),
+                            StatusLevel::Success,
+                        ),
                     };
                     finish_capture(&overlay, &main, &state, status, level);
                 }
                 Err(error) => {
-                    set_error_status(&main, &mut state.borrow_mut(), format!("钉住失败：{error}"));
+                    set_error_status(
+                        &main,
+                        &mut state.borrow_mut(),
+                        format!("{}: {error}", i18n::text("钉住失败", "Pin failed")),
+                    );
                 }
             }
         });
@@ -325,7 +406,7 @@ fn bind_overlay(
                 &overlay,
                 &main,
                 &state,
-                "已取消截图".to_owned(),
+                i18n::text("已取消截图", "Screenshot canceled").to_owned(),
                 StatusLevel::Info,
             );
         });
@@ -375,23 +456,35 @@ fn handle_overlay_ocr_result(
                 overlay,
                 main,
                 state,
-                "OCR 识别完成".to_owned(),
+                i18n::text("OCR 识别完成", "OCR completed").to_owned(),
                 StatusLevel::Success,
             );
         }
-        1 => finish_with_ocr_message(overlay, main, state, "未识别到文字", StatusLevel::Info),
+        1 => finish_with_ocr_message(
+            overlay,
+            main,
+            state,
+            i18n::text("未识别到文字", "No text was recognized"),
+            StatusLevel::Info,
+        ),
         2 => finish_with_ocr_message(
             overlay,
             main,
             state,
-            "缺少可用的 Windows OCR 语言包",
+            i18n::text(
+                "缺少可用的 Windows OCR 语言包",
+                "No compatible Windows OCR language pack is installed",
+            ),
             StatusLevel::Error,
         ),
         3 => finish_with_ocr_message(
             overlay,
             main,
             state,
-            "当前系统或程序安装方式不支持 Windows 系统 OCR",
+            i18n::text(
+                "当前系统或程序安装方式不支持 Windows 系统 OCR",
+                "Windows system OCR is not supported by this system or installation",
+            ),
             StatusLevel::Error,
         ),
         _ => finish_with_ocr_message(
@@ -399,7 +492,7 @@ fn handle_overlay_ocr_result(
             main,
             state,
             if text.is_empty() {
-                "OCR 识别失败"
+                i18n::text("OCR 识别失败", "OCR failed")
             } else {
                 text
             },
@@ -463,41 +556,23 @@ pub(super) fn ocr_result_payload(result: Result<String, OcrFailure>) -> (i32, St
     }
 }
 
-fn execute_output(image: &CapturedImage, config: &CaptureConfig) -> Result<String> {
-    let should_copy = matches!(
-        config.completion_action,
-        CompletionAction::Copy | CompletionAction::CopyAndSave
-    );
-    let should_save = config.auto_save
-        || matches!(
-            config.completion_action,
-            CompletionAction::Save | CompletionAction::CopyAndSave
-        );
-
-    if should_copy {
-        capture::copy_to_clipboard(image)?;
-    }
-    let saved = if should_save {
+fn copy_output(image: &CapturedImage, config: &CaptureConfig) -> Result<String> {
+    capture::copy_to_clipboard(image)?;
+    let saved = if config.auto_save {
         Some(output::save_quick(image, config)?)
     } else {
         None
     };
 
-    Ok(match (should_copy, saved, config.save_notification) {
-        (true, Some(path), true) => format!("已复制并保存到 {}", path.display()),
-        (false, Some(path), true) => format!("已保存到 {}", path.display()),
-        (_, Some(_), false) => "截图已完成".to_owned(),
-        (true, None, _) => "已复制到剪贴板".to_owned(),
-        (false, None, _) => "截图已完成".to_owned(),
+    Ok(match (saved, config.save_notification) {
+        (Some(path), true) => format!(
+            "{} {}",
+            i18n::text("已复制并保存到", "Copied and saved to"),
+            path.display()
+        ),
+        (Some(_), false) => i18n::text("已复制到剪贴板", "Copied to clipboard").to_owned(),
+        (None, _) => i18n::text("已复制到剪贴板", "Copied to clipboard").to_owned(),
     })
-}
-
-fn completion_action_index(action: CompletionAction) -> i32 {
-    match action {
-        CompletionAction::Copy => 0,
-        CompletionAction::Save => 1,
-        CompletionAction::CopyAndSave => 2,
-    }
 }
 
 fn refresh_annotations(overlay: &slint::Weak<OverlayWindow>, state: &Rc<RefCell<AppController>>) {
@@ -611,6 +686,20 @@ impl AppController {
         }
     }
 
+    fn add_text(&mut self, x: f32, y: f32, text: &str, font_size: i32) {
+        let style = self.draw_style;
+        let Some(session) = self.session.as_mut() else {
+            return;
+        };
+        let Some(selected) = session.selected.as_ref() else {
+            return;
+        };
+        let point = clamp_point(x, y, selected);
+        session
+            .annotations
+            .add_text(point, text, style, font_size.clamp(8, 96) as u32);
+    }
+
     fn set_color(&mut self, index: i32) {
         self.draw_style.rgba = match index {
             0 => [236, 92, 102, 255],
@@ -653,7 +742,7 @@ impl AppController {
             .selected
             .as_ref()
             .ok_or_else(|| anyhow!("尚未选择截图区域"))?;
-        Ok(session.annotations.render(selected))
+        session.annotations.render(selected)
     }
 
     fn original_selection(&self) -> Result<CapturedImage> {

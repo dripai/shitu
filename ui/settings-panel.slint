@@ -30,6 +30,8 @@ component CenteredTabLabel inherits Rectangle {
     horizontal-stretch: 1;
 
     Text {
+        width: 100%;
+        height: 100%;
         text: root.text;
         color: root.selected ? Palette.foreground : Palette.alternate-foreground;
         font-size: SettingsTypography.body-font-size;
@@ -97,8 +99,8 @@ export component SettingsPanel inherits Rectangle {
 
     in-out property <int> current-tab: 0;
     in-out property <int> theme-mode: 0;
+    in-out property <int> language-mode: 0;
     in-out property <bool> launch-at-startup: false;
-    in-out property <int> completion-action: 0;
     in-out property <int> image-format: 0;
     in-out property <int> jpeg-quality: 90;
     in-out property <string> save-directory;
@@ -138,8 +140,10 @@ export component SettingsPanel inherits Rectangle {
     callback config-hint(bool);
     callback clear-hotkey();
     callback prepare-ai-ocr();
+    callback preview-language(int);
 
     changed current-tab => { root.config-hint(false); }
+    changed language-mode => { root.preview-language(root.language-mode); }
 
     VerticalLayout {
         padding-left: 10px;
@@ -162,26 +166,34 @@ export component SettingsPanel inherits Rectangle {
                 VerticalLayout {
                 padding: 12px;
                 spacing: 8px;
-                SectionTitle { text: "应用"; }
+                SectionTitle { text: @tr("应用"); }
                 CheckBox {
-                    text: "开机启动";
+                    text: @tr("开机启动");
                     checked <=> root.launch-at-startup;
                 }
                 HorizontalLayout {
                     height: 26px;
-                    FieldLabel { text: "外观模式"; }
+                    FieldLabel { text: @tr("外观模式"); }
                     ComboBox {
-                        model: ["跟随系统", "浅色", "深色"];
+                        model: [@tr("跟随系统"), @tr("浅色"), @tr("深色")];
                         current-index <=> root.theme-mode;
                     }
                 }
+                HorizontalLayout {
+                    height: 26px;
+                    FieldLabel { text: @tr("界面语言"); }
+                    ComboBox {
+                        model: [@tr("跟随系统"), @tr("简体中文"), "English"];
+                        current-index <=> root.language-mode;
+                    }
+                }
                 Rectangle { height: 1px; background: Palette.foreground.with-alpha(0.16); }
-                SectionTitle { text: "文件与诊断"; }
+                SectionTitle { text: @tr("文件与诊断"); }
                 HorizontalLayout {
                     height: 28px;
                     spacing: 8px;
                     PathActionButton {
-                        text: "打开日志";
+                        text: @tr("打开日志");
                         activated => { root.open-log-directory(); }
                     }
                     Text {
@@ -196,7 +208,7 @@ export component SettingsPanel inherits Rectangle {
                     height: 28px;
                     spacing: 8px;
                     PathActionButton {
-                        text: "打开配置";
+                        text: @tr("打开配置");
                         activated => { root.open-config-directory(); }
                         hover-changed(hovered) => { root.config-hint(hovered); }
                     }
@@ -220,20 +232,10 @@ export component SettingsPanel inherits Rectangle {
                 spacing: 7px;
                 VerticalLayout {
                     spacing: 7px;
-                    SectionTitle { text: "输出"; }
+                    SectionTitle { text: @tr("输出"); }
                     HorizontalLayout {
                         height: 26px;
-                        FieldLabel { text: "截图完成后"; }
-                        ComboBox {
-                            width: 240px;
-                            model: ["复制到剪贴板", "保存到文件", "复制并保存"];
-                            current-index <=> root.completion-action;
-                        }
-                        Rectangle { }
-                    }
-                    HorizontalLayout {
-                        height: 26px;
-                        FieldLabel { text: "图像格式"; }
+                        FieldLabel { text: @tr("图像格式"); }
                         ComboBox {
                             width: 112px;
                             model: ["PNG", "JPEG"];
@@ -241,7 +243,7 @@ export component SettingsPanel inherits Rectangle {
                         }
                         Text {
                             width: 68px;
-                            text: "JPEG 质量";
+                            text: @tr("JPEG 质量");
                             color: Palette.foreground;
                             font-size: SettingsTypography.body-font-size;
                             vertical-alignment: center;
@@ -257,34 +259,34 @@ export component SettingsPanel inherits Rectangle {
                     HorizontalLayout {
                         height: 26px;
                         spacing: 6px;
-                        FieldLabel { text: "保存目录"; }
+                        FieldLabel { text: @tr("保存目录"); }
                         LineEdit {
                             text <=> root.save-directory;
                         }
                         Button {
                             width: 58px;
-                            text: "选择...";
+                            text: @tr("选择...");
                             clicked => { root.choose-save-directory(); }
                         }
                         Button {
                             width: 72px;
-                            text: "打开目录";
+                            text: @tr("打开目录");
                             clicked => { root.open-save-directory(); }
                         }
                     }
                     HorizontalLayout {
                         height: 26px;
-                        FieldLabel { text: "文件名模板"; }
+                        FieldLabel { text: @tr("文件名模板"); }
                         LineEdit {
                             text <=> root.filename-template;
                         }
                     }
                     CheckBox {
-                        text: "自动保存（执行复制或钉住时同时保存）";
+                        text: @tr("自动保存（执行复制或钉住时同时保存）");
                         checked <=> root.auto-save;
                     }
                     CheckBox {
-                        text: "显示保存结果";
+                        text: @tr("显示保存结果");
                         checked <=> root.save-notification;
                     }
                     Rectangle { }
@@ -298,20 +300,20 @@ export component SettingsPanel inherits Rectangle {
                 VerticalLayout {
                 padding: 12px;
                 spacing: 8px;
-                SectionTitle { text: "识别引擎"; }
+                SectionTitle { text: @tr("识别引擎"); }
                 HorizontalLayout {
                     height: 26px;
-                    FieldLabel { text: "默认引擎"; }
+                    FieldLabel { text: @tr("默认引擎"); }
                     ComboBox {
                         width: 220px;
-                        model: ["兼容系统 OCR", "Windows AI OCR（增强）"];
+                        model: [@tr("兼容系统 OCR"), @tr("Windows AI OCR（增强）")];
                         current-index <=> root.ocr-engine;
                     }
                     Rectangle { }
                 }
                 HorizontalLayout {
                     height: 26px;
-                    FieldLabel { text: "兼容 OCR"; }
+                    FieldLabel { text: @tr("兼容 OCR"); }
                     Text {
                         text: root.system-ocr-status;
                         color: root.system-ocr-available ? #16833d : #cf222e;
@@ -322,7 +324,7 @@ export component SettingsPanel inherits Rectangle {
                 }
                 HorizontalLayout {
                     height: 26px;
-                    FieldLabel { text: "增强 OCR"; }
+                    FieldLabel { text: @tr("增强 OCR"); }
                     Text {
                         text: root.ai-ocr-status;
                         color: root.ai-ocr-available ? #16833d : #cf222e;
@@ -332,15 +334,15 @@ export component SettingsPanel inherits Rectangle {
                     }
                     if root.ai-ocr-can-install: Button {
                         width: 78px;
-                        text: "安装模型";
+                        text: @tr("安装模型");
                         clicked => { root.prepare-ai-ocr(); }
                     }
                 }
                 Rectangle { height: 1px; background: Palette.foreground.with-alpha(0.16); }
-                SectionTitle { text: "增强 OCR 输出"; }
+                SectionTitle { text: @tr("增强 OCR 输出"); }
                 HorizontalLayout {
                     height: 26px;
-                    FieldLabel { text: "最低置信度"; }
+                    FieldLabel { text: @tr("最低置信度"); }
                     SpinBox {
                         width: 84px;
                         enabled: root.ocr-engine == 1 && root.ai-ocr-available;
@@ -357,7 +359,7 @@ export component SettingsPanel inherits Rectangle {
                     Rectangle { }
                 }
                 Text {
-                    text: "仅过滤 Windows AI OCR 返回的低置信度词语。";
+                    text: @tr("仅过滤 Windows AI OCR 返回的低置信度词语。");
                     color: Palette.alternate-foreground;
                     font-size: SettingsTypography.body-font-size;
                 }
@@ -371,10 +373,10 @@ export component SettingsPanel inherits Rectangle {
                 VerticalLayout {
                 padding: 12px;
                 spacing: 8px;
-                SectionTitle { text: "新建钉住窗口"; }
+                SectionTitle { text: @tr("新建钉住窗口"); }
                 HorizontalLayout {
                     height: 26px;
-                    FieldLabel { text: "默认不透明度"; }
+                    FieldLabel { text: @tr("默认不透明度"); }
                     SpinBox {
                         value <=> root.pin-opacity;
                         minimum: 25;
@@ -387,12 +389,12 @@ export component SettingsPanel inherits Rectangle {
                         vertical-alignment: center;
                     }
                 }
-                CheckBox { text: "窗口阴影"; checked <=> root.pin-shadow; }
-                CheckBox { text: "始终置顶"; checked <=> root.pin-always-on-top; }
-                CheckBox { text: "启用滚轮缩放"; checked <=> root.pin-wheel-zoom; }
+                CheckBox { text: @tr("窗口阴影"); checked <=> root.pin-shadow; }
+                CheckBox { text: @tr("始终置顶"); checked <=> root.pin-always-on-top; }
+                CheckBox { text: @tr("启用滚轮缩放"); checked <=> root.pin-wheel-zoom; }
                 HorizontalLayout {
                     height: 26px;
-                    FieldLabel { text: "缩放步长"; }
+                    FieldLabel { text: @tr("缩放步长"); }
                     SpinBox {
                         enabled: root.pin-wheel-zoom;
                         value <=> root.pin-zoom-step;
@@ -406,7 +408,7 @@ export component SettingsPanel inherits Rectangle {
                         vertical-alignment: center;
                     }
                 }
-                CheckBox { text: "双击关闭"; checked <=> root.pin-double-click-close; }
+                CheckBox { text: @tr("双击关闭"); checked <=> root.pin-double-click-close; }
                 Rectangle { }
                 }
             }
@@ -417,19 +419,19 @@ export component SettingsPanel inherits Rectangle {
                 VerticalLayout {
                 padding: 12px;
                 spacing: 8px;
-                SectionTitle { text: "全局快捷键"; }
+                SectionTitle { text: @tr("全局快捷键"); }
                 HorizontalLayout {
                     height: 28px;
                     spacing: 6px;
-                    FieldLabel { text: "区域截图"; }
+                    FieldLabel { text: @tr("区域截图"); }
                     LineEdit {
                         width: 190px;
                         text <=> root.hotkey-text;
-                        placeholder-text: "默认 Ctrl+Alt+C；留空则关闭";
+                        placeholder-text: @tr("默认 Ctrl+Alt+C；留空则关闭");
                     }
                     Button {
                         width: 52px;
-                        text: "清除";
+                        text: @tr("清除");
                         clicked => { root.clear-hotkey(); }
                     }
                     if root.hotkey-status > 0: Rectangle {
@@ -451,7 +453,7 @@ export component SettingsPanel inherits Rectangle {
                 }
                 if root.hotkey-status != 1: Text {
                     text: root.hotkey-status == 0
-                        ? "未设置时不会注册任何全局快捷键。"
+                        ? @tr("未设置时不会注册任何全局快捷键。")
                         : root.hotkey-status-tip;
                     color: Palette.alternate-foreground;
                     font-size: SettingsTypography.body-font-size;
@@ -467,26 +469,43 @@ export component SettingsPanel inherits Rectangle {
                 padding: 12px;
                 spacing: 6px;
                 HorizontalLayout {
-                    height: 42px;
-                    spacing: 7px;
-                    Image {
-                        width: 32px;
-                        height: 32px;
-                        source: @image-url("icons/tray.svg");
-                        image-fit: contain;
+                    height: 44px;
+                    spacing: 14px;
+                    HorizontalLayout {
+                        height: 100%;
+                        spacing: 7px;
+                        Image {
+                            width: 32px;
+                            height: 32px;
+                            source: @image-url("icons/tray.svg");
+                            image-fit: contain;
+                        }
+                        Text {
+                            height: 32px;
+                            text: @tr("拾图");
+                            color: Palette.foreground;
+                            font-size: 16px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                        }
                     }
-                    Text {
-                        text: "拾图";
-                        color: Palette.foreground;
-                        font-size: 16px;
-                        font-weight: 700;
-                        vertical-alignment: center;
-                    }
-                    Text {
-                        text: root.version-text;
-                        color: Palette.alternate-foreground;
-                        font-size: SettingsTypography.body-font-size;
-                        vertical-alignment: center;
+                    VerticalLayout {
+                        height: 40px;
+                        spacing: 2px;
+                        Text {
+                            height: 19px;
+                            text: @tr("一个便捷的截图工具");
+                            color: Palette.foreground;
+                            font-size: SettingsTypography.body-font-size;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            height: 19px;
+                            text: @tr("版本 {}", root.version-text);
+                            color: Palette.alternate-foreground;
+                            font-size: SettingsTypography.body-font-size;
+                            vertical-alignment: center;
+                        }
                     }
                     Rectangle { }
                 }
@@ -495,7 +514,7 @@ export component SettingsPanel inherits Rectangle {
                     height: 38px;
                     Text {
                         width: 72px;
-                        text: "构建信息";
+                        text: @tr("构建信息");
                         color: Palette.alternate-foreground;
                         font-size: SettingsTypography.body-font-size;
                         vertical-alignment: top;
@@ -510,17 +529,17 @@ export component SettingsPanel inherits Rectangle {
                 }
                 Rectangle { height: 1px; background: Palette.foreground.with-alpha(0.16); }
                 AboutLinkRow {
-                    label: "Git 项目";
+                    label: @tr("Git 项目");
                     link-text: "dripai/shitu.git";
                     target-url: "https://github.com/dripai/shitu.git";
                 }
                 AboutLinkRow {
-                    label: "问题反馈";
+                    label: @tr("问题反馈");
                     link-text: "https://github.com/dripai/shitu/issues";
                     target-url: "https://github.com/dripai/shitu/issues";
                 }
                 Text {
-                    text: "使用 Rust 与 Slint 构建 · © 2026";
+                    text: @tr("使用 Rust 与 Slint 构建 · © 2026");
                     color: Palette.alternate-foreground;
                     font-size: SettingsTypography.body-font-size;
                 }
@@ -536,12 +555,12 @@ export component SettingsPanel inherits Rectangle {
                 height: 32px;
                 spacing: 0px;
 
-                CenteredTabLabel { text: "常规"; selected: root.current-tab == 0; }
-                CenteredTabLabel { text: "截图"; selected: root.current-tab == 1; }
+                CenteredTabLabel { text: @tr("常规"); selected: root.current-tab == 0; }
+                CenteredTabLabel { text: @tr("截图"); selected: root.current-tab == 1; }
                 CenteredTabLabel { text: "OCR"; selected: root.current-tab == 2; }
-                CenteredTabLabel { text: "钉住"; selected: root.current-tab == 3; }
-                CenteredTabLabel { text: "快捷键"; selected: root.current-tab == 4; }
-                CenteredTabLabel { text: "关于"; selected: root.current-tab == 5; }
+                CenteredTabLabel { text: @tr("钉住"); selected: root.current-tab == 3; }
+                CenteredTabLabel { text: @tr("快捷键"); selected: root.current-tab == 4; }
+                CenteredTabLabel { text: @tr("关于"); selected: root.current-tab == 5; }
             }
         }
 
@@ -550,16 +569,16 @@ export component SettingsPanel inherits Rectangle {
         HorizontalLayout {
             height: 28px;
             Button {
-                text: "开始截图";
+                text: @tr("开始截图");
                 clicked => { root.capture(); }
             }
             Rectangle { }
             Button {
-                text: "恢复默认";
+                text: @tr("恢复默认");
                 clicked => { root.restore-defaults(root.current-tab); }
             }
             Button {
-                text: "保存";
+                text: @tr("保存");
                 clicked => { root.apply-settings(); }
             }
         }

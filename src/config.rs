@@ -3,6 +3,8 @@ use std::{fs, io::Write, path::PathBuf};
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
 
+use crate::i18n;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AppearanceMode {
@@ -14,11 +16,11 @@ pub enum AppearanceMode {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum CompletionAction {
+pub enum LanguageMode {
     #[default]
-    Copy,
-    Save,
-    CopyAndSave,
+    System,
+    Chinese,
+    English,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -57,7 +59,6 @@ impl Default for OcrConfig {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct CaptureConfig {
-    pub completion_action: CompletionAction,
     pub format: ImageFormat,
     pub jpeg_quality: u8,
     pub save_directory: PathBuf,
@@ -69,7 +70,6 @@ pub struct CaptureConfig {
 impl Default for CaptureConfig {
     fn default() -> Self {
         Self {
-            completion_action: CompletionAction::Copy,
             format: ImageFormat::Png,
             jpeg_quality: 90,
             save_directory: default_picture_directory(),
@@ -108,6 +108,7 @@ impl Default for PinConfig {
 #[serde(default)]
 pub struct Config {
     pub appearance: AppearanceMode,
+    pub language: LanguageMode,
     pub launch_at_startup: bool,
     pub hotkey: Option<String>,
     pub capture: CaptureConfig,
@@ -119,6 +120,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             appearance: AppearanceMode::System,
+            language: LanguageMode::System,
             launch_at_startup: false,
             hotkey: Some("Ctrl+Alt+C".to_owned()),
             capture: CaptureConfig::default(),
@@ -137,11 +139,22 @@ impl Config {
                 return Ok(Self::default());
             }
             Err(error) => {
-                return Err(error).with_context(|| format!("读取配置失败：{}", path.display()));
+                return Err(error).with_context(|| {
+                    format!(
+                        "{}: {}",
+                        i18n::text("读取配置失败", "Failed to read settings"),
+                        path.display()
+                    )
+                });
             }
         };
-        let mut config: Self = serde_json::from_slice(&bytes)
-            .with_context(|| format!("配置文件格式无效：{}", path.display()))?;
+        let mut config: Self = serde_json::from_slice(&bytes).with_context(|| {
+            format!(
+                "{}: {}",
+                i18n::text("配置文件格式无效", "Invalid settings file"),
+                path.display()
+            )
+        })?;
         config.validate()?;
         Ok(config)
     }
@@ -151,19 +164,53 @@ impl Config {
         config.validate()?;
 
         let path = Self::path();
-        let parent = path.parent().ok_or_else(|| anyhow!("配置路径没有父目录"))?;
-        fs::create_dir_all(parent)
-            .with_context(|| format!("创建配置目录失败：{}", parent.display()))?;
+        let parent = path.parent().ok_or_else(|| {
+            anyhow!(i18n::text(
+                "配置路径没有父目录",
+                "The settings path has no parent directory"
+            ))
+        })?;
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "{}: {}",
+                i18n::text("创建配置目录失败", "Failed to create settings folder"),
+                parent.display()
+            )
+        })?;
 
         let temp_path = path.with_extension("json.tmp");
         let json = serde_json::to_vec_pretty(&config)?;
         let write_result = (|| -> Result<()> {
-            let mut file = fs::File::create(&temp_path)
-                .with_context(|| format!("创建临时配置失败：{}", temp_path.display()))?;
-            file.write_all(&json)
-                .with_context(|| format!("写入临时配置失败：{}", temp_path.display()))?;
-            file.sync_all()
-                .with_context(|| format!("同步临时配置失败：{}", temp_path.display()))?;
+            let mut file = fs::File::create(&temp_path).with_context(|| {
+                format!(
+                    "{}: {}",
+                    i18n::text(
+                        "创建临时配置失败",
+                        "Failed to create temporary settings file"
+                    ),
+                    temp_path.display()
+                )
+            })?;
+            file.write_all(&json).with_context(|| {
+                format!(
+                    "{}: {}",
+                    i18n::text(
+                        "写入临时配置失败",
+                        "Failed to write temporary settings file"
+                    ),
+                    temp_path.display()
+                )
+            })?;
+            file.sync_all().with_context(|| {
+                format!(
+                    "{}: {}",
+                    i18n::text(
+                        "同步临时配置失败",
+                        "Failed to flush temporary settings file"
+                    ),
+                    temp_path.display()
+                )
+            })?;
             crate::platform::replace_file(&temp_path, &path)
         })();
 
@@ -187,7 +234,10 @@ impl Config {
 
         self.capture.filename_template = self.capture.filename_template.trim().to_owned();
         if self.capture.filename_template.is_empty() {
-            return Err(anyhow!("文件名模板不能为空"));
+            return Err(anyhow!(i18n::text(
+                "文件名模板不能为空",
+                "Filename template cannot be empty"
+            )));
         }
         if self
             .capture
@@ -195,7 +245,10 @@ impl Config {
             .chars()
             .any(|ch| matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*'))
         {
-            return Err(anyhow!("文件名模板包含 Windows 不允许的字符"));
+            return Err(anyhow!(i18n::text(
+                "文件名模板包含 Windows 不允许的字符",
+                "Filename template contains characters that Windows does not allow"
+            )));
         }
 
         if self.capture.save_directory.as_os_str().is_empty() {
