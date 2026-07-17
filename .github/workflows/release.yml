@@ -17,6 +17,15 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Verify tag matches package version
+        shell: pwsh
+        run: |
+          $package = (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages | Select-Object -First 1
+          $expectedTag = "v$($package.version)"
+          if ($env:GITHUB_REF_NAME -ne $expectedTag) {
+            throw "Release tag $env:GITHUB_REF_NAME must match Cargo.toml version $expectedTag"
+          }
+
       - name: Test
         run: cargo test --locked
 

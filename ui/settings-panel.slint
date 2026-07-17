@@ -39,11 +39,12 @@ component CenteredTabLabel inherits Rectangle {
     }
 }
 
-component AboutRow inherits HorizontalLayout {
+component AboutLinkRow inherits HorizontalLayout {
     in property <string> label;
-    in property <string> detail;
+    in property <string> link-text;
+    in property <string> target-url;
 
-    height: 24px;
+    height: 28px;
     spacing: 0px;
 
     Text {
@@ -53,12 +54,10 @@ component AboutRow inherits HorizontalLayout {
         font-size: SettingsTypography.body-font-size;
         vertical-alignment: center;
     }
-    Text {
-        text: root.detail;
-        color: Palette.foreground;
-        font-size: SettingsTypography.body-font-size;
-        vertical-alignment: center;
-        overflow: elide;
+    Button {
+        text: root.link-text;
+        horizontal-stretch: 1;
+        clicked => { Platform.open-url(root.target-url); }
     }
 }
 
@@ -137,7 +136,6 @@ export component SettingsPanel inherits Rectangle {
     callback open-log-directory();
     callback open-config-directory();
     callback config-hint(bool);
-    callback open-licenses();
     callback clear-hotkey();
     callback prepare-ai-ocr();
 
@@ -427,7 +425,7 @@ export component SettingsPanel inherits Rectangle {
                     LineEdit {
                         width: 190px;
                         text <=> root.hotkey-text;
-                        placeholder-text: "例如 Ctrl+Alt+A；留空则关闭";
+                        placeholder-text: "默认 Ctrl+Alt+C；留空则关闭";
                     }
                     Button {
                         width: 52px;
@@ -478,7 +476,7 @@ export component SettingsPanel inherits Rectangle {
                         image-fit: contain;
                     }
                     Text {
-                        text: "截图工具";
+                        text: "拾图";
                         color: Palette.foreground;
                         font-size: 16px;
                         font-weight: 700;
@@ -511,20 +509,15 @@ export component SettingsPanel inherits Rectangle {
                     }
                 }
                 Rectangle { height: 1px; background: Palette.foreground.with-alpha(0.16); }
-                AboutRow { label: "官网"; detail: "尚未配置"; }
-                AboutRow { label: "Git 项目"; detail: "本地仓库（尚未配置远程）"; }
-                AboutRow { label: "问题反馈"; detail: "尚未配置"; }
-                HorizontalLayout {
-                    height: 28px;
-                    Text {
-                        width: 72px;
-                        text: "开源许可";
-                        color: Palette.alternate-foreground;
-                        font-size: SettingsTypography.body-font-size;
-                        vertical-alignment: center;
-                    }
-                    Button { text: "查看第三方许可"; clicked => { root.open-licenses(); } }
-                    Rectangle { }
+                AboutLinkRow {
+                    label: "Git 项目";
+                    link-text: "dripai/shitu.git";
+                    target-url: "https://github.com/dripai/shitu.git";
+                }
+                AboutLinkRow {
+                    label: "问题反馈";
+                    link-text: "https://github.com/dripai/shitu/issues";
+                    target-url: "https://github.com/dripai/shitu/issues";
                 }
                 Text {
                     text: "使用 Rust 与 Slint 构建 · © 2026";

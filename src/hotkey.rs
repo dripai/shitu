@@ -207,6 +207,7 @@ mod tests {
 
     #[test]
     fn parses_modifier_key_binding() {
+        assert!(parse_hotkey("Ctrl+Alt+C").is_some());
         assert!(parse_hotkey("Ctrl+Alt+Space").is_some());
         assert!(parse_hotkey("Win+Shift+K").is_some());
         assert!(parse_hotkey("Ctrl+F3").is_some());

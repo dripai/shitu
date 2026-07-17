@@ -12,17 +12,24 @@ export component StatusBar inherits Rectangle {
         padding-right: 7px;
         spacing: 6px;
 
-        dot-slot := Rectangle {
-            width: 8px;
+        status-indicator := Rectangle {
+            width: 12px;
 
-            Rectangle {
-                y: (dot-slot.height - self.height) / 2;
-                width: 8px;
-                height: 8px;
-                border-radius: 4px;
-                background: root.status-level == 2
-                    ? #cf222e
-                    : root.status-level == 1 ? #238636 : Palette.alternate-foreground;
+            if root.status-level == 2: Text {
+                text: "×";
+                color: #cf222e;
+                font-size: 17px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            if root.status-level != 2: Text {
+                text: "√";
+                color: root.status-level == 1 ? #238636 : Palette.alternate-foreground;
+                font-size: 15px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
             }
         }
         Text {

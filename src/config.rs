@@ -120,7 +120,7 @@ impl Default for Config {
         Self {
             appearance: AppearanceMode::System,
             launch_at_startup: false,
-            hotkey: None,
+            hotkey: Some("Ctrl+Alt+C".to_owned()),
             capture: CaptureConfig::default(),
             ocr: OcrConfig::default(),
             pin: PinConfig::default(),
@@ -215,10 +215,6 @@ impl Config {
     pub fn log_directory() -> PathBuf {
         Self::directory().join("logs")
     }
-
-    pub fn third_party_licenses_path() -> PathBuf {
-        app_data_directory().join("THIRD_PARTY_LICENSES.md")
-    }
 }
 
 pub fn app_data_directory() -> PathBuf {
@@ -242,7 +238,7 @@ mod tests {
     #[test]
     fn defaults_match_product_specification() {
         let config = Config::default();
-        assert!(config.hotkey.is_none());
+        assert_eq!(config.hotkey.as_deref(), Some("Ctrl+Alt+C"));
         assert_eq!(config.capture.jpeg_quality, 90);
         assert_eq!(config.capture.save_directory, default_picture_directory());
         assert_eq!(config.ocr.engine, OcrEngineKind::System);

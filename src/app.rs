@@ -357,7 +357,7 @@ impl AppController {
         } = capabilities;
         let hotkey = HotkeyState::new(config.hotkey.as_deref());
         if let Some(error) = hotkey.error() {
-            status = format!("快捷键无效：{}", error.message());
+            status = format!("启动快捷键异常：{}", error.message());
             status_level = StatusLevel::Error;
         }
         let (ocr_available, ocr_status) = selected_ocr_status(

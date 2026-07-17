@@ -3,7 +3,7 @@ import { SettingsPanel } from "settings-panel.slint";
 import { StatusBar } from "status-bar.slint";
 
 export component MainWindow inherits Window {
-    title: "截图工具";
+    title: "拾图";
     icon: @image-url("icons/tray.svg");
     // Fluent body text is 1.0769rem; this resolves native controls to 13px.
     default-font-size: 12.07px;
@@ -58,7 +58,6 @@ export component MainWindow inherits Window {
     callback open-log-directory();
     callback open-config-directory();
     callback config-hint(bool);
-    callback open-licenses();
     callback clear-hotkey();
     callback prepare-ai-ocr();
     callback ai-ocr-prepared(string);
@@ -128,7 +127,6 @@ export component MainWindow inherits Window {
                     open-log-directory => { root.open-log-directory(); }
                     open-config-directory => { root.open-config-directory(); }
                     config-hint(visible) => { root.config-hint(visible); }
-                    open-licenses => { root.open-licenses(); }
                     clear-hotkey => { root.clear-hotkey(); }
                     prepare-ai-ocr => { root.prepare-ai-ocr(); }
                 }

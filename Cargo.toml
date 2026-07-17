@@ -1,6 +1,6 @@
 [package]
 name = "gridstart"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "A lightweight Windows screenshot and pinning utility built with Rust and Slint"
 

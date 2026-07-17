@@ -1,9 +1,4 @@
-use std::{
-    cell::RefCell,
-    path::{Path, PathBuf},
-    rc::Rc,
-    thread,
-};
+use std::{cell::RefCell, path::PathBuf, rc::Rc, thread};
 
 use anyhow::{Result, anyhow};
 use slint::ComponentHandle;
@@ -197,16 +192,6 @@ pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
     {
         let settings = settings.as_weak();
         let main = main.clone();
-        let state = Rc::clone(&state);
-        settings.unwrap().on_open_licenses(move || {
-            let path = Config::third_party_licenses_path();
-            let result = write_third_party_licenses(&path).and_then(|_| shell::open_path(&path));
-            report_result(&main, &state, result, "已打开第三方许可");
-        });
-    }
-    {
-        let settings = settings.as_weak();
-        let main = main.clone();
         settings.unwrap().on_clear_hotkey(move || {
             let Some(settings) = settings.upgrade() else {
                 return;
@@ -265,7 +250,7 @@ pub(super) fn populate(settings: &MainWindow, state: &AppController) {
     settings.set_pin_double_click_close(state.config.pin.double_click_close);
     settings.set_hotkey_text(state.config.hotkey.clone().unwrap_or_default().into());
     set_hotkey_indicator(settings, state);
-    settings.set_version_text(format!("版本 {}", env!("CARGO_PKG_VERSION")).into());
+    settings.set_version_text(format!("版本 v{}", env!("CARGO_PKG_VERSION")).into());
     settings.set_build_text(build_information().into());
     settings.set_log_path(
         Config::log_directory()
@@ -456,7 +441,7 @@ fn restore_settings_page(settings: &MainWindow, tab: i32) {
             settings.set_pin_double_click_close(defaults.pin.double_click_close);
         }
         4 => {
-            settings.set_hotkey_text("".into());
+            settings.set_hotkey_text(defaults.hotkey.as_deref().unwrap_or_default().into());
             settings.set_hotkey_status(0);
             settings.set_hotkey_status_tip("".into());
         }
@@ -502,14 +487,6 @@ fn report_result(
             );
         }
     }
-}
-
-fn write_third_party_licenses(path: &Path) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(path, include_str!("../../docs/third-party-licenses.md"))?;
-    Ok(())
 }
 
 fn build_information() -> String {
