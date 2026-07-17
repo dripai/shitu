@@ -29,6 +29,31 @@ pub enum ImageFormat {
     Jpeg,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OcrEngineKind {
+    #[default]
+    System,
+    WindowsAi,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct OcrConfig {
+    pub engine: OcrEngineKind,
+    /// Application-side filter for Windows AI `RecognizedWord.MatchConfidence`.
+    pub minimum_confidence: u8,
+}
+
+impl Default for OcrConfig {
+    fn default() -> Self {
+        Self {
+            engine: OcrEngineKind::System,
+            minimum_confidence: 60,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct CaptureConfig {
@@ -86,6 +111,7 @@ pub struct Config {
     pub launch_at_startup: bool,
     pub hotkey: Option<String>,
     pub capture: CaptureConfig,
+    pub ocr: OcrConfig,
     pub pin: PinConfig,
 }
 
@@ -96,6 +122,7 @@ impl Default for Config {
             launch_at_startup: false,
             hotkey: None,
             capture: CaptureConfig::default(),
+            ocr: OcrConfig::default(),
             pin: PinConfig::default(),
         }
     }
@@ -148,6 +175,7 @@ impl Config {
 
     pub fn validate(&mut self) -> Result<()> {
         self.capture.jpeg_quality = self.capture.jpeg_quality.clamp(1, 100);
+        self.ocr.minimum_confidence = self.ocr.minimum_confidence.clamp(0, 100);
         self.pin.default_opacity = self.pin.default_opacity.clamp(25, 100);
         self.pin.zoom_step = self.pin.zoom_step.clamp(5, 100);
 
@@ -209,7 +237,7 @@ pub fn default_picture_directory() -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::{Config, default_picture_directory};
+    use super::{Config, OcrEngineKind, default_picture_directory};
 
     #[test]
     fn defaults_match_product_specification() {
@@ -217,6 +245,8 @@ mod tests {
         assert!(config.hotkey.is_none());
         assert_eq!(config.capture.jpeg_quality, 90);
         assert_eq!(config.capture.save_directory, default_picture_directory());
+        assert_eq!(config.ocr.engine, OcrEngineKind::System);
+        assert_eq!(config.ocr.minimum_confidence, 60);
         assert_eq!(config.pin.default_opacity, 100);
         assert_eq!(config.pin.zoom_step, 15);
     }
@@ -225,10 +255,12 @@ mod tests {
     fn validation_normalizes_ranges_and_rejects_invalid_names() {
         let mut config = Config::default();
         config.capture.jpeg_quality = 0;
+        config.ocr.minimum_confidence = 255;
         config.pin.default_opacity = 1;
         config.pin.zoom_step = 255;
         config.validate().unwrap();
         assert_eq!(config.capture.jpeg_quality, 1);
+        assert_eq!(config.ocr.minimum_confidence, 100);
         assert_eq!(config.pin.default_opacity, 25);
         assert_eq!(config.pin.zoom_step, 100);
 

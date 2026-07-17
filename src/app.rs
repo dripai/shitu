@@ -20,11 +20,14 @@ use slint::{CloseRequestResponse, ComponentHandle, SharedString, Timer};
 
 use crate::{
     capture,
-    config::{AppearanceMode, Config},
+    config::{AppearanceMode, Config, OcrEngineKind},
     hotkey::HotkeyState,
     image::DrawStyle,
     logging,
-    platform::{ocr::system_availability, windows::window},
+    platform::{
+        ocr::{AiOcrState, ai_availability, system_availability},
+        windows::window,
+    },
 };
 use capture_controller::CaptureSession;
 use pin::PinRegistry;
@@ -40,7 +43,7 @@ enum StatusLevel {
 
 pub fn run() -> Result<(), slint::PlatformError> {
     logging::initialize();
-    let (ocr_available, ocr_status) = match system_availability() {
+    let (system_ocr_available, system_ocr_status) = match system_availability() {
         Ok(()) => {
             logging::info("Windows system OCR is available");
             (true, "可用（Windows 系统 OCR）".to_owned())
@@ -49,6 +52,17 @@ pub fn run() -> Result<(), slint::PlatformError> {
             let message = error.message();
             logging::error(format!("Windows system OCR unavailable: {message}"));
             (false, format!("不可用：{message}"))
+        }
+    };
+    let ai_ocr_state = match ai_availability() {
+        Ok(state) => {
+            logging::info(format!("Windows AI OCR state: {state:?}"));
+            state
+        }
+        Err(error) => {
+            let message = error.message();
+            logging::error(format!("Windows AI OCR probe failed: {message}"));
+            AiOcrState::Failed(message)
         }
     };
 
@@ -72,6 +86,12 @@ pub fn run() -> Result<(), slint::PlatformError> {
             )
         }
     };
+    let (ocr_available, ocr_status) = selected_ocr_status(
+        &config,
+        system_ocr_available,
+        &system_ocr_status,
+        &ai_ocr_state,
+    );
     if !ocr_available && initial_level != StatusLevel::Error {
         initial_status = ocr_status.clone();
         initial_level = StatusLevel::Error;
@@ -82,8 +102,11 @@ pub fn run() -> Result<(), slint::PlatformError> {
         initial_level,
         Rc::clone(&pins),
         ocr_result.as_weak(),
-        ocr_available,
-        ocr_status,
+        OcrCapabilities {
+            system_available: system_ocr_available,
+            system_status: system_ocr_status,
+            ai_state: ai_ocr_state,
+        },
     )));
 
     refresh_main(&main, &state.borrow());
@@ -231,6 +254,11 @@ fn refresh_main(main: &MainWindow, state: &AppController) {
     main.set_status_level(state.status_level as i32);
     main.set_ocr_available(state.ocr_available);
     main.set_ocr_status(state.ocr_status.as_str().into());
+    main.set_system_ocr_available(state.system_ocr_available);
+    main.set_system_ocr_status(state.system_ocr_status.as_str().into());
+    main.set_ai_ocr_available(state.ai_ocr_state.is_ready());
+    main.set_ai_ocr_status(state.ai_ocr_state.message().into());
+    main.set_ai_ocr_can_install(state.ai_ocr_state.can_install());
 }
 
 fn set_status(main: &slint::Weak<MainWindow>, state: &mut AppController, status: String) {
@@ -301,7 +329,16 @@ struct AppController {
     ocr_result: slint::Weak<OcrResultWindow>,
     ocr_available: bool,
     ocr_status: String,
+    system_ocr_available: bool,
+    system_ocr_status: String,
+    ai_ocr_state: AiOcrState,
     draw_style: DrawStyle,
+}
+
+struct OcrCapabilities {
+    system_available: bool,
+    system_status: String,
+    ai_state: AiOcrState,
 }
 
 impl AppController {
@@ -311,14 +348,24 @@ impl AppController {
         mut status_level: StatusLevel,
         pins: Rc<RefCell<PinRegistry>>,
         ocr_result: slint::Weak<OcrResultWindow>,
-        ocr_available: bool,
-        ocr_status: String,
+        capabilities: OcrCapabilities,
     ) -> Self {
+        let OcrCapabilities {
+            system_available: system_ocr_available,
+            system_status: system_ocr_status,
+            ai_state: ai_ocr_state,
+        } = capabilities;
         let hotkey = HotkeyState::new(config.hotkey.as_deref());
         if let Some(error) = hotkey.error() {
             status = format!("快捷键无效：{}", error.message());
             status_level = StatusLevel::Error;
         }
+        let (ocr_available, ocr_status) = selected_ocr_status(
+            &config,
+            system_ocr_available,
+            &system_ocr_status,
+            &ai_ocr_state,
+        );
         Self {
             config,
             hotkey,
@@ -331,11 +378,35 @@ impl AppController {
             ocr_result,
             ocr_available,
             ocr_status,
+            system_ocr_available,
+            system_ocr_status,
+            ai_ocr_state,
             draw_style: DrawStyle {
                 rgba: [236, 92, 102, 255],
                 radius: 2,
             },
         }
+    }
+
+    fn refresh_selected_ocr(&mut self) {
+        (self.ocr_available, self.ocr_status) = selected_ocr_status(
+            &self.config,
+            self.system_ocr_available,
+            &self.system_ocr_status,
+            &self.ai_ocr_state,
+        );
+    }
+}
+
+fn selected_ocr_status(
+    config: &Config,
+    system_available: bool,
+    system_status: &str,
+    ai_state: &AiOcrState,
+) -> (bool, String) {
+    match config.ocr.engine {
+        OcrEngineKind::System => (system_available, system_status.to_owned()),
+        OcrEngineKind::WindowsAi => (ai_state.is_ready(), ai_state.message()),
     }
 }
 

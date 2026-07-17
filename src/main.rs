@@ -10,5 +10,10 @@ mod output;
 mod platform;
 
 fn main() -> Result<(), slint::PlatformError> {
+    #[cfg(windows)]
+    if let Some(exit_code) = platform::ocr::worker_exit_code() {
+        std::process::exit(exit_code);
+    }
+
     app::run()
 }

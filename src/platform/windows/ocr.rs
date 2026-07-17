@@ -1,3 +1,5 @@
+use std::{thread, time::Duration};
+
 use windows::{
     Graphics::Imaging::{BitmapAlphaMode, BitmapPixelFormat, SoftwareBitmap},
     Media::Ocr::OcrEngine as NativeOcrEngine,
@@ -41,7 +43,12 @@ fn recognize_impl(image: &CapturedImage) -> windows::core::Result<String> {
         image.height() as i32,
         BitmapAlphaMode::Ignore,
     )?;
-    let result = engine.RecognizeAsync(&bitmap)?.join()?;
+    let operation = engine.RecognizeAsync(&bitmap)?;
+    // AsyncStatus::Started is 0; windows-future does not re-export the enum through windows.
+    while operation.Status()?.0 == 0 {
+        thread::sleep(Duration::from_millis(5));
+    }
+    let result = operation.GetResults()?;
     Ok(result.Text()?.to_string())
 }
 

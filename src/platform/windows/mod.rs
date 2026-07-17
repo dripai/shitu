@@ -7,6 +7,8 @@ pub mod shell;
 pub mod startup;
 pub mod window;
 pub mod window_target;
+mod windows_ai_bindings;
+pub mod windows_ai_ocr;
 
 use std::mem::size_of;
 

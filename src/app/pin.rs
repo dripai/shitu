@@ -15,11 +15,11 @@ use super::{
 };
 use crate::{
     capture,
-    config::{CaptureConfig, PinConfig},
+    config::{CaptureConfig, OcrConfig, PinConfig},
     image::{CapturedImage, DrawStyle},
     logging, output,
     platform::{
-        ocr::{OcrFailure, recognize_system},
+        ocr::{OcrFailure, recognize},
         windows::{shell, window},
     },
 };
@@ -29,6 +29,7 @@ pub(super) struct PinRequest {
     pub source_path: Option<PathBuf>,
     pub pin_config: PinConfig,
     pub capture_config: CaptureConfig,
+    pub ocr_config: OcrConfig,
     pub ocr_available: bool,
 }
 
@@ -50,6 +51,7 @@ impl PinRegistry {
             source_path,
             pin_config,
             capture_config,
+            ocr_config,
             ocr_available,
         } = request;
         let pin = PinWindow::new()?;
@@ -90,6 +92,7 @@ impl PinRegistry {
             scale_percent: 100,
             zoom_step: pin_config.zoom_step,
             capture_config,
+            ocr_config,
             annotations: AnnotationHistory::default(),
             draw_style: DrawStyle {
                 rgba: [236, 92, 102, 255],
@@ -459,7 +462,11 @@ impl PinController {
             return;
         };
         self.status("正在识别文字...".to_owned(), StatusLevel::Info);
-        spawn_pin_ocr(pin.as_weak(), self.state.borrow().image.clone());
+        let (image, config) = {
+            let state = self.state.borrow();
+            (state.image.clone(), state.ocr_config.clone())
+        };
+        spawn_pin_ocr(pin.as_weak(), image, config);
     }
 
     fn begin_annotation(&self, x: f32, y: f32, tool: i32) {
@@ -754,7 +761,7 @@ fn replace_pin_image(
     pin.window().set_size(PhysicalSize::new(width, height));
 }
 
-fn spawn_pin_ocr(pin: slint::Weak<PinWindow>, image: CapturedImage) {
+fn spawn_pin_ocr(pin: slint::Weak<PinWindow>, image: CapturedImage, config: OcrConfig) {
     let width = image.width();
     let height = image.height();
     let bounds = image.bounds;
@@ -763,7 +770,7 @@ fn spawn_pin_ocr(pin: slint::Weak<PinWindow>, image: CapturedImage) {
         logging::info(format!("pin OCR started: {width}x{height}"));
         let result = CapturedImage::from_rgba(bounds.left, bounds.top, width, height, &rgba)
             .map_err(|error| OcrFailure::Failed(error.to_string()))
-            .and_then(|image| recognize_system(&image));
+            .and_then(|image| recognize(&image, &config));
         let (code, text) = ocr_result_payload(result);
         logging::info(format!("pin OCR completed with code {code}"));
         let _ = pin.upgrade_in_event_loop(move |pin| {
@@ -788,6 +795,7 @@ struct PinnedWindowState {
     scale_percent: i32,
     zoom_step: u8,
     capture_config: CaptureConfig,
+    ocr_config: OcrConfig,
     annotations: AnnotationHistory,
     draw_style: DrawStyle,
 }

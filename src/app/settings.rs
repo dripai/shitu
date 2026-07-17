@@ -2,6 +2,7 @@ use std::{
     cell::RefCell,
     path::{Path, PathBuf},
     rc::Rc,
+    thread,
 };
 
 use anyhow::{Result, anyhow};
@@ -12,14 +13,91 @@ use super::{
     set_status_level,
 };
 use crate::{
-    config::{AppearanceMode, CaptureConfig, CompletionAction, Config, ImageFormat, PinConfig},
+    config::{
+        AppearanceMode, CaptureConfig, CompletionAction, Config, ImageFormat, OcrConfig,
+        OcrEngineKind, PinConfig,
+    },
     hotkey::{HotkeyState, validate_binding},
     logging,
-    platform::windows::{shell, startup},
+    platform::{
+        ocr::{AiOcrState, OcrFailure, prepare_ai},
+        windows::{shell, startup},
+    },
 };
 
 pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
     let main = settings.as_weak();
+    {
+        let main = main.clone();
+        let state = Rc::clone(&state);
+        settings.on_prepare_ai_ocr(move || {
+            {
+                let mut state = state.borrow_mut();
+                state.ai_ocr_state = AiOcrState::Preparing;
+                state.refresh_selected_ocr();
+                set_status_level(
+                    &main,
+                    &mut state,
+                    "正在准备 Windows AI OCR 模型...".to_owned(),
+                    StatusLevel::Info,
+                );
+                refresh_main_if_available(&main, &state);
+            }
+            let main = main.clone();
+            thread::spawn(move || {
+                let payload = serde_json::to_string(&prepare_ai()).unwrap_or_else(|error| {
+                    serde_json::to_string(&Err::<AiOcrState, _>(OcrFailure::Failed(
+                        error.to_string(),
+                    )))
+                    .unwrap_or_default()
+                });
+                let _ = main.upgrade_in_event_loop(move |main| {
+                    main.invoke_ai_ocr_prepared(payload.into());
+                });
+            });
+        });
+    }
+    {
+        let main = main.clone();
+        let state = Rc::clone(&state);
+        settings.on_ai_ocr_prepared(move |payload| {
+            let result = serde_json::from_str::<Result<AiOcrState, OcrFailure>>(payload.as_str())
+                .unwrap_or_else(|error| Err(OcrFailure::Failed(error.to_string())));
+            let (ai_state, message, level) = match result {
+                Ok(ai_state) => {
+                    let message = ai_state.message();
+                    let level = if ai_state.is_ready() {
+                        StatusLevel::Success
+                    } else {
+                        StatusLevel::Error
+                    };
+                    (ai_state, message, level)
+                }
+                Err(OcrFailure::AiUnavailable(ai_state)) => {
+                    let message = ai_state.message();
+                    (ai_state, message, StatusLevel::Error)
+                }
+                Err(error) => {
+                    let message = error.message();
+                    (
+                        AiOcrState::Failed(message.clone()),
+                        message,
+                        StatusLevel::Error,
+                    )
+                }
+            };
+            {
+                let mut state = state.borrow_mut();
+                state.ai_ocr_state = ai_state;
+                state.refresh_selected_ocr();
+                set_status_level(&main, &mut state, message, level);
+                refresh_main_if_available(&main, &state);
+                if let Some(main) = main.upgrade() {
+                    populate(&main, &state);
+                }
+            }
+        });
+    }
     {
         let settings = settings.as_weak();
         let main = main.clone();
@@ -177,6 +255,8 @@ pub(super) fn populate(settings: &MainWindow, state: &AppController) {
     settings.set_filename_template(state.config.capture.filename_template.clone().into());
     settings.set_auto_save(state.config.capture.auto_save);
     settings.set_save_notification(state.config.capture.save_notification);
+    settings.set_ocr_engine(ocr_engine_index(state.config.ocr.engine));
+    settings.set_ocr_minimum_confidence(state.config.ocr.minimum_confidence as i32);
     settings.set_pin_opacity(state.config.pin.default_opacity as i32);
     settings.set_pin_shadow(state.config.pin.shadow);
     settings.set_pin_always_on_top(state.config.pin.always_on_top);
@@ -247,6 +327,7 @@ fn apply_settings(
     {
         let mut state = state.borrow_mut();
         state.config = candidate;
+        state.refresh_selected_ocr();
         set_status_level(
             main,
             &mut state,
@@ -323,6 +404,10 @@ fn config_from_settings(settings: &MainWindow) -> Config {
             auto_save: settings.get_auto_save(),
             save_notification: settings.get_save_notification(),
         },
+        ocr: OcrConfig {
+            engine: ocr_engine_from_index(settings.get_ocr_engine()),
+            minimum_confidence: settings.get_ocr_minimum_confidence().clamp(0, 100) as u8,
+        },
         pin: PinConfig {
             default_opacity: settings.get_pin_opacity().clamp(25, 100) as u8,
             shadow: settings.get_pin_shadow(),
@@ -359,6 +444,10 @@ fn restore_settings_page(settings: &MainWindow, tab: i32) {
             settings.set_save_notification(defaults.capture.save_notification);
         }
         2 => {
+            settings.set_ocr_engine(ocr_engine_index(defaults.ocr.engine));
+            settings.set_ocr_minimum_confidence(defaults.ocr.minimum_confidence as i32);
+        }
+        3 => {
             settings.set_pin_opacity(defaults.pin.default_opacity as i32);
             settings.set_pin_shadow(defaults.pin.shadow);
             settings.set_pin_always_on_top(defaults.pin.always_on_top);
@@ -366,12 +455,27 @@ fn restore_settings_page(settings: &MainWindow, tab: i32) {
             settings.set_pin_zoom_step(defaults.pin.zoom_step as i32);
             settings.set_pin_double_click_close(defaults.pin.double_click_close);
         }
-        3 => {
+        4 => {
             settings.set_hotkey_text("".into());
             settings.set_hotkey_status(0);
             settings.set_hotkey_status_tip("".into());
         }
         _ => {}
+    }
+}
+
+fn ocr_engine_index(engine: OcrEngineKind) -> i32 {
+    match engine {
+        OcrEngineKind::System => 0,
+        OcrEngineKind::WindowsAi => 1,
+    }
+}
+
+fn ocr_engine_from_index(index: i32) -> OcrEngineKind {
+    if index == 1 {
+        OcrEngineKind::WindowsAi
+    } else {
+        OcrEngineKind::System
     }
 }
 

@@ -18,6 +18,11 @@ export component MainWindow inherits Window {
     in property <int> status-level: 0;
     in property <bool> ocr-available: false;
     in property <string> ocr-status;
+    in property <bool> system-ocr-available: false;
+    in property <string> system-ocr-status;
+    in property <bool> ai-ocr-available: false;
+    in property <string> ai-ocr-status;
+    in property <bool> ai-ocr-can-install: false;
 
     in-out property <int> current-tab: 0;
     in-out property <int> theme-mode: 0;
@@ -29,6 +34,8 @@ export component MainWindow inherits Window {
     in-out property <string> filename-template;
     in-out property <bool> auto-save: false;
     in-out property <bool> save-notification: true;
+    in-out property <int> ocr-engine: 0;
+    in-out property <int> ocr-minimum-confidence: 60;
     in-out property <int> pin-opacity: 100;
     in-out property <bool> pin-shadow: true;
     in-out property <bool> pin-always-on-top: true;
@@ -53,6 +60,8 @@ export component MainWindow inherits Window {
     callback config-hint(bool);
     callback open-licenses();
     callback clear-hotkey();
+    callback prepare-ai-ocr();
+    callback ai-ocr-prepared(string);
 
     init => {
         Palette.color-scheme = root.theme-mode == 1
@@ -88,6 +97,8 @@ export component MainWindow inherits Window {
                     filename-template <=> root.filename-template;
                     auto-save <=> root.auto-save;
                     save-notification <=> root.save-notification;
+                    ocr-engine <=> root.ocr-engine;
+                    ocr-minimum-confidence <=> root.ocr-minimum-confidence;
                     pin-opacity <=> root.pin-opacity;
                     pin-shadow <=> root.pin-shadow;
                     pin-always-on-top <=> root.pin-always-on-top;
@@ -103,6 +114,11 @@ export component MainWindow inherits Window {
                     config-path: root.config-path;
                     ocr-available: root.ocr-available;
                     ocr-status: root.ocr-status;
+                    system-ocr-available: root.system-ocr-available;
+                    system-ocr-status: root.system-ocr-status;
+                    ai-ocr-available: root.ai-ocr-available;
+                    ai-ocr-status: root.ai-ocr-status;
+                    ai-ocr-can-install: root.ai-ocr-can-install;
 
                     capture => { root.capture(); }
                     apply-settings => { root.apply-settings(); }
@@ -114,6 +130,7 @@ export component MainWindow inherits Window {
                     config-hint(visible) => { root.config-hint(visible); }
                     open-licenses => { root.open-licenses(); }
                     clear-hotkey => { root.clear-hotkey(); }
+                    prepare-ai-ocr => { root.prepare-ai-ocr(); }
                 }
             }
         }

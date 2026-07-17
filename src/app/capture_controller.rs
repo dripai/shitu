@@ -12,11 +12,11 @@ use super::{
 };
 use crate::{
     capture,
-    config::{CaptureConfig, CompletionAction},
+    config::{CaptureConfig, CompletionAction, OcrConfig},
     image::{CapturedImage, DesktopBounds},
     logging, output,
     platform::{
-        ocr::{OcrFailure, recognize_system},
+        ocr::{OcrFailure, recognize},
         windows::window_target::WindowTargets,
     },
 };
@@ -226,13 +226,16 @@ fn bind_overlay(
         let overlay = overlay.as_weak();
         let state = Rc::clone(&state);
         overlay.unwrap().on_recognize_text(move || {
-            let image = state.borrow().original_selection();
+            let (image, ocr_config) = {
+                let state = state.borrow();
+                (state.original_selection(), state.config.ocr.clone())
+            };
             match image {
                 Ok(image) => {
                     if let Some(overlay) = overlay.upgrade() {
                         overlay.set_selection_info("正在识别文字...".into());
                     }
-                    spawn_overlay_ocr(overlay.clone(), image);
+                    spawn_overlay_ocr(overlay.clone(), image, ocr_config);
                 }
                 Err(error) => {
                     if let Some(overlay) = overlay.upgrade() {
@@ -256,12 +259,13 @@ fn bind_overlay(
         let state = Rc::clone(&state);
         let app_state = Rc::downgrade(&state);
         overlay.unwrap().on_pin_selection(move || {
-            let (image, pin_config, capture_config, pins, ocr_available) = {
+            let (image, pin_config, capture_config, ocr_config, pins, ocr_available) = {
                 let state = state.borrow();
                 (
                     state.rendered_selection(),
                     state.config.pin.clone(),
                     state.config.capture.clone(),
+                    state.config.ocr.clone(),
                     state.pins.clone(),
                     state.ocr_available,
                 )
@@ -292,6 +296,7 @@ fn bind_overlay(
                     source_path,
                     pin_config,
                     capture_config,
+                    ocr_config,
                     ocr_available,
                 },
                 main.clone(),
@@ -327,7 +332,7 @@ fn bind_overlay(
     }
 }
 
-fn spawn_overlay_ocr(overlay: slint::Weak<OverlayWindow>, image: CapturedImage) {
+fn spawn_overlay_ocr(overlay: slint::Weak<OverlayWindow>, image: CapturedImage, config: OcrConfig) {
     let width = image.width();
     let height = image.height();
     let bounds = image.bounds;
@@ -336,7 +341,7 @@ fn spawn_overlay_ocr(overlay: slint::Weak<OverlayWindow>, image: CapturedImage) 
         logging::info(format!("selection OCR started: {width}x{height}"));
         let result = CapturedImage::from_rgba(bounds.left, bounds.top, width, height, &rgba)
             .map_err(|error| OcrFailure::Failed(error.to_string()))
-            .and_then(|image| recognize_system(&image));
+            .and_then(|image| recognize(&image, &config));
         let (code, text) = ocr_result_payload(result);
         logging::info(format!("selection OCR completed with code {code}"));
         let _ = overlay.upgrade_in_event_loop(move |overlay| {
@@ -450,9 +455,10 @@ pub(super) fn ocr_result_payload(result: Result<String, OcrFailure>) -> (i32, St
         Ok(text) => (0, text),
         Err(OcrFailure::MissingLanguagePack) => (2, String::new()),
         Err(OcrFailure::Unsupported) => (3, String::new()),
+        Err(OcrFailure::AiUnavailable(state)) => (4, state.message()),
         Err(OcrFailure::Failed(message)) => {
             logging::error(message.as_str());
-            (4, message)
+            (5, message)
         }
     }
 }

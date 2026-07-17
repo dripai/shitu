@@ -121,6 +121,13 @@ export component SettingsPanel inherits Rectangle {
     in property <string> config-path;
     in property <bool> ocr-available: false;
     in property <string> ocr-status;
+    in property <bool> system-ocr-available: false;
+    in property <string> system-ocr-status;
+    in property <bool> ai-ocr-available: false;
+    in property <string> ai-ocr-status;
+    in property <bool> ai-ocr-can-install: false;
+    in-out property <int> ocr-engine: 0;
+    in-out property <int> ocr-minimum-confidence: 60;
 
     callback apply-settings();
     callback capture();
@@ -132,6 +139,7 @@ export component SettingsPanel inherits Rectangle {
     callback config-hint(bool);
     callback open-licenses();
     callback clear-hotkey();
+    callback prepare-ai-ocr();
 
     changed current-tab => { root.config-hint(false); }
 
@@ -217,17 +225,6 @@ export component SettingsPanel inherits Rectangle {
                     SectionTitle { text: "输出"; }
                     HorizontalLayout {
                         height: 26px;
-                        FieldLabel { text: "系统 OCR"; }
-                        Text {
-                            text: root.ocr-status;
-                            color: root.ocr-available ? #16833d : #cf222e;
-                            font-size: SettingsTypography.body-font-size;
-                            vertical-alignment: center;
-                            overflow: elide;
-                        }
-                    }
-                    HorizontalLayout {
-                        height: 26px;
                         FieldLabel { text: "截图完成后"; }
                         ComboBox {
                             width: 240px;
@@ -294,6 +291,79 @@ export component SettingsPanel inherits Rectangle {
                     }
                     Rectangle { }
                 }
+                }
+            }
+
+            Tab {
+                title: "";
+                horizontal-stretch: 1;
+                VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                SectionTitle { text: "识别引擎"; }
+                HorizontalLayout {
+                    height: 26px;
+                    FieldLabel { text: "默认引擎"; }
+                    ComboBox {
+                        width: 220px;
+                        model: ["兼容系统 OCR", "Windows AI OCR（增强）"];
+                        current-index <=> root.ocr-engine;
+                    }
+                    Rectangle { }
+                }
+                HorizontalLayout {
+                    height: 26px;
+                    FieldLabel { text: "兼容 OCR"; }
+                    Text {
+                        text: root.system-ocr-status;
+                        color: root.system-ocr-available ? #16833d : #cf222e;
+                        font-size: SettingsTypography.body-font-size;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+                HorizontalLayout {
+                    height: 26px;
+                    FieldLabel { text: "增强 OCR"; }
+                    Text {
+                        text: root.ai-ocr-status;
+                        color: root.ai-ocr-available ? #16833d : #cf222e;
+                        font-size: SettingsTypography.body-font-size;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                    if root.ai-ocr-can-install: Button {
+                        width: 78px;
+                        text: "安装模型";
+                        clicked => { root.prepare-ai-ocr(); }
+                    }
+                }
+                Rectangle { height: 1px; background: Palette.foreground.with-alpha(0.16); }
+                SectionTitle { text: "增强 OCR 输出"; }
+                HorizontalLayout {
+                    height: 26px;
+                    FieldLabel { text: "最低置信度"; }
+                    SpinBox {
+                        width: 84px;
+                        enabled: root.ocr-engine == 1 && root.ai-ocr-available;
+                        value <=> root.ocr-minimum-confidence;
+                        minimum: 0;
+                        maximum: 100;
+                    }
+                    Text {
+                        text: "%";
+                        color: Palette.foreground;
+                        font-size: SettingsTypography.body-font-size;
+                        vertical-alignment: center;
+                    }
+                    Rectangle { }
+                }
+                Text {
+                    text: "仅过滤 Windows AI OCR 返回的低置信度词语。";
+                    color: Palette.alternate-foreground;
+                    font-size: SettingsTypography.body-font-size;
+                }
+                Rectangle { }
                 }
             }
 
@@ -475,9 +545,10 @@ export component SettingsPanel inherits Rectangle {
 
                 CenteredTabLabel { text: "常规"; selected: root.current-tab == 0; }
                 CenteredTabLabel { text: "截图"; selected: root.current-tab == 1; }
-                CenteredTabLabel { text: "钉住"; selected: root.current-tab == 2; }
-                CenteredTabLabel { text: "快捷键"; selected: root.current-tab == 3; }
-                CenteredTabLabel { text: "关于"; selected: root.current-tab == 4; }
+                CenteredTabLabel { text: "OCR"; selected: root.current-tab == 2; }
+                CenteredTabLabel { text: "钉住"; selected: root.current-tab == 3; }
+                CenteredTabLabel { text: "快捷键"; selected: root.current-tab == 4; }
+                CenteredTabLabel { text: "关于"; selected: root.current-tab == 5; }
             }
         }
 
