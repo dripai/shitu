@@ -87,15 +87,33 @@ pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
         let settings = settings.as_weak();
         let main = main.clone();
         let state = Rc::clone(&state);
-        settings.unwrap().on_open_config_file(move || {
+        settings.unwrap().on_open_config_directory(move || {
             let path = Config::path();
+            let directory = Config::directory();
             let result = if path.exists() {
                 Ok(())
             } else {
                 state.borrow().config.save()
             }
-            .and_then(|_| shell::open_path(&path));
-            report_result(&main, &state, result, "已打开配置文件，修改后请重启应用");
+            .and_then(|_| shell::open_path(&directory));
+            report_result(&main, &state, result, "已打开配置文件夹");
+        });
+    }
+    {
+        let main = main.clone();
+        let state = Rc::clone(&state);
+        settings.on_config_hint(move |visible| {
+            let Some(main) = main.upgrade() else {
+                return;
+            };
+            if visible {
+                main.set_status_text("手动修改配置后需要重启应用。".into());
+                main.set_status_level(StatusLevel::Info as i32);
+            } else {
+                let state = state.borrow();
+                main.set_status_text(state.status.as_str().into());
+                main.set_status_level(state.status_level as i32);
+            }
         });
     }
     {
@@ -169,7 +187,13 @@ pub(super) fn populate(settings: &MainWindow, state: &AppController) {
     set_hotkey_indicator(settings, state);
     settings.set_version_text(format!("版本 {}", env!("CARGO_PKG_VERSION")).into());
     settings.set_build_text(build_information().into());
-    settings.set_config_path(Config::path().to_string_lossy().into_owned().into());
+    settings.set_log_path(
+        Config::log_directory()
+            .to_string_lossy()
+            .into_owned()
+            .into(),
+    );
+    settings.set_config_path(Config::directory().to_string_lossy().into_owned().into());
 }
 
 fn apply_settings(

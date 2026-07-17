@@ -1,5 +1,4 @@
 import { AnnotationView } from "annotation-view.slint";
-import { CaptureToolbar } from "capture-toolbar.slint";
 
 export component PinWindow inherits Window {
     title: "钉住";
@@ -19,17 +18,16 @@ export component PinWindow inherits Window {
     in-out property <int> scale-percent: 100;
     in property <string> original-size-text;
     in property <bool> has-source-file: false;
+    in property <bool> ocr-available: false;
     in-out property <bool> toolbar-visible: false;
     in property <[AnnotationView]> annotations;
     in-out property <int> active-tool: 0;
-    in-out property <int> color-index: 0;
-    in-out property <int> stroke-radius: 2;
     in-out property <bool> drawing: false;
 
     callback close-pin();
-    callback open-menu();
     callback drag-pin();
     callback scale-pin(int);
+    callback set-toolbar(bool);
     callback set-scale(int);
     callback fit-screen();
     callback copy-image();
@@ -51,8 +49,6 @@ export component PinWindow inherits Window {
     callback finish-annotation();
     callback undo();
     callback redo();
-    callback select-color(int);
-    callback select-width(int);
 
     FocusScope {
         key-pressed(event) => {
@@ -65,12 +61,88 @@ export component PinWindow inherits Window {
         }
     }
 
-    Image {
+    menu-area := ContextMenuArea {
+        Menu {
+            MenuItem {
+                title: "复制图像";
+                activated => { root.copy-image(); }
+            }
+            MenuItem {
+                title: "图像另存为...";
+                activated => { root.save-image(); }
+            }
+            if root.ocr-available: MenuItem {
+                title: "OCR 识别";
+                activated => { root.recognize-text(); }
+            }
+            MenuSeparator {}
+            MenuItem {
+                title: "显示工具栏";
+                checkable: true;
+                checked: root.toolbar-visible;
+                activated => { root.set-toolbar(!root.toolbar-visible); }
+            }
+            MenuItem {
+                title: "窗口阴影";
+                checkable: true;
+                checked: root.shadow-enabled;
+                activated => { root.set-shadow(!root.shadow-enabled); }
+            }
+            MenuItem {
+                title: "始终置顶";
+                checkable: true;
+                checked: root.top-enabled;
+                activated => { root.set-top(!root.top-enabled); }
+            }
+            Menu {
+                title: "不透明度";
+                MenuItem { title: "25%"; checkable: true; checked: root.alpha-percent == 25; activated => { root.set-opacity(25); } }
+                MenuItem { title: "50%"; checkable: true; checked: root.alpha-percent == 50; activated => { root.set-opacity(50); } }
+                MenuItem { title: "75%"; checkable: true; checked: root.alpha-percent == 75; activated => { root.set-opacity(75); } }
+                MenuItem { title: "90%"; checkable: true; checked: root.alpha-percent == 90; activated => { root.set-opacity(90); } }
+                MenuItem { title: "100%"; checkable: true; checked: root.alpha-percent == 100; activated => { root.set-opacity(100); } }
+            }
+            Menu {
+                title: "缩放（\{root.scale-percent}%）";
+                MenuItem { title: "25%"; checkable: true; checked: root.scale-percent == 25; activated => { root.set-scale(25); } }
+                MenuItem { title: "50%"; checkable: true; checked: root.scale-percent == 50; activated => { root.set-scale(50); } }
+                MenuItem { title: "75%"; checkable: true; checked: root.scale-percent == 75; activated => { root.set-scale(75); } }
+                MenuItem { title: "100%"; checkable: true; checked: root.scale-percent == 100; activated => { root.set-scale(100); } }
+                MenuItem { title: "125%"; checkable: true; checked: root.scale-percent == 125; activated => { root.set-scale(125); } }
+                MenuItem { title: "150%"; checkable: true; checked: root.scale-percent == 150; activated => { root.set-scale(150); } }
+                MenuItem { title: "200%"; checkable: true; checked: root.scale-percent == 200; activated => { root.set-scale(200); } }
+                MenuSeparator {}
+                MenuItem { title: "适合屏幕"; activated => { root.fit-screen(); } }
+                MenuItem { title: "恢复原始大小"; activated => { root.set-scale(100); } }
+            }
+            MenuSeparator {}
+            Menu {
+                title: "图像处理";
+                MenuItem { title: "向左旋转 90°"; activated => { root.rotate-left(); } }
+                MenuItem { title: "向右旋转 90°"; activated => { root.rotate-right(); } }
+                MenuItem { title: "水平翻转"; activated => { root.flip-horizontal(); } }
+                MenuItem { title: "垂直翻转"; activated => { root.flip-vertical(); } }
+            }
+            Menu {
+                title: "替换图像";
+                MenuItem { title: "从剪贴板"; activated => { root.replace-clipboard(); } }
+                MenuItem { title: "从文件..."; activated => { root.replace-file(); } }
+            }
+            if root.has-source-file: MenuItem {
+                title: "在文件夹中显示";
+                activated => { root.reveal-file(); }
+            }
+            MenuSeparator {}
+            MenuItem { title: "关闭"; activated => { root.close-pin(); } }
+            MenuItem { title: "原始尺寸：\{root.original-size-text}"; enabled: false; }
+        }
+
+        Image {
         width: parent.width;
         height: parent.height;
         source: root.screenshot;
         image-fit: fill;
-    }
+        }
 
     TouchArea {
         width: parent.width;
@@ -83,7 +155,7 @@ export component PinWindow inherits Window {
                 if event.button == PointerEventButton.left {
                     root.drag-pin();
                 } else if event.button == PointerEventButton.right {
-                    root.open-menu();
+                    menu-area.show({ x: self.mouse-x, y: self.mouse-y });
                 }
             }
         }
@@ -136,7 +208,7 @@ export component PinWindow inherits Window {
                     root.drawing = true;
                     root.begin-annotation(image-x, image-y, root.active-tool);
                 } else if event.button == PointerEventButton.right {
-                    root.open-menu();
+                    menu-area.show({ x: self.mouse-x, y: self.mouse-y });
                 }
             } else if event.kind == PointerEventKind.move && root.drawing {
                 root.update-annotation(image-x, image-y);
@@ -151,28 +223,6 @@ export component PinWindow inherits Window {
         }
     }
 
-    if root.toolbar-visible: CaptureToolbar {
-        x: Math.max(4px, (parent.width - self.width) / 2);
-        y: parent.height - self.height - 4px;
-        annotation-tools-visible: true;
-        ocr-available: true;
-        pin-action-visible: false;
-        output-mode: 0;
-        output-tip-override: "复制图像";
-        ocr-tip-override: "识别图像文字";
-        cancel-tip: "关闭钉住";
-        active-tool <=> root.active-tool;
-        color-index <=> root.color-index;
-        stroke-radius <=> root.stroke-radius;
-        undo => { root.undo(); }
-        redo => { root.redo(); }
-        complete-output => { root.copy-image(); }
-        recognize-text => { root.recognize-text(); }
-        cancel-action => { root.close-pin(); }
-        select-color(index) => { root.select-color(index); }
-        select-width(width) => { root.select-width(width); }
-    }
-
     Rectangle {
         width: parent.width;
         height: parent.height;
@@ -180,4 +230,6 @@ export component PinWindow inherits Window {
         border-color: #54a5ff;
         background: transparent;
     }
+    }
+
 }

@@ -104,9 +104,11 @@ export component CaptureToolbar inherits Rectangle {
     in-out property <int> active-tool: 0;
     in-out property <int> color-index: 0;
     in-out property <int> stroke-radius: 2;
+    property <bool> tool-properties-visible: root.annotation-tools-visible && root.active-tool > 0;
     property <length> calculated-width: root.annotation-tools-visible
-        ? 428px + (root.ocr-available ? 30px : 0px) + (root.pin-action-visible ? 30px : 0px)
+        ? 222px + (root.ocr-available ? 30px : 0px) + (root.pin-action-visible ? 30px : 0px)
         : 66px + (root.ocr-available ? 30px : 0px) + (root.pin-action-visible ? 30px : 0px);
+    property <length> calculated-height: root.tool-properties-visible ? 68px : 38px;
 
     callback undo();
     callback redo();
@@ -114,142 +116,158 @@ export component CaptureToolbar inherits Rectangle {
     callback recognize-text();
     callback pin-action();
     callback cancel-action();
+    callback select-tool(int);
     callback select-color(int);
     callback select-width(int);
 
     width: root.calculated-width;
-    height: 38px;
+    height: root.calculated-height;
     border-radius: 4px;
     border-width: 1px;
     border-color: #aeb6c2;
     background: #f7f8fa;
 
-    HorizontalLayout {
+    VerticalLayout {
         padding: 4px;
         spacing: 2px;
         alignment: center;
 
-        if root.annotation-tools-visible: ToolCell {
-            icon: @image-url("../src/icons/undo-2.svg");
-            tip: "撤销上一步操作";
-            activated => { root.undo(); }
-        }
-        if root.annotation-tools-visible: ToolCell {
-            icon: @image-url("../src/icons/redo-2.svg");
-            tip: "重做上一步操作";
-            activated => { root.redo(); }
-        }
-        if root.annotation-tools-visible: Rectangle {
-            width: 1px;
-            height: 20px;
-            background: #c7cdd5;
+        HorizontalLayout {
+            height: 28px;
+            spacing: 2px;
+            alignment: center;
+
+            if root.annotation-tools-visible: ToolCell {
+                icon: @image-url("../src/icons/undo-2.svg");
+                tip: "撤销上一步操作";
+                activated => { root.undo(); }
+            }
+            if root.annotation-tools-visible: ToolCell {
+                icon: @image-url("../src/icons/redo-2.svg");
+                tip: "重做上一步操作";
+                activated => { root.redo(); }
+            }
+            if root.annotation-tools-visible: Rectangle {
+                width: 1px;
+                height: 20px;
+                background: #c7cdd5;
+            }
+
+            if root.annotation-tools-visible: ToolCell {
+                icon: @image-url("../src/icons/pencil.svg");
+                tip: "画笔标注";
+                selected: root.active-tool == 1;
+                activated => {
+                    root.active-tool = root.active-tool == 1 ? 0 : 1;
+                    root.select-tool(root.active-tool);
+                }
+            }
+            if root.annotation-tools-visible: ToolCell {
+                icon: @image-url("../src/icons/square.svg");
+                tip: "绘制矩形";
+                selected: root.active-tool == 2;
+                activated => {
+                    root.active-tool = root.active-tool == 2 ? 0 : 2;
+                    root.select-tool(root.active-tool);
+                }
+            }
+            if root.annotation-tools-visible: ToolCell {
+                icon: @image-url("../src/icons/arrow-up-right.svg");
+                tip: "绘制箭头";
+                selected: root.active-tool == 3;
+                activated => {
+                    root.active-tool = root.active-tool == 3 ? 0 : 3;
+                    root.select-tool(root.active-tool);
+                }
+            }
+            if root.annotation-tools-visible: Rectangle {
+                width: 1px;
+                height: 20px;
+                background: #c7cdd5;
+            }
+
+            ToolCell {
+                icon: root.output-mode == 0
+                    ? @image-url("../src/icons/copy.svg")
+                    : @image-url("../src/icons/save.svg");
+                tip: root.output-tip-override != ""
+                    ? root.output-tip-override
+                    : root.output-mode == 0
+                        ? "复制截图到剪贴板"
+                        : root.output-mode == 1 ? "保存截图到文件" : "复制截图并保存";
+                activated => { root.complete-output(); }
+            }
+            if root.ocr-available: ToolCell {
+                icon: @image-url("../src/icons/scan-text.svg");
+                tip: root.ocr-tip-override != ""
+                    ? root.ocr-tip-override
+                    : root.annotation-tools-visible ? "识别选区文字" : "识别图像文字";
+                activated => { root.recognize-text(); }
+            }
+            if root.pin-action-visible: ToolCell {
+                icon: @image-url("../src/icons/pin.svg");
+                tip: "将截图钉在屏幕上";
+                activated => { root.pin-action(); }
+            }
+            ToolCell {
+                icon: @image-url("../src/icons/x.svg");
+                tip: root.cancel-tip;
+                activated => { root.cancel-action(); }
+            }
         }
 
-        if root.annotation-tools-visible: ToolCell {
-            icon: @image-url("../src/icons/pencil.svg");
-            tip: "画笔标注";
-            selected: root.active-tool == 1;
-            activated => { root.active-tool = root.active-tool == 1 ? 0 : 1; }
-        }
-        if root.annotation-tools-visible: ToolCell {
-            icon: @image-url("../src/icons/square.svg");
-            tip: "绘制矩形";
-            selected: root.active-tool == 2;
-            activated => { root.active-tool = root.active-tool == 2 ? 0 : 2; }
-        }
-        if root.annotation-tools-visible: ToolCell {
-            icon: @image-url("../src/icons/arrow-up-right.svg");
-            tip: "绘制箭头";
-            selected: root.active-tool == 3;
-            activated => { root.active-tool = root.active-tool == 3 ? 0 : 3; }
-        }
-        if root.annotation-tools-visible: Rectangle {
-            width: 1px;
-            height: 20px;
-            background: #c7cdd5;
-        }
+        if root.tool-properties-visible: HorizontalLayout {
+            height: 28px;
+            spacing: 2px;
+            alignment: center;
 
-        ToolCell {
-            icon: root.output-mode == 0
-                ? @image-url("../src/icons/copy.svg")
-                : @image-url("../src/icons/save.svg");
-            tip: root.output-tip-override != ""
-                ? root.output-tip-override
-                : root.output-mode == 0
-                    ? "复制截图到剪贴板"
-                    : root.output-mode == 1 ? "保存截图到文件" : "复制截图并保存";
-            activated => { root.complete-output(); }
-        }
-        if root.ocr-available: ToolCell {
-            icon: @image-url("../src/icons/scan-text.svg");
-            tip: root.ocr-tip-override != ""
-                ? root.ocr-tip-override
-                : root.annotation-tools-visible ? "识别选区文字" : "识别图像文字";
-            activated => { root.recognize-text(); }
-        }
-        if root.pin-action-visible: ToolCell {
-            icon: @image-url("../src/icons/pin.svg");
-            tip: "将截图钉在屏幕上";
-            activated => { root.pin-action(); }
-        }
-        ToolCell {
-            icon: @image-url("../src/icons/x.svg");
-            tip: root.cancel-tip;
-            activated => { root.cancel-action(); }
-        }
-
-        if root.annotation-tools-visible: Rectangle {
-            width: 1px;
-            height: 20px;
-            background: #c7cdd5;
-        }
-        if root.annotation-tools-visible: ColorCell {
-            swatch-color: #ec5c66;
-            tip: "红色";
-            selected: root.color-index == 0;
-            activated => { root.color-index = 0; root.select-color(0); }
-        }
-        if root.annotation-tools-visible: ColorCell {
-            swatch-color: #4a90e2;
-            tip: "蓝色";
-            selected: root.color-index == 1;
-            activated => { root.color-index = 1; root.select-color(1); }
-        }
-        if root.annotation-tools-visible: ColorCell {
-            swatch-color: #31a36b;
-            tip: "绿色";
-            selected: root.color-index == 2;
-            activated => { root.color-index = 2; root.select-color(2); }
-        }
-        if root.annotation-tools-visible: ColorCell {
-            swatch-color: #f5c542;
-            tip: "黄色";
-            selected: root.color-index == 3;
-            activated => { root.color-index = 3; root.select-color(3); }
-        }
-        if root.annotation-tools-visible: Rectangle {
-            width: 1px;
-            height: 20px;
-            background: #c7cdd5;
-        }
-
-        if root.annotation-tools-visible: StrokeCell {
-            stroke-size: 1;
-            tip: "细线";
-            selected: root.stroke-radius == 1;
-            activated => { root.stroke-radius = 1; root.select-width(1); }
-        }
-        if root.annotation-tools-visible: StrokeCell {
-            stroke-size: 2;
-            tip: "中等线宽";
-            selected: root.stroke-radius == 2;
-            activated => { root.stroke-radius = 2; root.select-width(2); }
-        }
-        if root.annotation-tools-visible: StrokeCell {
-            stroke-size: 4;
-            tip: "粗线";
-            selected: root.stroke-radius == 4;
-            activated => { root.stroke-radius = 4; root.select-width(4); }
+            ColorCell {
+                swatch-color: #ec5c66;
+                tip: "红色";
+                selected: root.color-index == 0;
+                activated => { root.color-index = 0; root.select-color(0); }
+            }
+            ColorCell {
+                swatch-color: #4a90e2;
+                tip: "蓝色";
+                selected: root.color-index == 1;
+                activated => { root.color-index = 1; root.select-color(1); }
+            }
+            ColorCell {
+                swatch-color: #31a36b;
+                tip: "绿色";
+                selected: root.color-index == 2;
+                activated => { root.color-index = 2; root.select-color(2); }
+            }
+            ColorCell {
+                swatch-color: #f5c542;
+                tip: "黄色";
+                selected: root.color-index == 3;
+                activated => { root.color-index = 3; root.select-color(3); }
+            }
+            Rectangle {
+                width: 1px;
+                height: 20px;
+                background: #c7cdd5;
+            }
+            StrokeCell {
+                stroke-size: 1;
+                tip: "细线";
+                selected: root.stroke-radius == 1;
+                activated => { root.stroke-radius = 1; root.select-width(1); }
+            }
+            StrokeCell {
+                stroke-size: 2;
+                tip: "中等线宽";
+                selected: root.stroke-radius == 2;
+                activated => { root.stroke-radius = 2; root.select-width(2); }
+            }
+            StrokeCell {
+                stroke-size: 4;
+                tip: "粗线";
+                selected: root.stroke-radius == 4;
+                activated => { root.stroke-radius = 4; root.select-width(4); }
+            }
         }
     }
 }

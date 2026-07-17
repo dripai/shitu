@@ -4,12 +4,13 @@ import { CaptureToolbar } from "capture-toolbar.slint";
 
 export component OverlayWindow inherits Window {
     title: "选择截图区域";
-    background: transparent;
+    background: #000000;
     no-frame: true;
     always-on-top: true;
 
     in property <int> capture-width: 1;
     in property <int> capture-height: 1;
+    in property <image> desktop-image;
     in property <image> selected-image;
     in property <[AnnotationView]> annotations;
     in property <string> selection-info;
@@ -37,6 +38,7 @@ export component OverlayWindow inherits Window {
     in-out property <float> press-x: 0;
     in-out property <float> press-y: 0;
     in-out property <bool> manual-drag: false;
+    in-out property <bool> adjusting-selection: false;
 
     property <length> selection-left: Math.min(root.start-x, root.current-x) * 1px;
     property <length> selection-top: Math.min(root.start-y, root.current-y) * 1px;
@@ -70,14 +72,31 @@ export component OverlayWindow inherits Window {
     property <length> focus-top: root.selecting ? root.selection-top : root.hover-view-top;
     property <length> focus-width: root.selecting ? root.selection-width : root.hover-view-width;
     property <length> focus-height: root.selecting ? root.selection-height : root.hover-view-height;
+    property <int> focus-source-left: Math.max(
+        0,
+        Math.min(root.capture-width - 1, Math.round(root.focus-left / 1px * root.source-scale-x))
+    );
+    property <int> focus-source-top: Math.max(
+        0,
+        Math.min(root.capture-height - 1, Math.round(root.focus-top / 1px * root.source-scale-y))
+    );
+    property <int> focus-source-width: Math.min(
+        root.capture-width - root.focus-source-left,
+        Math.max(1, Math.round(root.focus-width / 1px * root.source-scale-x))
+    );
+    property <int> focus-source-height: Math.min(
+        root.capture-height - root.focus-source-top,
+        Math.max(1, Math.round(root.focus-height / 1px * root.source-scale-y))
+    );
     property <length> toolbar-x: Math.max(
         8px,
         Math.min(root.width - root.toolbar-width - 8px, root.selection-left)
     );
-    property <length> toolbar-width: root.ocr-available ? 488px : 458px;
-    property <length> toolbar-y: root.selection-top + root.selection-height + 52px <= root.height
+    property <length> toolbar-width: root.ocr-available ? 282px : 252px;
+    property <length> toolbar-height: root.active-tool > 0 ? 68px : 38px;
+    property <length> toolbar-y: root.selection-top + root.selection-height + root.toolbar-height + 12px <= root.height
         ? root.selection-top + root.selection-height + 12px
-        : Math.max(8px, root.selection-top - 50px);
+        : Math.max(8px, root.selection-top - root.toolbar-height - 12px);
 
     callback probe-window(float, float);
     callback selected(float, float, float, float);
@@ -111,6 +130,13 @@ export component OverlayWindow inherits Window {
         );
     }
 
+    Image {
+        width: root.width;
+        height: root.height;
+        source: root.desktop-image;
+        image-fit: fill;
+    }
+
     FocusScope {
         key-pressed(event) => {
             if event.text == Key.Escape {
@@ -122,35 +148,23 @@ export component OverlayWindow inherits Window {
         }
     }
 
-    if !root.completed && !root.focus-visible: Rectangle {
-        width: parent.width;
-        height: parent.height;
+    Rectangle {
+        width: root.width;
+        height: root.height;
         background: #00000088;
     }
 
-    if !root.completed && root.focus-visible: Rectangle {
-        width: parent.width;
-        height: Math.max(0px, root.focus-top);
-        background: #00000088;
-    }
-    if !root.completed && root.focus-visible: Rectangle {
+    if !root.completed && root.focus-visible: Image {
+        x: root.focus-left;
         y: root.focus-top;
-        width: Math.max(0px, root.focus-left);
-        height: Math.max(0px, root.focus-height);
-        background: #00000088;
-    }
-    if !root.completed && root.focus-visible: Rectangle {
-        x: root.focus-left + root.focus-width;
-        y: root.focus-top;
-        width: Math.max(0px, parent.width - self.x);
-        height: Math.max(0px, root.focus-height);
-        background: #00000088;
-    }
-    if !root.completed && root.focus-visible: Rectangle {
-        y: root.focus-top + root.focus-height;
-        width: parent.width;
-        height: Math.max(0px, parent.height - self.y);
-        background: #00000088;
+        width: Math.max(1px, root.focus-width);
+        height: Math.max(1px, root.focus-height);
+        source: root.desktop-image;
+        source-clip-x: root.focus-source-left;
+        source-clip-y: root.focus-source-top;
+        source-clip-width: root.focus-source-width;
+        source-clip-height: root.focus-source-height;
+        image-fit: fill;
     }
 
     if !root.completed && root.hover-valid && !root.selecting: Rectangle {
@@ -166,7 +180,7 @@ export component OverlayWindow inherits Window {
     TouchArea {
         width: parent.width;
         height: parent.height;
-        enabled: !root.completed && root.capture-ready;
+        enabled: root.capture-ready;
         mouse-cursor: crosshair;
 
         moved => {
@@ -194,7 +208,9 @@ export component OverlayWindow inherits Window {
         }
 
         pointer-event(event) => {
-            if event.kind == PointerEventKind.down {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                root.cancel-selection();
+            } else if !root.completed && event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                 root.press-x = self.mouse-x / 1px;
                 root.press-y = self.mouse-y / 1px;
                 root.start-x = root.press-x;
@@ -203,7 +219,7 @@ export component OverlayWindow inherits Window {
                 root.current-y = root.press-y;
                 root.manual-drag = false;
                 root.selecting = false;
-            } else if event.kind == PointerEventKind.up {
+            } else if !root.completed && event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
                 if root.manual-drag {
                     root.current-x = self.mouse-x / 1px;
                     root.current-y = self.mouse-y / 1px;
@@ -239,11 +255,16 @@ export component OverlayWindow inherits Window {
         if root.completed: Image {
             width: parent.width;
             height: parent.height;
-            source: root.selected-image;
+            source: root.desktop-image;
+            source-clip-x: root.source-left;
+            source-clip-y: root.source-top;
+            source-clip-width: root.source-width;
+            source-clip-height: root.source-height;
             image-fit: fill;
         }
 
         for annotation in root.annotations: Path {
+            visible: !root.adjusting-selection;
             width: parent.width;
             height: parent.height;
             commands: annotation.commands;
@@ -268,11 +289,13 @@ export component OverlayWindow inherits Window {
             pointer-event(event) => {
                 let image-x = self.mouse-x / self.width * root.selected-image.width;
                 let image-y = self.mouse-y / self.height * root.selected-image.height;
-                if event.kind == PointerEventKind.down {
+                if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                    root.cancel-selection();
+                } else if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                     root.begin-annotation(image-x, image-y, root.active-tool);
                 } else if event.kind == PointerEventKind.move && self.pressed {
                     root.update-annotation(image-x, image-y);
-                } else if event.kind == PointerEventKind.up {
+                } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
                     root.update-annotation(image-x, image-y);
                     root.finish-annotation();
                 } else if event.kind == PointerEventKind.cancel {
@@ -287,14 +310,21 @@ export component OverlayWindow inherits Window {
             mouse-cursor: move;
 
             pointer-event(event) => {
-                if event.kind == PointerEventKind.down {
+                if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                    root.cancel-selection();
+                } else if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                     root.drag-start-x = root.start-x;
                     root.drag-start-y = root.start-y;
                     root.drag-current-x = root.current-x;
                     root.drag-current-y = root.current-y;
+                    root.press-x = root.selection-left / 1px + self.mouse-x / 1px;
+                    root.press-y = root.selection-top / 1px + self.mouse-y / 1px;
+                    root.adjusting-selection = true;
                 } else if event.kind == PointerEventKind.move && self.pressed {
-                    let delta-x = (self.mouse-x - self.pressed-x) / 1px;
-                    let delta-y = (self.mouse-y - self.pressed-y) / 1px;
+                    let pointer-x = root.selection-left / 1px + self.mouse-x / 1px;
+                    let pointer-y = root.selection-top / 1px + self.mouse-y / 1px;
+                    let delta-x = pointer-x - root.press-x;
+                    let delta-y = pointer-y - root.press-y;
                     let selected-width = root.drag-current-x - root.drag-start-x;
                     let selected-height = root.drag-current-y - root.drag-start-y;
                     let next-left = Math.max(
@@ -309,8 +339,11 @@ export component OverlayWindow inherits Window {
                     root.start-y = next-top;
                     root.current-x = next-left + selected-width;
                     root.current-y = next-top + selected-height;
-                } else if event.kind == PointerEventKind.up {
+                } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                    root.adjusting-selection = false;
                     root.commit-selection();
+                } else if event.kind == PointerEventKind.cancel {
+                    root.adjusting-selection = false;
                 }
             }
         }
@@ -324,20 +357,30 @@ export component OverlayWindow inherits Window {
         mouse-cursor: nwse-resize;
 
         pointer-event(event) => {
-            if event.kind == PointerEventKind.down {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                root.cancel-selection();
+            } else if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                 root.drag-start-x = root.start-x;
                 root.drag-start-y = root.start-y;
+                root.press-x = (self.x + self.mouse-x) / 1px;
+                root.press-y = (self.y + self.mouse-y) / 1px;
+                root.adjusting-selection = true;
             } else if event.kind == PointerEventKind.move && self.pressed {
+                let delta-x = (self.x + self.mouse-x) / 1px - root.press-x;
+                let delta-y = (self.y + self.mouse-y) / 1px - root.press-y;
                 root.start-x = Math.max(0, Math.min(
                     root.current-x - 3,
-                    root.drag-start-x + (self.mouse-x - self.pressed-x) / 1px
+                    root.drag-start-x + delta-x
                 ));
                 root.start-y = Math.max(0, Math.min(
                     root.current-y - 3,
-                    root.drag-start-y + (self.mouse-y - self.pressed-y) / 1px
+                    root.drag-start-y + delta-y
                 ));
-            } else if event.kind == PointerEventKind.up {
+            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                root.adjusting-selection = false;
                 root.commit-selection();
+            } else if event.kind == PointerEventKind.cancel {
+                root.adjusting-selection = false;
             }
         }
     }
@@ -350,20 +393,30 @@ export component OverlayWindow inherits Window {
         mouse-cursor: nesw-resize;
 
         pointer-event(event) => {
-            if event.kind == PointerEventKind.down {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                root.cancel-selection();
+            } else if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                 root.drag-current-x = root.current-x;
                 root.drag-start-y = root.start-y;
+                root.press-x = (self.x + self.mouse-x) / 1px;
+                root.press-y = (self.y + self.mouse-y) / 1px;
+                root.adjusting-selection = true;
             } else if event.kind == PointerEventKind.move && self.pressed {
+                let delta-x = (self.x + self.mouse-x) / 1px - root.press-x;
+                let delta-y = (self.y + self.mouse-y) / 1px - root.press-y;
                 root.current-x = Math.min(root.width / 1px, Math.max(
                     root.start-x + 3,
-                    root.drag-current-x + (self.mouse-x - self.pressed-x) / 1px
+                    root.drag-current-x + delta-x
                 ));
                 root.start-y = Math.max(0, Math.min(
                     root.current-y - 3,
-                    root.drag-start-y + (self.mouse-y - self.pressed-y) / 1px
+                    root.drag-start-y + delta-y
                 ));
-            } else if event.kind == PointerEventKind.up {
+            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                root.adjusting-selection = false;
                 root.commit-selection();
+            } else if event.kind == PointerEventKind.cancel {
+                root.adjusting-selection = false;
             }
         }
     }
@@ -376,20 +429,30 @@ export component OverlayWindow inherits Window {
         mouse-cursor: nesw-resize;
 
         pointer-event(event) => {
-            if event.kind == PointerEventKind.down {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                root.cancel-selection();
+            } else if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                 root.drag-start-x = root.start-x;
                 root.drag-current-y = root.current-y;
+                root.press-x = (self.x + self.mouse-x) / 1px;
+                root.press-y = (self.y + self.mouse-y) / 1px;
+                root.adjusting-selection = true;
             } else if event.kind == PointerEventKind.move && self.pressed {
+                let delta-x = (self.x + self.mouse-x) / 1px - root.press-x;
+                let delta-y = (self.y + self.mouse-y) / 1px - root.press-y;
                 root.start-x = Math.max(0, Math.min(
                     root.current-x - 3,
-                    root.drag-start-x + (self.mouse-x - self.pressed-x) / 1px
+                    root.drag-start-x + delta-x
                 ));
                 root.current-y = Math.min(root.height / 1px, Math.max(
                     root.start-y + 3,
-                    root.drag-current-y + (self.mouse-y - self.pressed-y) / 1px
+                    root.drag-current-y + delta-y
                 ));
-            } else if event.kind == PointerEventKind.up {
+            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                root.adjusting-selection = false;
                 root.commit-selection();
+            } else if event.kind == PointerEventKind.cancel {
+                root.adjusting-selection = false;
             }
         }
     }
@@ -402,20 +465,30 @@ export component OverlayWindow inherits Window {
         mouse-cursor: nwse-resize;
 
         pointer-event(event) => {
-            if event.kind == PointerEventKind.down {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                root.cancel-selection();
+            } else if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                 root.drag-current-x = root.current-x;
                 root.drag-current-y = root.current-y;
+                root.press-x = (self.x + self.mouse-x) / 1px;
+                root.press-y = (self.y + self.mouse-y) / 1px;
+                root.adjusting-selection = true;
             } else if event.kind == PointerEventKind.move && self.pressed {
+                let delta-x = (self.x + self.mouse-x) / 1px - root.press-x;
+                let delta-y = (self.y + self.mouse-y) / 1px - root.press-y;
                 root.current-x = Math.min(root.width / 1px, Math.max(
                     root.start-x + 3,
-                    root.drag-current-x + (self.mouse-x - self.pressed-x) / 1px
+                    root.drag-current-x + delta-x
                 ));
                 root.current-y = Math.min(root.height / 1px, Math.max(
                     root.start-y + 3,
-                    root.drag-current-y + (self.mouse-y - self.pressed-y) / 1px
+                    root.drag-current-y + delta-y
                 ));
-            } else if event.kind == PointerEventKind.up {
+            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                root.adjusting-selection = false;
                 root.commit-selection();
+            } else if event.kind == PointerEventKind.cancel {
+                root.adjusting-selection = false;
             }
         }
     }

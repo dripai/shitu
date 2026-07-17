@@ -1,5 +1,5 @@
 use windows::{
-    Graphics::Imaging::{BitmapPixelFormat, SoftwareBitmap},
+    Graphics::Imaging::{BitmapAlphaMode, BitmapPixelFormat, SoftwareBitmap},
     Media::Ocr::OcrEngine as NativeOcrEngine,
     Storage::Streams::DataWriter,
     Win32::System::WinRT::{RO_INIT_MULTITHREADED, RoInitialize, RoUninitialize},
@@ -13,8 +13,8 @@ use crate::{
 pub struct WindowsOcrEngine;
 
 impl OcrEngine for WindowsOcrEngine {
-    fn is_available(&self) -> bool {
-        probe().is_ok()
+    fn availability(&self) -> Result<(), OcrFailure> {
+        probe().map_err(classify_error)
     }
 
     fn recognize(&self, image: &CapturedImage) -> Result<String, OcrFailure> {
@@ -31,16 +31,26 @@ fn recognize_impl(image: &CapturedImage) -> windows::core::Result<String> {
     let _apartment = Apartment::initialize()?;
     let engine = NativeOcrEngine::TryCreateFromUserProfileLanguages()?;
     let writer = DataWriter::new()?;
-    writer.WriteBytes(&image.rgba_bytes())?;
+    let pixels = rgba_to_bgra(image.rgba_bytes());
+    writer.WriteBytes(&pixels)?;
     let buffer = writer.DetachBuffer()?;
-    let bitmap = SoftwareBitmap::CreateCopyFromBuffer(
+    let bitmap = SoftwareBitmap::CreateCopyWithAlphaFromBuffer(
         &buffer,
-        BitmapPixelFormat::Rgba8,
+        BitmapPixelFormat::Bgra8,
         image.width() as i32,
         image.height() as i32,
+        BitmapAlphaMode::Ignore,
     )?;
     let result = engine.RecognizeAsync(&bitmap)?.join()?;
     Ok(result.Text()?.to_string())
+}
+
+fn rgba_to_bgra(mut pixels: Vec<u8>) -> Vec<u8> {
+    for pixel in pixels.chunks_exact_mut(4) {
+        pixel.swap(0, 2);
+        pixel[3] = 255;
+    }
+    pixels
 }
 
 fn classify_error(error: windows::core::Error) -> OcrFailure {
@@ -71,5 +81,18 @@ impl Apartment {
 impl Drop for Apartment {
     fn drop(&mut self) {
         unsafe { RoUninitialize() };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::rgba_to_bgra;
+
+    #[test]
+    fn ocr_pixels_are_converted_to_opaque_bgra() {
+        assert_eq!(
+            rgba_to_bgra(vec![10, 20, 30, 40, 50, 60, 70, 80]),
+            vec![30, 20, 10, 255, 70, 60, 50, 255]
+        );
     }
 }

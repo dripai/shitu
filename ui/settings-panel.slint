@@ -1,43 +1,96 @@
 import {
-    Button, CheckBox, ComboBox, LineEdit, Palette, SpinBox
+    Button, CheckBox, ComboBox, LineEdit, Palette, SpinBox, TabWidget
 } from "std-widgets.slint";
 
-component TabButton inherits Rectangle {
-    in property <string> text;
-    in property <bool> selected;
-    callback activated();
-
-    height: 27px;
-    border-width: 1px;
-    border-color: root.selected ? Palette.border : transparent;
-    background: root.selected ? Palette.background : Palette.alternate-background;
-
-    Text {
-        text: root.text;
-        color: Palette.foreground;
-        font-size: 12px;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-    }
-    touch := TouchArea {
-        mouse-cursor: pointer;
-        clicked => { root.activated(); }
-    }
+global SettingsTypography {
+    out property <length> title-font-size: 14px;
+    out property <length> body-font-size: 13px;
 }
 
 component FieldLabel inherits Text {
     width: 92px;
     color: Palette.foreground;
-    font-size: 12px;
+    font-size: SettingsTypography.body-font-size;
     vertical-alignment: center;
 }
 
 component SectionTitle inherits Text {
     height: 24px;
     color: Palette.foreground;
-    font-size: 12px;
+    font-size: SettingsTypography.title-font-size;
     font-weight: 700;
     vertical-alignment: center;
+}
+
+component CenteredTabLabel inherits Rectangle {
+    in property <string> text;
+    in property <bool> selected;
+
+    height: 32px;
+    horizontal-stretch: 1;
+
+    Text {
+        text: root.text;
+        color: root.selected ? Palette.foreground : Palette.alternate-foreground;
+        font-size: SettingsTypography.body-font-size;
+        font-weight: root.selected ? 700 : 400;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component AboutRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> detail;
+
+    height: 24px;
+    spacing: 0px;
+
+    Text {
+        width: 72px;
+        text: root.label;
+        color: Palette.alternate-foreground;
+        font-size: SettingsTypography.body-font-size;
+        vertical-alignment: center;
+    }
+    Text {
+        text: root.detail;
+        color: Palette.foreground;
+        font-size: SettingsTypography.body-font-size;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+}
+
+component PathActionButton inherits Rectangle {
+    in property <string> text;
+    callback activated();
+    callback hover-changed(bool);
+
+    width: 92px;
+    height: 28px;
+    border-width: 1px;
+    border-color: Palette.foreground.with-alpha(0.24);
+    border-radius: 3px;
+    background: touch.pressed
+        ? Palette.selection-background
+        : touch.has-hover ? Palette.alternate-background : Palette.background;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => { root.activated(); }
+
+    Text {
+        text: root.text;
+        color: Palette.foreground;
+        font-size: SettingsTypography.body-font-size;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.activated(); }
+        changed has-hover => { root.hover-changed(self.has-hover); }
+    }
 }
 
 export component SettingsPanel inherits Rectangle {
@@ -64,7 +117,10 @@ export component SettingsPanel inherits Rectangle {
     in property <string> hotkey-status-tip;
     in property <string> version-text;
     in property <string> build-text;
+    in property <string> log-path;
     in property <string> config-path;
+    in property <bool> ocr-available: false;
+    in property <string> ocr-status;
 
     callback apply-settings();
     callback capture();
@@ -72,30 +128,32 @@ export component SettingsPanel inherits Rectangle {
     callback choose-save-directory();
     callback open-save-directory();
     callback open-log-directory();
-    callback open-config-file();
+    callback open-config-directory();
+    callback config-hint(bool);
     callback open-licenses();
     callback clear-hotkey();
 
-    VerticalLayout {
-        padding: 10px;
-        spacing: 8px;
+    changed current-tab => { root.config-hint(false); }
 
-        HorizontalLayout {
-            height: 27px;
-            spacing: 0px;
-            TabButton { text: "常规"; selected: root.current-tab == 0; activated => { root.current-tab = 0; } }
-            TabButton { text: "截图"; selected: root.current-tab == 1; activated => { root.current-tab = 1; } }
-            TabButton { text: "钉住"; selected: root.current-tab == 2; activated => { root.current-tab = 2; } }
-            TabButton { text: "快捷键"; selected: root.current-tab == 3; activated => { root.current-tab = 3; } }
-            TabButton { text: "关于"; selected: root.current-tab == 4; activated => { root.current-tab = 4; } }
-        }
+    VerticalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        padding-bottom: 10px;
+        padding-top: 0px;
+        spacing: 0px;
 
         Rectangle {
-            border-width: 1px;
-            border-color: Palette.border;
-            background: Palette.background;
+            vertical-stretch: 1;
 
-            if root.current-tab == 0: VerticalLayout {
+            tabs := TabWidget {
+                width: 100%;
+                height: 100%;
+                current-index <=> root.current-tab;
+
+            Tab {
+                title: "";
+                horizontal-stretch: 1;
+                VerticalLayout {
                 padding: 12px;
                 spacing: 8px;
                 SectionTitle { text: "应用"; }
@@ -111,33 +169,63 @@ export component SettingsPanel inherits Rectangle {
                         current-index <=> root.theme-mode;
                     }
                 }
-                Rectangle { height: 1px; background: Palette.border; }
+                Rectangle { height: 1px; background: Palette.foreground.with-alpha(0.16); }
                 SectionTitle { text: "文件与诊断"; }
                 HorizontalLayout {
-                    Button { text: "打开日志文件夹"; clicked => { root.open-log-directory(); } }
-                    Button { text: "打开配置文件"; clicked => { root.open-config-file(); } }
-                    Rectangle { }
+                    height: 28px;
+                    spacing: 8px;
+                    PathActionButton {
+                        text: "打开日志";
+                        activated => { root.open-log-directory(); }
+                    }
+                    Text {
+                        text: root.log-path;
+                        color: Palette.alternate-foreground;
+                        font-size: SettingsTypography.body-font-size;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
                 }
-                Text {
-                    text: "手动修改配置文件后需要重启应用。";
-                    color: Palette.alternate-foreground;
-                    font-size: 11px;
-                }
-                Text {
-                    text: root.config-path;
-                    color: Palette.alternate-foreground;
-                    font-size: 10px;
-                    overflow: elide;
+                HorizontalLayout {
+                    height: 28px;
+                    spacing: 8px;
+                    PathActionButton {
+                        text: "打开配置";
+                        activated => { root.open-config-directory(); }
+                        hover-changed(hovered) => { root.config-hint(hovered); }
+                    }
+                    Text {
+                        text: root.config-path;
+                        color: Palette.alternate-foreground;
+                        font-size: SettingsTypography.body-font-size;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
                 }
                 Rectangle { }
+                }
             }
 
-            if root.current-tab == 1: VerticalLayout {
+            Tab {
+                title: "";
+                horizontal-stretch: 1;
+                VerticalLayout {
                 padding: 12px;
                 spacing: 7px;
                 VerticalLayout {
                     spacing: 7px;
                     SectionTitle { text: "输出"; }
+                    HorizontalLayout {
+                        height: 26px;
+                        FieldLabel { text: "系统 OCR"; }
+                        Text {
+                            text: root.ocr-status;
+                            color: root.ocr-available ? #16833d : #cf222e;
+                            font-size: SettingsTypography.body-font-size;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                    }
                     HorizontalLayout {
                         height: 26px;
                         FieldLabel { text: "截图完成后"; }
@@ -160,7 +248,7 @@ export component SettingsPanel inherits Rectangle {
                             width: 68px;
                             text: "JPEG 质量";
                             color: Palette.foreground;
-                            font-size: 12px;
+                            font-size: SettingsTypography.body-font-size;
                             vertical-alignment: center;
                         }
                         SpinBox {
@@ -173,6 +261,7 @@ export component SettingsPanel inherits Rectangle {
                     }
                     HorizontalLayout {
                         height: 26px;
+                        spacing: 6px;
                         FieldLabel { text: "保存目录"; }
                         LineEdit {
                             text <=> root.save-directory;
@@ -182,12 +271,11 @@ export component SettingsPanel inherits Rectangle {
                             text: "选择...";
                             clicked => { root.choose-save-directory(); }
                         }
-                    }
-                    HorizontalLayout {
-                        height: 26px;
-                        Rectangle { width: 92px; }
-                        Button { text: "打开目录"; clicked => { root.open-save-directory(); } }
-                        Rectangle { }
+                        Button {
+                            width: 72px;
+                            text: "打开目录";
+                            clicked => { root.open-save-directory(); }
+                        }
                     }
                     HorizontalLayout {
                         height: 26px;
@@ -206,9 +294,13 @@ export component SettingsPanel inherits Rectangle {
                     }
                     Rectangle { }
                 }
+                }
             }
 
-            if root.current-tab == 2: VerticalLayout {
+            Tab {
+                title: "";
+                horizontal-stretch: 1;
+                VerticalLayout {
                 padding: 12px;
                 spacing: 8px;
                 SectionTitle { text: "新建钉住窗口"; }
@@ -220,7 +312,12 @@ export component SettingsPanel inherits Rectangle {
                         minimum: 25;
                         maximum: 100;
                     }
-                    Text { text: "%"; color: Palette.foreground; vertical-alignment: center; }
+                    Text {
+                        text: "%";
+                        color: Palette.foreground;
+                        font-size: SettingsTypography.body-font-size;
+                        vertical-alignment: center;
+                    }
                 }
                 CheckBox { text: "窗口阴影"; checked <=> root.pin-shadow; }
                 CheckBox { text: "始终置顶"; checked <=> root.pin-always-on-top; }
@@ -234,24 +331,36 @@ export component SettingsPanel inherits Rectangle {
                         minimum: 5;
                         maximum: 100;
                     }
-                    Text { text: "%"; color: Palette.foreground; vertical-alignment: center; }
+                    Text {
+                        text: "%";
+                        color: Palette.foreground;
+                        font-size: SettingsTypography.body-font-size;
+                        vertical-alignment: center;
+                    }
                 }
                 CheckBox { text: "双击关闭"; checked <=> root.pin-double-click-close; }
                 Rectangle { }
+                }
             }
 
-            if root.current-tab == 3: VerticalLayout {
+            Tab {
+                title: "";
+                horizontal-stretch: 1;
+                VerticalLayout {
                 padding: 12px;
                 spacing: 8px;
                 SectionTitle { text: "全局快捷键"; }
                 HorizontalLayout {
                     height: 28px;
+                    spacing: 6px;
                     FieldLabel { text: "区域截图"; }
                     LineEdit {
+                        width: 190px;
                         text <=> root.hotkey-text;
                         placeholder-text: "例如 Ctrl+Alt+A；留空则关闭";
                     }
                     Button {
+                        width: 52px;
                         text: "清除";
                         clicked => { root.clear-hotkey(); }
                     }
@@ -261,74 +370,118 @@ export component SettingsPanel inherits Rectangle {
                         border-radius: 11px;
                         background: root.hotkey-status == 1 ? #238636 : #cf222e;
                         Text {
-                            text: root.hotkey-status == 1 ? "✓" : "!";
+                            text: root.hotkey-status == 1 ? "√" : "!";
                             color: #ffffff;
-                            font-size: 12px;
+                            font-size: 15px;
+                            font-weight: 700;
                             horizontal-alignment: center;
                             vertical-alignment: center;
                         }
                         Tooltip { text: @markdown("\{root.hotkey-status-tip}"); }
                     }
+                    Rectangle { }
                 }
-                Text {
+                if root.hotkey-status != 1: Text {
                     text: root.hotkey-status == 0
                         ? "未设置时不会注册任何全局快捷键。"
                         : root.hotkey-status-tip;
                     color: Palette.alternate-foreground;
-                    font-size: 11px;
+                    font-size: SettingsTypography.body-font-size;
                 }
                 Rectangle { }
+                }
             }
 
-            if root.current-tab == 4: VerticalLayout {
+            Tab {
+                title: "";
+                horizontal-stretch: 1;
+                VerticalLayout {
                 padding: 12px;
-                spacing: 7px;
+                spacing: 6px;
                 HorizontalLayout {
-                    height: 48px;
+                    height: 42px;
+                    spacing: 7px;
                     Image {
-                        width: 36px;
-                        height: 36px;
+                        width: 32px;
+                        height: 32px;
                         source: @image-url("icons/tray.svg");
                         image-fit: contain;
                     }
-                    VerticalLayout {
-                        spacing: 2px;
-                        Text {
-                            text: "截图工具";
-                            color: Palette.foreground;
-                            font-size: 18px;
-                            font-weight: 700;
-                        }
-                        Text {
-                            text: root.version-text;
-                            color: Palette.alternate-foreground;
-                            font-size: 11px;
-                        }
+                    Text {
+                        text: "截图工具";
+                        color: Palette.foreground;
+                        font-size: 16px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.version-text;
+                        color: Palette.alternate-foreground;
+                        font-size: SettingsTypography.body-font-size;
+                        vertical-alignment: center;
                     }
                     Rectangle { }
                 }
-                Text {
-                    text: root.build-text;
-                    color: Palette.foreground;
-                    font-size: 11px;
-                    wrap: word-wrap;
-                }
-                Rectangle { height: 1px; background: Palette.border; }
-                Text { text: "官网：尚未配置"; color: Palette.alternate-foreground; font-size: 11px; }
-                Text { text: "Git 项目：本地仓库（尚未配置远程）"; color: Palette.alternate-foreground; font-size: 11px; }
-                Text { text: "问题反馈：尚未配置"; color: Palette.alternate-foreground; font-size: 11px; }
+                Rectangle { height: 1px; background: Palette.foreground.with-alpha(0.16); }
                 HorizontalLayout {
+                    height: 38px;
+                    Text {
+                        width: 72px;
+                        text: "构建信息";
+                        color: Palette.alternate-foreground;
+                        font-size: SettingsTypography.body-font-size;
+                        vertical-alignment: top;
+                    }
+                    Text {
+                        text: root.build-text;
+                        color: Palette.foreground;
+                        font-size: SettingsTypography.body-font-size;
+                        wrap: word-wrap;
+                        vertical-alignment: top;
+                    }
+                }
+                Rectangle { height: 1px; background: Palette.foreground.with-alpha(0.16); }
+                AboutRow { label: "官网"; detail: "尚未配置"; }
+                AboutRow { label: "Git 项目"; detail: "本地仓库（尚未配置远程）"; }
+                AboutRow { label: "问题反馈"; detail: "尚未配置"; }
+                HorizontalLayout {
+                    height: 28px;
+                    Text {
+                        width: 72px;
+                        text: "开源许可";
+                        color: Palette.alternate-foreground;
+                        font-size: SettingsTypography.body-font-size;
+                        vertical-alignment: center;
+                    }
                     Button { text: "查看第三方许可"; clicked => { root.open-licenses(); } }
                     Rectangle { }
                 }
                 Text {
                     text: "使用 Rust 与 Slint 构建 · © 2026";
                     color: Palette.alternate-foreground;
-                    font-size: 10px;
+                    font-size: SettingsTypography.body-font-size;
                 }
                 Rectangle { }
+                }
+            }
+            }
+
+            HorizontalLayout {
+                x: tabs.x;
+                y: tabs.y;
+                width: tabs.width;
+                height: 32px;
+                spacing: 0px;
+
+                CenteredTabLabel { text: "常规"; selected: root.current-tab == 0; }
+                CenteredTabLabel { text: "截图"; selected: root.current-tab == 1; }
+                CenteredTabLabel { text: "钉住"; selected: root.current-tab == 2; }
+                CenteredTabLabel { text: "快捷键"; selected: root.current-tab == 3; }
+                CenteredTabLabel { text: "关于"; selected: root.current-tab == 4; }
             }
         }
+
+        Rectangle { height: 8px; }
 
         HorizontalLayout {
             height: 28px;

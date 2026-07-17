@@ -14,19 +14,17 @@ use std::{
     time::Duration,
 };
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use global_hotkey::{GlobalHotKeyEvent, HotKeyState as GlobalHotKeyEventState};
 use slint::{CloseRequestResponse, ComponentHandle, SharedString, Timer};
 
 use crate::{
+    capture,
     config::{AppearanceMode, Config},
     hotkey::HotkeyState,
     image::DrawStyle,
     logging,
-    platform::{
-        ocr::{OcrEngine, system_engine},
-        windows::window,
-    },
+    platform::{ocr::system_availability, windows::window},
 };
 use capture_controller::CaptureSession;
 use pin::PinRegistry;
@@ -42,15 +40,24 @@ enum StatusLevel {
 
 pub fn run() -> Result<(), slint::PlatformError> {
     logging::initialize();
-    if !system_engine().is_available() {
-        logging::info("Windows system OCR is not currently available");
-    }
+    let (ocr_available, ocr_status) = match system_availability() {
+        Ok(()) => {
+            logging::info("Windows system OCR is available");
+            (true, "可用（Windows 系统 OCR）".to_owned())
+        }
+        Err(error) => {
+            let message = error.message();
+            logging::error(format!("Windows system OCR unavailable: {message}"));
+            (false, format!("不可用：{message}"))
+        }
+    };
 
     let main = MainWindow::new()?;
+    let ocr_result = OcrResultWindow::new()?;
     let tray = CaptureTray::new()?;
     let pins = Rc::new(RefCell::new(PinRegistry::default()));
 
-    let (config, initial_status, initial_level) = match Config::load() {
+    let (config, mut initial_status, mut initial_level) = match Config::load() {
         Ok(config) => (
             config,
             "就绪。右键托盘图标可打开菜单。".to_owned(),
@@ -65,26 +72,38 @@ pub fn run() -> Result<(), slint::PlatformError> {
             )
         }
     };
+    if !ocr_available && initial_level != StatusLevel::Error {
+        initial_status = ocr_status.clone();
+        initial_level = StatusLevel::Error;
+    }
     let state = Rc::new(RefCell::new(AppController::new(
         config,
         initial_status,
         initial_level,
         Rc::clone(&pins),
+        ocr_result.as_weak(),
+        ocr_available,
+        ocr_status,
     )));
 
     refresh_main(&main, &state.borrow());
     settings::populate(&main, &state.borrow());
     bind_main_window(&main, Rc::clone(&state));
+    bind_ocr_result_window(&ocr_result, main.as_weak(), Rc::clone(&state));
     settings::bind(&main, Rc::clone(&state));
     bind_tray(&tray, main.as_weak(), Rc::clone(&state));
     bind_hotkey_events(main.as_weak(), state.borrow().hotkey.active_id_handle());
 
     main.window()
         .on_close_requested(|| CloseRequestResponse::HideWindow);
+    ocr_result
+        .window()
+        .on_close_requested(|| CloseRequestResponse::HideWindow);
 
     main.show()?;
+    configure_main_window_frame(main.as_weak());
     tray.show()?;
-    slint::run_event_loop()
+    slint::run_event_loop_until_quit()
 }
 
 fn bind_main_window(main: &MainWindow, state: Rc<RefCell<AppController>>) {
@@ -93,6 +112,51 @@ fn bind_main_window(main: &MainWindow, state: Rc<RefCell<AppController>>) {
         let state = Rc::clone(&state);
         main.unwrap()
             .on_capture(move || capture_controller::start_capture(main.clone(), Rc::clone(&state)));
+    }
+}
+
+fn bind_ocr_result_window(
+    result: &OcrResultWindow,
+    main: slint::Weak<MainWindow>,
+    state: Rc<RefCell<AppController>>,
+) {
+    {
+        let result = result.as_weak();
+        result.unwrap().on_copy_text(move || {
+            let Some(result) = result.upgrade() else {
+                return;
+            };
+            let text = result.get_result_text();
+            match capture::copy_text_to_clipboard(text.as_str()) {
+                Ok(()) => {
+                    result.set_status_text("已复制全部文字".into());
+                    set_status_level(
+                        &main,
+                        &mut state.borrow_mut(),
+                        "已复制 OCR 文字".to_owned(),
+                        StatusLevel::Success,
+                    );
+                }
+                Err(error) => {
+                    logging::error(error.to_string());
+                    result.set_status_text(format!("复制失败：{error}").into());
+                    set_status_level(
+                        &main,
+                        &mut state.borrow_mut(),
+                        format!("OCR 文字复制失败：{error}"),
+                        StatusLevel::Error,
+                    );
+                }
+            }
+        });
+    }
+    {
+        let result = result.as_weak();
+        result.unwrap().on_close_result(move || {
+            if let Some(result) = result.upgrade() {
+                let _ = result.hide();
+            }
+        });
     }
 }
 
@@ -148,9 +212,13 @@ fn show_main_window(main: &slint::Weak<MainWindow>) {
     main.window().request_redraw();
     window::activate(main.window());
 
-    let main = main.as_weak();
+    configure_main_window_frame(main.as_weak());
+}
+
+fn configure_main_window_frame(main: slint::Weak<MainWindow>) {
     Timer::single_shot(Duration::from_millis(16), move || {
         if let Some(main) = main.upgrade() {
+            window::remove_minimize_maximize(main.window());
             main.window().request_redraw();
         }
     });
@@ -161,7 +229,8 @@ fn refresh_main(main: &MainWindow, state: &AppController) {
     main.set_hotkey_text(state.config.hotkey.clone().unwrap_or_default().into());
     main.set_status_text(state.status.as_str().into());
     main.set_status_level(state.status_level as i32);
-    main.set_ocr_available(cfg!(windows));
+    main.set_ocr_available(state.ocr_available);
+    main.set_ocr_status(state.ocr_status.as_str().into());
 }
 
 fn set_status(main: &slint::Weak<MainWindow>, state: &mut AppController, status: String) {
@@ -192,6 +261,34 @@ fn refresh_main_if_available(main: &slint::Weak<MainWindow>, state: &AppControll
     }
 }
 
+fn present_ocr_result(result: &slint::Weak<OcrResultWindow>, text: &str) -> Result<()> {
+    present_ocr_window(result, text, "可选择文字，或复制全部内容。")
+}
+
+fn present_ocr_error(result: &slint::Weak<OcrResultWindow>, message: &str) -> Result<()> {
+    present_ocr_window(result, message, "OCR 识别失败，错误详情已写入日志。")
+}
+
+fn present_ocr_notice(result: &slint::Weak<OcrResultWindow>, message: &str) -> Result<()> {
+    present_ocr_window(result, message, "OCR 识别已完成。")
+}
+
+fn present_ocr_window(
+    result: &slint::Weak<OcrResultWindow>,
+    text: &str,
+    status: &str,
+) -> Result<()> {
+    let result = result
+        .upgrade()
+        .ok_or_else(|| anyhow!("OCR 结果窗口已不可用"))?;
+    result.set_result_text(text.into());
+    result.set_status_text(status.into());
+    result.show()?;
+    result.window().request_redraw();
+    window::activate(result.window());
+    Ok(())
+}
+
 struct AppController {
     config: Config,
     hotkey: HotkeyState,
@@ -201,6 +298,9 @@ struct AppController {
     restore_main_after_capture: bool,
     session: Option<CaptureSession>,
     pins: Rc<RefCell<PinRegistry>>,
+    ocr_result: slint::Weak<OcrResultWindow>,
+    ocr_available: bool,
+    ocr_status: String,
     draw_style: DrawStyle,
 }
 
@@ -210,6 +310,9 @@ impl AppController {
         mut status: String,
         mut status_level: StatusLevel,
         pins: Rc<RefCell<PinRegistry>>,
+        ocr_result: slint::Weak<OcrResultWindow>,
+        ocr_available: bool,
+        ocr_status: String,
     ) -> Self {
         let hotkey = HotkeyState::new(config.hotkey.as_deref());
         if let Some(error) = hotkey.error() {
@@ -225,6 +328,9 @@ impl AppController {
             restore_main_after_capture: false,
             session: None,
             pins,
+            ocr_result,
+            ocr_available,
+            ocr_status,
             draw_style: DrawStyle {
                 rgba: [236, 92, 102, 255],
                 radius: 2,

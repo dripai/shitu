@@ -7,7 +7,8 @@ use super::{
     AnnotationView, AppController, MainWindow, OverlayWindow, StatusLevel,
     annotation::AnnotationHistory,
     pin::{PinRegistry, PinRequest},
-    set_error_status, set_status, set_status_level, show_main_window,
+    present_ocr_error, present_ocr_notice, present_ocr_result, set_error_status, set_status,
+    set_status_level, show_main_window,
 };
 use crate::{
     capture,
@@ -15,12 +16,10 @@ use crate::{
     image::{CapturedImage, DesktopBounds},
     logging, output,
     platform::{
-        ocr::{OcrEngine, OcrFailure, system_engine},
-        windows::{window, window_target::WindowTargets},
+        ocr::{OcrFailure, recognize_system},
+        windows::window_target::WindowTargets,
     },
 };
-
-const OVERLAY_HANDLE_RETRY_LIMIT: u8 = 10;
 
 pub(super) fn start_capture(main: slint::Weak<MainWindow>, state: Rc<RefCell<AppController>>) {
     let Some(main_window) = main.upgrade() else {
@@ -48,24 +47,28 @@ pub(super) fn start_capture(main: slint::Weak<MainWindow>, state: Rc<RefCell<App
         Duration::ZERO
     };
     Timer::single_shot(delay, move || {
-        let result = capture::virtual_desktop_bounds();
+        let result = capture::virtual_desktop_bounds().and_then(|bounds| {
+            let targets = WindowTargets::snapshot(bounds)?;
+            let desktop_snapshot = capture::capture_region(bounds)?;
+            open_overlay(
+                main.clone(),
+                Rc::clone(&state),
+                bounds,
+                targets,
+                desktop_snapshot,
+            )
+        });
         state.borrow_mut().capturing = false;
 
         match result {
-            Ok(bounds) => {
-                logging::info("capture overlay prepared");
-                if let Err(error) = open_overlay(main.clone(), Rc::clone(&state), bounds) {
-                    set_error_status(
-                        &main,
-                        &mut state.borrow_mut(),
-                        format!("截图窗口打开失败：{error}"),
-                    );
-                    restore_main_after_capture(&main, &state);
-                }
-            }
+            Ok(()) => logging::info("capture snapshot prepared"),
             Err(error) => {
                 logging::error(error.to_string());
-                set_error_status(&main, &mut state.borrow_mut(), format!("截图失败：{error}"));
+                set_error_status(
+                    &main,
+                    &mut state.borrow_mut(),
+                    format!("截图窗口打开失败：{error}"),
+                );
                 restore_main_after_capture(&main, &state);
             }
         }
@@ -76,17 +79,20 @@ fn open_overlay(
     main: slint::Weak<MainWindow>,
     state: Rc<RefCell<AppController>>,
     bounds: DesktopBounds,
+    targets: WindowTargets,
+    desktop_snapshot: CapturedImage,
 ) -> Result<()> {
     let overlay = OverlayWindow::new()?;
-    let targets = WindowTargets::snapshot(bounds)?;
     let initial_target = targets.target_at_cursor();
     let output_mode = completion_action_index(state.borrow().config.capture.completion_action);
 
     overlay.set_capture_width(bounds.width);
     overlay.set_capture_height(bounds.height);
+    overlay.set_desktop_image(desktop_snapshot.slint_image());
     overlay.set_annotations(empty_annotation_model());
     overlay.set_output_mode(output_mode);
-    overlay.set_ocr_available(cfg!(windows));
+    overlay.set_ocr_available(state.borrow().ocr_available);
+    overlay.set_capture_ready(true);
     set_hover_target(
         &overlay,
         initial_target.map(|target| relative_bounds(bounds, target)),
@@ -102,6 +108,7 @@ fn open_overlay(
     state.borrow_mut().session = Some(CaptureSession {
         desktop_bounds: bounds,
         window_targets: targets,
+        desktop_snapshot,
         selected: None,
         annotations: AnnotationHistory::default(),
         _overlay: overlay.clone_strong(),
@@ -111,68 +118,7 @@ fn open_overlay(
         state.borrow_mut().session = None;
         return Err(error.into());
     }
-    prepare_overlay_capture(overlay.as_weak(), main, Rc::clone(&state), 0);
     Ok(())
-}
-
-fn prepare_overlay_capture(
-    overlay: slint::Weak<OverlayWindow>,
-    main: slint::Weak<MainWindow>,
-    state: Rc<RefCell<AppController>>,
-    attempt: u8,
-) {
-    let delay = if attempt == 0 {
-        Duration::ZERO
-    } else {
-        Duration::from_millis(16)
-    };
-    Timer::single_shot(delay, move || {
-        let Some(overlay_window) = overlay.upgrade() else {
-            return;
-        };
-        if window::hwnd(overlay_window.window()).is_none() {
-            if attempt < OVERLAY_HANDLE_RETRY_LIMIT {
-                prepare_overlay_capture(overlay_window.as_weak(), main, state, attempt + 1);
-            } else {
-                fail_overlay_preparation(
-                    &overlay_window,
-                    &main,
-                    &state,
-                    "截图遮罩窗口句柄未就绪".to_owned(),
-                );
-            }
-            return;
-        }
-
-        match window::set_excluded_from_capture(overlay_window.window(), true) {
-            Ok(()) => {
-                overlay_window.set_capture_ready(true);
-                overlay_window.window().request_redraw();
-            }
-            Err(error) => fail_overlay_preparation(
-                &overlay_window,
-                &main,
-                &state,
-                format!("无法将截图遮罩排除在截图外：{error}"),
-            ),
-        }
-    });
-}
-
-fn fail_overlay_preparation(
-    overlay: &OverlayWindow,
-    main: &slint::Weak<MainWindow>,
-    state: &Rc<RefCell<AppController>>,
-    message: String,
-) {
-    logging::error(message.as_str());
-    let _ = overlay.hide();
-    {
-        let mut state = state.borrow_mut();
-        state.session = None;
-        set_error_status(main, &mut state, format!("截图窗口打开失败：{message}"));
-    }
-    restore_main_after_capture(main, state);
 }
 
 fn bind_overlay(
@@ -310,13 +256,14 @@ fn bind_overlay(
         let state = Rc::clone(&state);
         let app_state = Rc::downgrade(&state);
         overlay.unwrap().on_pin_selection(move || {
-            let (image, pin_config, capture_config, pins) = {
+            let (image, pin_config, capture_config, pins, ocr_available) = {
                 let state = state.borrow();
                 (
                     state.rendered_selection(),
                     state.config.pin.clone(),
                     state.config.capture.clone(),
                     state.pins.clone(),
+                    state.ocr_available,
                 )
             };
             let image = match image {
@@ -345,6 +292,7 @@ fn bind_overlay(
                     source_path,
                     pin_config,
                     capture_config,
+                    ocr_available,
                 },
                 main.clone(),
                 app_state.clone(),
@@ -385,10 +333,12 @@ fn spawn_overlay_ocr(overlay: slint::Weak<OverlayWindow>, image: CapturedImage) 
     let bounds = image.bounds;
     let rgba = image.rgba_bytes();
     thread::spawn(move || {
+        logging::info(format!("selection OCR started: {width}x{height}"));
         let result = CapturedImage::from_rgba(bounds.left, bounds.top, width, height, &rgba)
             .map_err(|error| OcrFailure::Failed(error.to_string()))
-            .and_then(|image| system_engine().recognize(&image));
+            .and_then(|image| recognize_system(&image));
         let (code, text) = ocr_result_payload(result);
+        logging::info(format!("selection OCR completed with code {code}"));
         let _ = overlay.upgrade_in_event_loop(move |overlay| {
             overlay.invoke_ocr_result(code, text.into());
         });
@@ -403,39 +353,82 @@ fn handle_overlay_ocr_result(
     state: &Rc<RefCell<AppController>>,
 ) {
     match code {
-        0 => match capture::copy_text_to_clipboard(text) {
-            Ok(()) => finish_capture(
+        0 => {
+            let result_window = state.borrow().ocr_result.clone();
+            if let Err(error) = present_ocr_result(&result_window, text) {
+                logging::error(error.to_string());
+                set_overlay_message(
+                    overlay,
+                    main,
+                    state,
+                    &format!("OCR 结果窗口打开失败：{error}"),
+                    StatusLevel::Error,
+                );
+                return;
+            }
+            finish_capture(
                 overlay,
                 main,
                 state,
-                "已识别并复制文字".to_owned(),
+                "OCR 识别完成".to_owned(),
                 StatusLevel::Success,
-            ),
-            Err(error) => {
-                set_error_status(
-                    main,
-                    &mut state.borrow_mut(),
-                    format!("OCR 文字复制失败：{error}"),
-                );
-            }
-        },
-        1 => set_overlay_message(overlay, main, state, "未识别到文字", StatusLevel::Info),
-        2 => set_overlay_message(
+            );
+        }
+        1 => finish_with_ocr_message(overlay, main, state, "未识别到文字", StatusLevel::Info),
+        2 => finish_with_ocr_message(
             overlay,
             main,
             state,
-            "缺少中文 OCR 语言包",
+            "缺少可用的 Windows OCR 语言包",
             StatusLevel::Error,
         ),
-        3 => set_overlay_message(
+        3 => finish_with_ocr_message(
             overlay,
             main,
             state,
-            "当前平台不支持系统 OCR",
+            "当前系统或程序安装方式不支持 Windows 系统 OCR",
             StatusLevel::Error,
         ),
-        _ => set_overlay_message(overlay, main, state, "OCR 识别失败", StatusLevel::Error),
+        _ => finish_with_ocr_message(
+            overlay,
+            main,
+            state,
+            if text.is_empty() {
+                "OCR 识别失败"
+            } else {
+                text
+            },
+            StatusLevel::Error,
+        ),
     }
+}
+
+fn finish_with_ocr_message(
+    overlay: &slint::Weak<OverlayWindow>,
+    main: &slint::Weak<MainWindow>,
+    state: &Rc<RefCell<AppController>>,
+    message: &str,
+    level: StatusLevel,
+) {
+    let result_window = state.borrow().ocr_result.clone();
+    let presentation = if level == StatusLevel::Error {
+        logging::error(format!("OCR failed: {message}"));
+        present_ocr_error(&result_window, message)
+    } else {
+        present_ocr_notice(&result_window, message)
+    };
+    if let Err(error) = presentation {
+        logging::error(format!("OCR result window failed: {error}"));
+        set_overlay_message(
+            overlay,
+            main,
+            state,
+            &format!("OCR 结果窗口打开失败：{error}"),
+            StatusLevel::Error,
+        );
+        return;
+    }
+    finish_capture(overlay, main, state, message.to_owned(), level);
 }
 
 fn set_overlay_message(
@@ -458,8 +451,8 @@ pub(super) fn ocr_result_payload(result: Result<String, OcrFailure>) -> (i32, St
         Err(OcrFailure::MissingLanguagePack) => (2, String::new()),
         Err(OcrFailure::Unsupported) => (3, String::new()),
         Err(OcrFailure::Failed(message)) => {
-            logging::error(message);
-            (4, String::new())
+            logging::error(message.as_str());
+            (4, message)
         }
     }
 }
@@ -576,12 +569,7 @@ impl AppController {
             session.desktop_bounds.height as u32,
         )
         .ok_or_else(|| anyhow!("选区过小"))?;
-        let selected = capture::capture_region(DesktopBounds {
-            left: session.desktop_bounds.left + left as i32,
-            top: session.desktop_bounds.top + top as i32,
-            width: width as i32,
-            height: height as i32,
-        })?;
+        let selected = session.desktop_snapshot.crop(left, top, width, height)?;
         let image = selected.slint_image();
         session.selected = Some(selected);
         session.annotations.clear();
@@ -697,6 +685,7 @@ pub(super) fn normalized_selection(
 pub(super) struct CaptureSession {
     desktop_bounds: DesktopBounds,
     window_targets: WindowTargets,
+    desktop_snapshot: CapturedImage,
     selected: Option<CapturedImage>,
     annotations: AnnotationHistory,
     _overlay: OverlayWindow,

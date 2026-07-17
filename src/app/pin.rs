@@ -3,15 +3,15 @@ use std::{
     path::PathBuf,
     rc::{Rc, Weak as RcWeak},
     thread,
-    time::Duration,
 };
 
 use anyhow::Result;
-use slint::{ComponentHandle, ModelRc, PhysicalPosition, PhysicalSize, Timer, VecModel};
+use slint::{ComponentHandle, ModelRc, PhysicalPosition, PhysicalSize, VecModel};
 
 use super::{
-    AnnotationView, AppController, MainWindow, PinMenuWindow, PinWindow, StatusLevel,
-    annotation::AnnotationHistory, capture_controller::ocr_result_payload, set_status_level,
+    AnnotationView, AppController, MainWindow, PinToolbarWindow, PinWindow, StatusLevel,
+    annotation::AnnotationHistory, capture_controller::ocr_result_payload, present_ocr_error,
+    present_ocr_result, set_status_level,
 };
 use crate::{
     capture,
@@ -19,7 +19,7 @@ use crate::{
     image::{CapturedImage, DrawStyle},
     logging, output,
     platform::{
-        ocr::{OcrEngine, OcrFailure, system_engine},
+        ocr::{OcrFailure, recognize_system},
         windows::{shell, window},
     },
 };
@@ -29,6 +29,7 @@ pub(super) struct PinRequest {
     pub source_path: Option<PathBuf>,
     pub pin_config: PinConfig,
     pub capture_config: CaptureConfig,
+    pub ocr_available: bool,
 }
 
 #[derive(Default)]
@@ -49,8 +50,10 @@ impl PinRegistry {
             source_path,
             pin_config,
             capture_config,
+            ocr_available,
         } = request;
         let pin = PinWindow::new()?;
+        let toolbar = PinToolbarWindow::new()?;
         pin.set_screenshot(image.slint_image());
         pin.set_alpha_percent(pin_config.default_opacity as i32);
         pin.set_shadow_enabled(pin_config.shadow);
@@ -62,6 +65,11 @@ impl PinRegistry {
         pin.set_original_size_text(format!("{} × {}", image.width(), image.height()).into());
         pin.set_has_source_file(source_path.is_some());
         pin.set_annotations(empty_annotation_model());
+        pin.set_ocr_available(ocr_available);
+        toolbar.set_active_tool(0);
+        toolbar.set_color_index(0);
+        toolbar.set_stroke_radius(2);
+        toolbar.set_ocr_available(ocr_available);
         pin.window()
             .set_position(PhysicalPosition::new(image.bounds.left, image.bounds.top));
         pin.window()
@@ -91,12 +99,13 @@ impl PinRegistry {
         let controller = PinController {
             id,
             pin: pin.as_weak(),
+            toolbar: toolbar.as_weak(),
             state: Rc::clone(&state),
             registry: Rc::downgrade(registry),
             main,
             app,
         };
-        controller.bind(&pin);
+        controller.bind(&pin, &toolbar);
 
         pin.show()?;
         window::set_opacity(pin.window(), pin_config.default_opacity);
@@ -105,6 +114,7 @@ impl PinRegistry {
         registry.borrow_mut().windows.push(PinnedWindow {
             id,
             _ui: pin,
+            _toolbar_ui: toolbar,
             _state: state,
         });
         Ok(())
@@ -115,6 +125,7 @@ impl PinRegistry {
 struct PinController {
     id: u64,
     pin: slint::Weak<PinWindow>,
+    toolbar: slint::Weak<PinToolbarWindow>,
     state: Rc<RefCell<PinnedWindowState>>,
     registry: RcWeak<RefCell<PinRegistry>>,
     main: slint::Weak<MainWindow>,
@@ -131,7 +142,6 @@ enum PinTransform {
 
 enum PinCommand {
     Close,
-    OpenMenu,
     Drag,
     ScaleBy(i32),
     SetScale(i32),
@@ -144,6 +154,7 @@ enum PinCommand {
     SetShadow(bool),
     SetTop(bool),
     SetToolbar(bool),
+    SetTool(i32),
     BeginAnnotation(f32, f32, i32),
     UpdateAnnotation(f32, f32),
     FinishAnnotation,
@@ -158,7 +169,7 @@ enum PinCommand {
 }
 
 impl PinController {
-    fn bind(&self, pin: &PinWindow) {
+    fn bind(&self, pin: &PinWindow, toolbar: &PinToolbarWindow) {
         macro_rules! bind {
             ($method:ident, $command:expr) => {{
                 let controller = self.clone();
@@ -167,7 +178,6 @@ impl PinController {
         }
 
         bind!(on_close_pin, PinCommand::Close);
-        bind!(on_open_menu, PinCommand::OpenMenu);
         bind!(on_drag_pin, PinCommand::Drag);
         bind!(on_fit_screen, PinCommand::FitScreen);
         bind!(on_copy_image, PinCommand::Copy);
@@ -193,6 +203,12 @@ impl PinController {
             PinCommand::Transform(PinTransform::FlipVertical)
         );
 
+        {
+            let controller = self.clone();
+            pin.on_set_toolbar(move |enabled| {
+                controller.dispatch(PinCommand::SetToolbar(enabled));
+            });
+        }
         {
             let controller = self.clone();
             pin.on_scale_pin(move |direction| {
@@ -244,15 +260,42 @@ impl PinController {
         bind!(on_finish_annotation, PinCommand::FinishAnnotation);
         bind!(on_undo, PinCommand::Undo);
         bind!(on_redo, PinCommand::Redo);
+
         {
             let controller = self.clone();
-            pin.on_select_color(move |index| {
+            toolbar.on_close_pin(move || controller.dispatch(PinCommand::Close));
+        }
+        {
+            let controller = self.clone();
+            toolbar.on_copy_image(move || controller.dispatch(PinCommand::Copy));
+        }
+        {
+            let controller = self.clone();
+            toolbar.on_recognize_text(move || controller.dispatch(PinCommand::Ocr));
+        }
+        {
+            let controller = self.clone();
+            toolbar.on_undo(move || controller.dispatch(PinCommand::Undo));
+        }
+        {
+            let controller = self.clone();
+            toolbar.on_redo(move || controller.dispatch(PinCommand::Redo));
+        }
+        {
+            let controller = self.clone();
+            toolbar.on_set_tool(move |tool| {
+                controller.dispatch(PinCommand::SetTool(tool));
+            });
+        }
+        {
+            let controller = self.clone();
+            toolbar.on_select_color(move |index| {
                 controller.dispatch(PinCommand::SetColor(index));
             });
         }
         {
             let controller = self.clone();
-            pin.on_select_width(move |radius| {
+            toolbar.on_select_width(move |radius| {
                 controller.dispatch(PinCommand::SetWidth(radius));
             });
         }
@@ -261,16 +304,7 @@ impl PinController {
     fn dispatch(&self, command: PinCommand) {
         match command {
             PinCommand::Close => self.close(),
-            PinCommand::OpenMenu => {
-                if let Err(error) = self.open_menu() {
-                    self.status(format!("打开钉住菜单失败：{error}"), StatusLevel::Error);
-                }
-            }
-            PinCommand::Drag => {
-                if let Some(pin) = self.pin.upgrade() {
-                    window::drag(pin.window());
-                }
-            }
+            PinCommand::Drag => self.drag(),
             PinCommand::ScaleBy(direction) => {
                 let current = self.state.borrow().scale_percent;
                 let step = self.state.borrow().zoom_step as i32;
@@ -285,14 +319,8 @@ impl PinController {
             PinCommand::SetOpacity(percent) => self.set_opacity(percent),
             PinCommand::SetShadow(enabled) => self.set_shadow(enabled),
             PinCommand::SetTop(enabled) => self.set_top(enabled),
-            PinCommand::SetToolbar(enabled) => {
-                if let Some(pin) = self.pin.upgrade() {
-                    pin.set_toolbar_visible(enabled);
-                    if !enabled {
-                        pin.set_active_tool(0);
-                    }
-                }
-            }
+            PinCommand::SetToolbar(enabled) => self.set_toolbar(enabled),
+            PinCommand::SetTool(tool) => self.set_tool(tool),
             PinCommand::BeginAnnotation(x, y, tool) => self.begin_annotation(x, y, tool),
             PinCommand::UpdateAnnotation(x, y) => self.update_annotation(x, y),
             PinCommand::FinishAnnotation => self.finish_annotation(),
@@ -308,6 +336,9 @@ impl PinController {
     }
 
     fn close(&self) {
+        if let Some(toolbar) = self.toolbar.upgrade() {
+            let _ = toolbar.hide();
+        }
         if let Some(pin) = self.pin.upgrade() {
             let _ = pin.hide();
         }
@@ -317,6 +348,77 @@ impl PinController {
                 .windows
                 .retain(|item| item.id != self.id);
         }
+    }
+
+    fn drag(&self) {
+        let (Some(pin), Some(toolbar)) = (self.pin.upgrade(), self.toolbar.upgrade()) else {
+            return;
+        };
+        let toolbar_visible = pin.get_toolbar_visible();
+        if toolbar_visible {
+            let _ = toolbar.hide();
+        }
+        window::drag(pin.window());
+        if toolbar_visible {
+            self.show_toolbar(&pin, &toolbar);
+        }
+    }
+
+    fn set_toolbar(&self, enabled: bool) {
+        let (Some(pin), Some(toolbar)) = (self.pin.upgrade(), self.toolbar.upgrade()) else {
+            return;
+        };
+        pin.set_toolbar_visible(enabled);
+        if enabled {
+            self.show_toolbar(&pin, &toolbar);
+        } else {
+            pin.set_active_tool(0);
+            toolbar.set_active_tool(0);
+            let _ = toolbar.hide();
+        }
+    }
+
+    fn show_toolbar(&self, pin: &PinWindow, toolbar: &PinToolbarWindow) {
+        if let Err(error) = toolbar.show() {
+            pin.set_toolbar_visible(false);
+            self.status(format!("工具栏显示失败：{error}"), StatusLevel::Error);
+            return;
+        }
+        self.resize_toolbar(toolbar);
+        window::set_owner(toolbar.window(), pin.window());
+        window::set_always_on_top(toolbar.window(), self.state.borrow().always_on_top);
+        window::position_below(pin.window(), toolbar.window(), 6);
+    }
+
+    fn set_tool(&self, tool: i32) {
+        let tool = tool.clamp(0, 3);
+        if let Some(pin) = self.pin.upgrade() {
+            pin.set_active_tool(tool);
+        }
+        if let Some(toolbar) = self.toolbar.upgrade() {
+            toolbar.set_active_tool(tool);
+            self.resize_toolbar(&toolbar);
+            if let Some(pin) = self.pin.upgrade() {
+                window::position_below(pin.window(), toolbar.window(), 6);
+            }
+        }
+    }
+
+    fn resize_toolbar(&self, toolbar: &PinToolbarWindow) {
+        let scale = toolbar.window().scale_factor();
+        let logical_width = if toolbar.get_ocr_available() {
+            252.0
+        } else {
+            222.0
+        };
+        let width = (logical_width * scale).round().max(1.0) as u32;
+        let logical_height = if toolbar.get_active_tool() > 0 {
+            68.0
+        } else {
+            38.0
+        };
+        let height = (logical_height * scale).round().max(1.0) as u32;
+        toolbar.window().set_size(PhysicalSize::new(width, height));
     }
 
     fn copy(&self) {
@@ -356,6 +458,7 @@ impl PinController {
         let Some(pin) = self.pin.upgrade() else {
             return;
         };
+        self.status("正在识别文字...".to_owned(), StatusLevel::Info);
         spawn_pin_ocr(pin.as_weak(), self.state.borrow().image.clone());
     }
 
@@ -401,10 +504,18 @@ impl PinController {
             3 => [245, 197, 66, 255],
             _ => state.draw_style.rgba,
         };
+        drop(state);
+        if let Some(toolbar) = self.toolbar.upgrade() {
+            toolbar.set_color_index(index.clamp(0, 3));
+        }
     }
 
     fn set_width(&self, radius: i32) {
-        self.state.borrow_mut().draw_style.radius = radius.clamp(1, 12);
+        let radius = radius.clamp(1, 12);
+        self.state.borrow_mut().draw_style.radius = radius;
+        if let Some(toolbar) = self.toolbar.upgrade() {
+            toolbar.set_stroke_radius(radius);
+        }
     }
 
     fn refresh_annotations(&self) {
@@ -417,12 +528,39 @@ impl PinController {
 
     fn handle_ocr_result(&self, code: i32, text: &str) {
         match code {
-            0 => self.report(capture::copy_text_to_clipboard(text), "已识别并复制文字"),
+            0 => {
+                let Some(app) = self.app.upgrade() else {
+                    self.status("OCR 结果窗口已不可用".to_owned(), StatusLevel::Error);
+                    return;
+                };
+                let result_window = app.borrow().ocr_result.clone();
+                match present_ocr_result(&result_window, text) {
+                    Ok(()) => self.status("OCR 识别完成".to_owned(), StatusLevel::Success),
+                    Err(error) => {
+                        self.status(format!("OCR 结果窗口打开失败：{error}"), StatusLevel::Error)
+                    }
+                }
+            }
             1 => self.status("未识别到文字".to_owned(), StatusLevel::Info),
-            2 => self.status("缺少中文 OCR 语言包".to_owned(), StatusLevel::Error),
-            3 => self.status("当前平台不支持系统 OCR".to_owned(), StatusLevel::Error),
-            _ => self.status("OCR 识别失败".to_owned(), StatusLevel::Error),
+            2 => self.show_ocr_error("缺少可用的 Windows OCR 语言包"),
+            3 => self.show_ocr_error("当前系统或程序安装方式不支持 Windows 系统 OCR"),
+            _ => self.show_ocr_error(if text.is_empty() {
+                "OCR 识别失败"
+            } else {
+                text
+            }),
         }
+    }
+
+    fn show_ocr_error(&self, message: &str) {
+        logging::error(format!("OCR failed: {message}"));
+        if let Some(app) = self.app.upgrade() {
+            let result_window = app.borrow().ocr_result.clone();
+            if let Err(error) = present_ocr_error(&result_window, message) {
+                logging::error(format!("OCR result window failed: {error}"));
+            }
+        }
+        self.status(format!("OCR 识别失败：{message}"), StatusLevel::Error);
     }
 
     fn set_opacity(&self, percent: i32) {
@@ -451,6 +589,9 @@ impl PinController {
         self.state.borrow_mut().always_on_top = enabled;
         pin.set_top_enabled(enabled);
         window::set_always_on_top(pin.window(), enabled);
+        if let Some(toolbar) = self.toolbar.upgrade() {
+            window::set_always_on_top(toolbar.window(), enabled);
+        }
     }
 
     fn set_scale(&self, percent: i32) {
@@ -465,6 +606,7 @@ impl PinController {
         self.state.borrow_mut().scale_percent = percent;
         pin.set_scale_percent(percent);
         pin.window().set_size(PhysicalSize::new(width, height));
+        self.position_toolbar();
     }
 
     fn fit_screen(&self) {
@@ -478,6 +620,7 @@ impl PinController {
         drop(state);
         self.state.borrow_mut().scale_percent = scale;
         pin.set_scale_percent(scale);
+        self.position_toolbar();
     }
 
     fn replace_clipboard(&self) {
@@ -488,6 +631,8 @@ impl PinController {
         match capture::image_from_clipboard(position.x, position.y) {
             Ok(image) => {
                 replace_pin_image(&pin, &self.state, image, None);
+                self.reset_toolbar_tool();
+                self.position_toolbar();
                 self.status("已从剪贴板替换图像".to_owned(), StatusLevel::Success);
             }
             Err(error) => self.status(format!("替换图像失败：{error}"), StatusLevel::Error),
@@ -508,6 +653,8 @@ impl PinController {
         match CapturedImage::from_file(&path, position.x, position.y) {
             Ok(image) => {
                 replace_pin_image(&pin, &self.state, image, Some(path));
+                self.reset_toolbar_tool();
+                self.position_toolbar();
                 self.status("已从文件替换图像".to_owned(), StatusLevel::Success);
             }
             Err(error) => self.status(format!("替换图像失败：{error}"), StatusLevel::Error),
@@ -543,105 +690,25 @@ impl PinController {
             (image, state.source_path.clone(), message)
         };
         replace_pin_image(&pin, &self.state, image, source_path);
+        self.reset_toolbar_tool();
+        self.position_toolbar();
         self.status(message.to_owned(), StatusLevel::Success);
     }
 
-    fn open_menu(&self) -> Result<()> {
-        let Some(pin) = self.pin.upgrade() else {
-            return Ok(());
+    fn reset_toolbar_tool(&self) {
+        if let Some(toolbar) = self.toolbar.upgrade() {
+            toolbar.set_active_tool(0);
+            self.resize_toolbar(&toolbar);
+        }
+    }
+
+    fn position_toolbar(&self) {
+        let (Some(pin), Some(toolbar)) = (self.pin.upgrade(), self.toolbar.upgrade()) else {
+            return;
         };
-        let menu = PinMenuWindow::new()?;
-        {
-            let state = self.state.borrow();
-            menu.set_alpha_percent(state.opacity as i32);
-            menu.set_shadow_enabled(state.shadow);
-            menu.set_top_enabled(state.always_on_top);
-            menu.set_scale_percent(state.scale_percent);
-            menu.set_original_size_text(
-                format!("{} × {}", state.image.width(), state.image.height()).into(),
-            );
-            menu.set_has_source_file(state.source_path.is_some());
+        if pin.get_toolbar_visible() {
+            window::position_below(pin.window(), toolbar.window(), 6);
         }
-        menu.set_toolbar_visible(pin.get_toolbar_visible());
-
-        {
-            let menu = menu.as_weak();
-            menu.unwrap().on_close_menu(move || {
-                if let Some(menu) = menu.upgrade() {
-                    let _ = menu.hide();
-                }
-            });
-        }
-
-        macro_rules! bind {
-            ($method:ident, $command:expr) => {{
-                let controller = self.clone();
-                menu.$method(move || controller.dispatch($command));
-            }};
-        }
-
-        bind!(on_close_pin, PinCommand::Close);
-        bind!(on_copy_image, PinCommand::Copy);
-        bind!(on_save_image, PinCommand::Save);
-        bind!(on_recognize_text, PinCommand::Ocr);
-        bind!(on_fit_screen, PinCommand::FitScreen);
-        bind!(on_replace_clipboard, PinCommand::ReplaceClipboard);
-        bind!(on_replace_file, PinCommand::ReplaceFile);
-        bind!(on_reveal_file, PinCommand::RevealFile);
-        bind!(
-            on_rotate_left,
-            PinCommand::Transform(PinTransform::RotateLeft)
-        );
-        bind!(
-            on_rotate_right,
-            PinCommand::Transform(PinTransform::RotateRight)
-        );
-        bind!(
-            on_flip_horizontal,
-            PinCommand::Transform(PinTransform::FlipHorizontal)
-        );
-        bind!(
-            on_flip_vertical,
-            PinCommand::Transform(PinTransform::FlipVertical)
-        );
-        {
-            let controller = self.clone();
-            menu.on_set_toolbar(move |enabled| {
-                controller.dispatch(PinCommand::SetToolbar(enabled));
-            });
-        }
-        {
-            let controller = self.clone();
-            menu.on_set_opacity(move |percent| {
-                controller.dispatch(PinCommand::SetOpacity(percent));
-            });
-        }
-        {
-            let controller = self.clone();
-            menu.on_set_shadow(move |enabled| {
-                controller.dispatch(PinCommand::SetShadow(enabled));
-            });
-        }
-        {
-            let controller = self.clone();
-            menu.on_set_top(move |enabled| {
-                controller.dispatch(PinCommand::SetTop(enabled));
-            });
-        }
-        {
-            let controller = self.clone();
-            menu.on_set_scale(move |percent| {
-                controller.dispatch(PinCommand::SetScale(percent));
-            });
-        }
-
-        menu.show()?;
-        window::configure_context_menu(menu.window(), pin.window());
-        window::place_context_menu_at_cursor(menu.window());
-        window::activate(menu.window());
-        monitor_pin_menu(menu.as_weak(), 0);
-        logging::info("independent pin context menu opened");
-        Ok(())
     }
 
     fn report(&self, result: Result<()>, success: &str) {
@@ -659,25 +726,6 @@ impl PinController {
             main.set_status_level(level as i32);
         }
     }
-}
-
-fn monitor_pin_menu(menu: slint::Weak<PinMenuWindow>, attempts: u8) {
-    Timer::single_shot(Duration::from_millis(120), move || {
-        let Some(menu) = menu.upgrade() else {
-            return;
-        };
-        if !menu.window().is_visible() {
-            return;
-        }
-        if window::is_foreground(menu.window()) {
-            monitor_pin_menu(menu.as_weak(), 0);
-        } else if attempts < 2 {
-            window::activate(menu.window());
-            monitor_pin_menu(menu.as_weak(), attempts + 1);
-        } else {
-            let _ = menu.hide();
-        }
-    });
 }
 
 fn replace_pin_image(
@@ -712,10 +760,12 @@ fn spawn_pin_ocr(pin: slint::Weak<PinWindow>, image: CapturedImage) {
     let bounds = image.bounds;
     let rgba = image.rgba_bytes();
     thread::spawn(move || {
+        logging::info(format!("pin OCR started: {width}x{height}"));
         let result = CapturedImage::from_rgba(bounds.left, bounds.top, width, height, &rgba)
             .map_err(|error| OcrFailure::Failed(error.to_string()))
-            .and_then(|image| system_engine().recognize(&image));
+            .and_then(|image| recognize_system(&image));
         let (code, text) = ocr_result_payload(result);
+        logging::info(format!("pin OCR completed with code {code}"));
         let _ = pin.upgrade_in_event_loop(move |pin| {
             pin.invoke_ocr_result(code, text.into());
         });
@@ -725,6 +775,7 @@ fn spawn_pin_ocr(pin: slint::Weak<PinWindow>, image: CapturedImage) {
 struct PinnedWindow {
     id: u64,
     _ui: PinWindow,
+    _toolbar_ui: PinToolbarWindow,
     _state: Rc<RefCell<PinnedWindowState>>,
 }
 

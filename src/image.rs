@@ -82,6 +82,40 @@ impl CapturedImage {
         Image::from_rgba8(self.pixels.clone())
     }
 
+    pub fn crop(&self, left: u32, top: u32, width: u32, height: u32) -> Result<Self> {
+        let right = left
+            .checked_add(width)
+            .ok_or_else(|| anyhow!("图像裁剪坐标溢出"))?;
+        let bottom = top
+            .checked_add(height)
+            .ok_or_else(|| anyhow!("图像裁剪坐标溢出"))?;
+        if width == 0 || height == 0 || right > self.width() || bottom > self.height() {
+            return Err(anyhow!("图像裁剪区域无效"));
+        }
+
+        let mut pixels = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
+        let source = self.pixels.as_slice();
+        let target = pixels.make_mut_slice();
+        let source_width = self.width() as usize;
+        let target_width = width as usize;
+        for row in 0..height as usize {
+            let source_start = (top as usize + row) * source_width + left as usize;
+            let target_start = row * target_width;
+            target[target_start..target_start + target_width]
+                .copy_from_slice(&source[source_start..source_start + target_width]);
+        }
+
+        Ok(Self {
+            bounds: DesktopBounds {
+                left: self.bounds.left + left as i32,
+                top: self.bounds.top + top as i32,
+                width: width as i32,
+                height: height as i32,
+            },
+            pixels,
+        })
+    }
+
     pub fn rotate_left(&self) -> Self {
         let source_width = self.width();
         let source_height = self.height();
@@ -266,11 +300,38 @@ pub fn arrow_head(start: (u32, u32), end: (u32, u32)) -> Option<((u32, u32), (u3
 
 #[cfg(test)]
 mod tests {
-    use super::arrow_head;
+    use super::{CapturedImage, arrow_head};
 
     #[test]
     fn arrow_head_requires_a_visible_segment() {
         assert!(arrow_head((10, 10), (10, 10)).is_none());
         assert!(arrow_head((10, 10), (30, 20)).is_some());
+    }
+
+    #[test]
+    fn crop_preserves_pixels_and_updates_origin() {
+        let source = CapturedImage::from_rgba(
+            -10,
+            20,
+            3,
+            2,
+            &[
+                1, 2, 3, 255, 4, 5, 6, 255, 7, 8, 9, 255, 10, 11, 12, 255, 13, 14, 15, 255, 16, 17,
+                18, 255,
+            ],
+        )
+        .unwrap();
+
+        let cropped = source.crop(1, 0, 2, 2).unwrap();
+
+        assert_eq!(cropped.bounds.left, -9);
+        assert_eq!(cropped.bounds.top, 20);
+        assert_eq!(cropped.width(), 2);
+        assert_eq!(cropped.height(), 2);
+        assert_eq!(
+            cropped.rgba_bytes(),
+            vec![4, 5, 6, 255, 7, 8, 9, 255, 13, 14, 15, 255, 16, 17, 18, 255]
+        );
+        assert!(source.crop(2, 1, 2, 1).is_err());
     }
 }

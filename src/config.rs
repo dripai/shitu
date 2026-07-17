@@ -177,11 +177,15 @@ impl Config {
     }
 
     pub fn path() -> PathBuf {
-        app_data_directory().join("config.json")
+        Self::directory().join("config.json")
+    }
+
+    pub fn directory() -> PathBuf {
+        app_data_directory()
     }
 
     pub fn log_directory() -> PathBuf {
-        app_data_directory().join("logs")
+        Self::directory().join("logs")
     }
 
     pub fn third_party_licenses_path() -> PathBuf {

@@ -1,27 +1,22 @@
-use anyhow::{Result, anyhow};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use slint::{PhysicalPosition, PhysicalSize, Window};
 use windows::Win32::{
-    Foundation::{COLORREF, HWND, LPARAM, POINT, RECT, WPARAM},
+    Foundation::{COLORREF, HWND, LPARAM, RECT, WPARAM},
     Graphics::{
         Dwm::{
             DWMNCRENDERINGPOLICY, DWMNCRP_DISABLED, DWMNCRP_ENABLED, DWMWA_NCRENDERING_POLICY,
             DwmSetWindowAttribute,
         },
-        Gdi::{
-            GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromPoint,
-            MonitorFromWindow,
-        },
+        Gdi::{GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow},
     },
     UI::{
         Input::KeyboardAndMouse::ReleaseCapture,
         WindowsAndMessaging::{
-            GWL_EXSTYLE, GWLP_HWNDPARENT, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW,
-            HTCAPTION, HWND_NOTOPMOST, HWND_TOPMOST, LWA_ALPHA, SWP_FRAMECHANGED, SWP_NOMOVE,
-            SWP_NOSIZE, SWP_NOZORDER, SendMessageW, SetForegroundWindow,
-            SetLayeredWindowAttributes, SetWindowDisplayAffinity, SetWindowLongPtrW, SetWindowPos,
-            WDA_EXCLUDEFROMCAPTURE, WDA_NONE, WM_NCLBUTTONDOWN, WS_EX_APPWINDOW, WS_EX_LAYERED,
-            WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+            GWL_EXSTYLE, GWL_STYLE, GWLP_HWNDPARENT, GetWindowLongPtrW, HTCAPTION, HWND_NOTOPMOST,
+            HWND_TOPMOST, LWA_ALPHA, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+            SendMessageW, SetForegroundWindow, SetLayeredWindowAttributes, SetWindowLongPtrW,
+            SetWindowPos, WM_NCLBUTTONDOWN, WS_EX_LAYERED, WS_EX_TOPMOST, WS_MAXIMIZEBOX,
+            WS_MINIMIZEBOX,
         },
     },
 };
@@ -45,79 +40,24 @@ pub fn activate(window: &Window) {
     }
 }
 
-pub fn set_excluded_from_capture(window: &Window, excluded: bool) -> Result<()> {
-    let hwnd = hwnd(window).ok_or_else(|| anyhow!("窗口句柄尚未就绪"))?;
-    let affinity = if excluded {
-        WDA_EXCLUDEFROMCAPTURE
-    } else {
-        WDA_NONE
-    };
-    unsafe { SetWindowDisplayAffinity(hwnd, affinity) }.map_err(Into::into)
-}
-
-pub fn configure_context_menu(window: &Window, owner: &Window) {
-    let (Some(menu_hwnd), Some(owner_hwnd)) = (hwnd(window), hwnd(owner)) else {
+pub fn remove_minimize_maximize(window: &Window) {
+    let Some(hwnd) = hwnd(window) else {
         return;
     };
     unsafe {
-        let mut style = GetWindowLongPtrW(menu_hwnd, GWL_EXSTYLE) as u32;
-        style |= WS_EX_TOOLWINDOW.0 | WS_EX_TOPMOST.0;
-        style &= !WS_EX_APPWINDOW.0;
-        SetWindowLongPtrW(menu_hwnd, GWL_EXSTYLE, style as isize);
-        SetWindowLongPtrW(menu_hwnd, GWLP_HWNDPARENT, owner_hwnd.0 as isize);
+        let style = GetWindowLongPtrW(hwnd, GWL_STYLE) as u32;
+        let style = style & !WS_MINIMIZEBOX.0 & !WS_MAXIMIZEBOX.0;
+        SetWindowLongPtrW(hwnd, GWL_STYLE, style as isize);
         let _ = SetWindowPos(
-            menu_hwnd,
-            Some(HWND_TOPMOST),
+            hwnd,
+            None,
             0,
             0,
             0,
             0,
-            SWP_NOMOVE | SWP_NOSIZE,
+            SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER,
         );
     }
-}
-
-pub fn place_context_menu_at_cursor(window: &Window) {
-    let mut cursor = POINT::default();
-    if unsafe { GetCursorPos(&mut cursor) }.is_err() {
-        return;
-    }
-
-    let monitor = unsafe { MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST) };
-    let mut info = MONITORINFO {
-        cbSize: size_of::<MONITORINFO>() as u32,
-        ..Default::default()
-    };
-    if !unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
-        return;
-    }
-
-    let size = window.size();
-    let width = size.width as i32;
-    let height = size.height as i32;
-    let RECT {
-        left,
-        top,
-        right,
-        bottom,
-    } = info.rcWork;
-    let x = if cursor.x + width + 2 <= right {
-        cursor.x + 2
-    } else {
-        cursor.x - width - 2
-    }
-    .clamp(left, (right - width).max(left));
-    let y = if cursor.y + height + 2 <= bottom {
-        cursor.y + 2
-    } else {
-        cursor.y - height - 2
-    }
-    .clamp(top, (bottom - height).max(top));
-    window.set_position(PhysicalPosition::new(x, y));
-}
-
-pub fn is_foreground(window: &Window) -> bool {
-    hwnd(window).is_some_and(|handle| unsafe { GetForegroundWindow() } == handle)
 }
 
 pub fn drag(window: &Window) {
@@ -175,6 +115,44 @@ pub fn set_always_on_top(window: &Window, enabled: bool) {
         }
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style as isize);
     }
+}
+
+pub fn set_owner(window: &Window, owner: &Window) {
+    let (Some(hwnd), Some(owner_hwnd)) = (hwnd(window), hwnd(owner)) else {
+        return;
+    };
+    unsafe {
+        SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, owner_hwnd.0 as isize);
+    }
+}
+
+pub fn position_below(anchor: &Window, floating: &Window, gap: i32) {
+    let anchor_position = anchor.position();
+    let anchor_size = anchor.size();
+    let floating_size = floating.size();
+    let mut x = anchor_position.x + (anchor_size.width as i32 - floating_size.width as i32) / 2;
+    let below = anchor_position.y + anchor_size.height as i32 + gap;
+    let mut y = below;
+
+    if let Some(anchor_hwnd) = hwnd(anchor) {
+        let monitor = unsafe { MonitorFromWindow(anchor_hwnd, MONITOR_DEFAULTTONEAREST) };
+        let mut info = MONITORINFO {
+            cbSize: size_of::<MONITORINFO>() as u32,
+            ..Default::default()
+        };
+        if unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
+            let work = info.rcWork;
+            x = x.clamp(
+                work.left,
+                (work.right - floating_size.width as i32).max(work.left),
+            );
+            if below + floating_size.height as i32 > work.bottom {
+                y = (anchor_position.y - floating_size.height as i32 - gap).max(work.top);
+            }
+        }
+    }
+
+    floating.set_position(PhysicalPosition::new(x, y));
 }
 
 pub fn set_shadow(window: &Window, enabled: bool) {
