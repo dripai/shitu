@@ -4,7 +4,7 @@ import { CaptureToolbar } from "capture-toolbar.slint";
 
 export component OverlayWindow inherits Window {
     title: "选择截图区域";
-    background: #000000;
+    background: transparent;
     no-frame: true;
     always-on-top: true;
 
@@ -67,7 +67,7 @@ export component OverlayWindow inherits Window {
     property <length> hover-view-top: root.hover-top / root.source-scale-y * 1px;
     property <length> hover-view-width: (root.hover-right - root.hover-left) / root.source-scale-x * 1px;
     property <length> hover-view-height: (root.hover-bottom - root.hover-top) / root.source-scale-y * 1px;
-    property <bool> focus-visible: root.selecting || root.hover-valid;
+    property <bool> focus-visible: root.selecting;
     property <length> focus-left: root.selecting ? root.selection-left : root.hover-view-left;
     property <length> focus-top: root.selecting ? root.selection-top : root.hover-view-top;
     property <length> focus-width: root.selecting ? root.selection-width : root.hover-view-width;
@@ -130,7 +130,7 @@ export component OverlayWindow inherits Window {
         );
     }
 
-    Image {
+    if root.selecting || root.completed: Image {
         width: root.width;
         height: root.height;
         source: root.desktop-image;
@@ -148,7 +148,7 @@ export component OverlayWindow inherits Window {
         }
     }
 
-    Rectangle {
+    if root.selecting || root.completed: Rectangle {
         width: root.width;
         height: root.height;
         background: #00000088;
@@ -165,16 +165,6 @@ export component OverlayWindow inherits Window {
         source-clip-width: root.focus-source-width;
         source-clip-height: root.focus-source-height;
         image-fit: fill;
-    }
-
-    if !root.completed && root.hover-valid && !root.selecting: Rectangle {
-        x: root.focus-left;
-        y: root.focus-top;
-        width: Math.max(1px, root.focus-width);
-        height: Math.max(1px, root.focus-height);
-        border-width: 2px;
-        border-color: #54a5ff;
-        background: transparent;
     }
 
     TouchArea {
