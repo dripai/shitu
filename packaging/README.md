@@ -1,30 +1,26 @@
-# Windows package identity
+# Microsoft Store MSIX package
 
-Windows AI OCR requires package identity and the `systemAIModels` capability. GridStart keeps its existing Win32 installation layout and uses an external-location identity package.
+ShiTu is published to Microsoft Store as a complete x64 MSIX package. The package contains `ShiTu.exe` and its app icon, and uses the Store identity reserved for this product.
 
-Files:
+`AppxManifest.xml` is a template: `tools/package-store-msix.ps1` replaces `__PACKAGE_VERSION__` with the Cargo package version in MSIX format (`X.Y.Z.0`) while preparing the staging directory. The Store submission version therefore follows the Git tag, which is already required to match `Cargo.toml`.
 
-- `AppxManifest.xml`: identity package template, Windows App Runtime 1.8 dependency, and `systemAIModels` declaration.
-- `ShiTu.exe.manifest`: side-by-side identity metadata embedded into `ShiTu.exe` by `build.rs`.
+The package declares `systemAIModels` for Windows AI OCR. It also declares `runFullTrust` because ShiTu is a packaged Win32 desktop application.
 
-Before release, replace `CN=GridStart Development` in both manifests with the Microsoft Store publisher or signing certificate subject. The values for package name, publisher, and application ID must remain identical in both manifests.
-
-Validate and build the unsigned identity package:
+Build a Store upload asset after compiling the release executable:
 
 ```powershell
-MakeAppx.exe pack /o /d packaging /nv /p GridStart.Identity.msix
+.\tools\package-store-msix.ps1 -ExecutablePath .\target\release\ShiTu.exe -Version 0.1.1 -OutputDirectory .\release-assets
 ```
 
-The package must be signed before registration. A development certificate must be trusted in `CurrentUser\TrustedPeople`; never commit a `.pfx` private key. Register the signed package against the directory containing `ShiTu.exe`:
+The script produces:
 
-```powershell
-Add-AppxPackage -Path GridStart.Identity.msix -ExternalLocation <install-directory>
-```
+- `ShiTu-<version>-windows-x64.msix`: the unsigned MSIX package.
+- `ShiTu-<version>-store.msixupload`: the MSIX wrapped in the Store upload format.
 
-The Microsoft Store re-signs accepted MSIX submissions. Store identity and purchase integration are separate release tasks and are not implemented by this template.
+The `.msixupload` file is for Partner Center. Microsoft Store re-signs accepted MSIX submissions, so no private signing certificate is stored in this repository or used by the release workflow. The unsigned package must not be distributed for sideloading.
 
 Official references:
 
+- https://learn.microsoft.com/windows/apps/package-and-deploy/choose-distribution-path
+- https://learn.microsoft.com/windows/apps/publish/publish-your-app/msix/upload-app-packages
 - https://learn.microsoft.com/windows/ai/apis/get-started
-- https://learn.microsoft.com/windows/apps/desktop/modernize/grant-identity-to-nonpackaged-apps
-- https://learn.microsoft.com/windows/apps/package-and-deploy/packaging/

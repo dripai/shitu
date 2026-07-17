@@ -32,6 +32,15 @@ jobs:
       - name: Build release binary
         run: cargo build --release --locked
 
+      - name: Build Microsoft Store upload asset
+        shell: pwsh
+        run: |
+          $package = (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages | Select-Object -First 1
+          .\tools\package-store-msix.ps1 `
+            -ExecutablePath .\target\release\ShiTu.exe `
+            -Version $package.version `
+            -OutputDirectory .\release-assets
+
       - name: Package release assets
         shell: pwsh
         run: |
