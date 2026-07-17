@@ -39,7 +39,7 @@
   <Applications>
     <Application
       Id="GridStart"
-      Executable="gridstart.exe"
+      Executable="ShiTu.exe"
       uap10:TrustLevel="mediumIL"
       uap10:RuntimeBehavior="win32App">
       <uap:VisualElements

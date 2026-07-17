@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 description = "A lightweight Windows screenshot and pinning utility built with Rust and Slint"
 
+[[bin]]
+name = "ShiTu"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0"
 global-hotkey = "0.8"

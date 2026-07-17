@@ -5,7 +5,7 @@ Windows AI OCR requires package identity and the `systemAIModels` capability. Gr
 Files:
 
 - `AppxManifest.xml`: identity package template, Windows App Runtime 1.8 dependency, and `systemAIModels` declaration.
-- `gridstart.exe.manifest`: side-by-side identity metadata embedded into `gridstart.exe` by `build.rs`.
+- `ShiTu.exe.manifest`: side-by-side identity metadata embedded into `ShiTu.exe` by `build.rs`.
 
 Before release, replace `CN=GridStart Development` in both manifests with the Microsoft Store publisher or signing certificate subject. The values for package name, publisher, and application ID must remain identical in both manifests.
 
@@ -15,7 +15,7 @@ Validate and build the unsigned identity package:
 MakeAppx.exe pack /o /d packaging /nv /p GridStart.Identity.msix
 ```
 
-The package must be signed before registration. A development certificate must be trusted in `CurrentUser\TrustedPeople`; never commit a `.pfx` private key. Register the signed package against the directory containing `gridstart.exe`:
+The package must be signed before registration. A development certificate must be trusted in `CurrentUser\TrustedPeople`; never commit a `.pfx` private key. Register the signed package against the directory containing `ShiTu.exe`:
 
 ```powershell
 Add-AppxPackage -Path GridStart.Identity.msix -ExternalLocation <install-directory>
