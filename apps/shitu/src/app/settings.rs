@@ -297,6 +297,7 @@ pub(super) fn populate(settings: &MainWindow, state: &AppController) {
     settings.set_theme_mode(appearance_index(state.config.appearance));
     settings.set_language_mode(language_index(state.config.language));
     settings.set_launch_at_startup(state.config.launch_at_startup);
+    settings.set_start_minimized(state.config.start_minimized);
     settings.set_image_format(image_format_index(state.config.capture.format));
     settings.set_jpeg_quality(state.config.capture.jpeg_quality as i32);
     settings.set_save_directory(
@@ -405,15 +406,17 @@ fn apply_settings(
 }
 
 fn apply_transaction(old: &Config, candidate: &Config, hotkey: &mut HotkeyState) -> Result<()> {
-    startup::set_enabled(candidate.launch_at_startup).map_err(|error| {
-        anyhow!(
-            "{}: {error}",
-            i18n::text("开机启动设置失败", "Failed to update launch-at-startup")
-        )
-    })?;
+    startup::set_enabled(candidate.launch_at_startup, candidate.start_minimized).map_err(
+        |error| {
+            anyhow!(
+                "{}: {error}",
+                i18n::text("开机启动设置失败", "Failed to update launch-at-startup")
+            )
+        },
+    )?;
 
     if let Err(error) = hotkey.set_binding(candidate.hotkey.as_deref()) {
-        let rollback = startup::set_enabled(old.launch_at_startup).err();
+        let rollback = startup::set_enabled(old.launch_at_startup, old.start_minimized).err();
         return Err(with_rollback(
             format!(
                 "{}: {}",
@@ -431,7 +434,7 @@ fn apply_transaction(old: &Config, candidate: &Config, hotkey: &mut HotkeyState)
 
     if let Err(error) = candidate.save() {
         let mut rollback_errors = Vec::new();
-        if let Err(error) = startup::set_enabled(old.launch_at_startup) {
+        if let Err(error) = startup::set_enabled(old.launch_at_startup, old.start_minimized) {
             rollback_errors.push(format!(
                 "{}: {error}",
                 i18n::text("恢复开机启动失败", "Failed to restore launch-at-startup")
@@ -485,6 +488,7 @@ fn config_from_settings(settings: &MainWindow) -> Config {
         appearance: appearance_from_index(settings.get_theme_mode()),
         language: language_from_index(settings.get_language_mode()),
         launch_at_startup: settings.get_launch_at_startup(),
+        start_minimized: settings.get_start_minimized(),
         hotkey: {
             let value = settings.get_hotkey_text().trim().to_owned();
             (!value.is_empty()).then_some(value)
@@ -519,6 +523,7 @@ fn restore_settings_page(settings: &MainWindow, tab: i32) {
             settings.set_theme_mode(appearance_index(defaults.appearance));
             settings.set_language_mode(language_index(defaults.language));
             settings.set_launch_at_startup(defaults.launch_at_startup);
+            settings.set_start_minimized(defaults.start_minimized);
         }
         1 => {
             settings.set_image_format(image_format_index(defaults.capture.format));

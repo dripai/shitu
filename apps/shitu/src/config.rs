@@ -103,6 +103,7 @@ pub struct Config {
     pub appearance: AppearanceMode,
     pub language: LanguageMode,
     pub launch_at_startup: bool,
+    pub start_minimized: bool,
     pub hotkey: Option<String>,
     pub capture: CaptureConfig,
     pub ocr: OcrConfig,
@@ -115,6 +116,7 @@ impl Default for Config {
             appearance: AppearanceMode::System,
             language: LanguageMode::System,
             launch_at_startup: false,
+            start_minimized: false,
             hotkey: Some("Ctrl+Alt+C".to_owned()),
             capture: CaptureConfig::default(),
             ocr: OcrConfig::default(),
@@ -275,6 +277,7 @@ mod tests {
     fn defaults_match_product_specification() {
         let config = Config::default();
         assert_eq!(config.hotkey.as_deref(), Some("Ctrl+Alt+C"));
+        assert!(!config.start_minimized);
         assert_eq!(config.capture.jpeg_quality, 90);
         assert_eq!(config.capture.save_directory, default_picture_directory());
         assert_eq!(config.ocr.engine, OcrEngineKind::System);
@@ -298,5 +301,11 @@ mod tests {
 
         config.capture.filename_template = "bad/name".to_owned();
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn older_settings_default_start_minimized_to_false() {
+        let config: Config = serde_json::from_str("{}").unwrap();
+        assert!(!config.start_minimized);
     }
 }

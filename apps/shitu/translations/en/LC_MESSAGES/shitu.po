@@ -186,6 +186,9 @@ msgstr "Application"
 msgid "开机启动"
 msgstr "Launch at startup"
 
+msgid "启动最小化"
+msgstr "Start minimized"
+
 msgid "外观模式"
 msgstr "Appearance"
 

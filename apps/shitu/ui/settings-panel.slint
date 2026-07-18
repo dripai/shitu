@@ -101,6 +101,7 @@ export component SettingsPanel inherits Rectangle {
     in-out property <int> theme-mode: 0;
     in-out property <int> language-mode: 0;
     in-out property <bool> launch-at-startup: false;
+    in-out property <bool> start-minimized: false;
     in-out property <int> image-format: 0;
     in-out property <int> jpeg-quality: 90;
     in-out property <string> save-directory;
@@ -167,9 +168,17 @@ export component SettingsPanel inherits Rectangle {
                 padding: 12px;
                 spacing: 8px;
                 SectionTitle { text: @tr("应用"); }
-                CheckBox {
-                    text: @tr("开机启动");
-                    checked <=> root.launch-at-startup;
+                HorizontalLayout {
+                    spacing: 16px;
+                    CheckBox {
+                        text: @tr("开机启动");
+                        checked <=> root.launch-at-startup;
+                    }
+                    CheckBox {
+                        text: @tr("启动最小化");
+                        enabled: root.launch-at-startup;
+                        checked <=> root.start-minimized;
+                    }
                 }
                 HorizontalLayout {
                     height: 26px;

@@ -35,7 +35,7 @@ case "$action" in
         exec cargo run --package "$app" --bin "$bin"
         ;;
     build)
-        exec cargo build --package "$app" --bin "$bin"
+        exec cargo build --release --package "$app" --bin "$bin"
         ;;
     *)
         echo "Unknown action: $action" >&2

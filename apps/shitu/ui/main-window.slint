@@ -28,6 +28,7 @@ export component MainWindow inherits Window {
     in-out property <int> theme-mode: 0;
     in-out property <int> language-mode: 0;
     in-out property <bool> launch-at-startup: false;
+    in-out property <bool> start-minimized: false;
     in-out property <int> image-format: 0;
     in-out property <int> jpeg-quality: 90;
     in-out property <string> save-directory;
@@ -91,6 +92,7 @@ export component MainWindow inherits Window {
                     theme-mode <=> root.theme-mode;
                     language-mode <=> root.language-mode;
                     launch-at-startup <=> root.launch-at-startup;
+                    start-minimized <=> root.start-minimized;
                     image-format <=> root.image-format;
                     jpeg-quality <=> root.jpeg-quality;
                     save-directory <=> root.save-directory;

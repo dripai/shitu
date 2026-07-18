@@ -16,5 +16,5 @@ fn main() -> Result<(), slint::PlatformError> {
         std::process::exit(exit_code);
     }
 
-    app::run()
+    app::run(platform::windows::startup::start_minimized_requested())
 }

@@ -42,7 +42,7 @@ enum StatusLevel {
     Error = 2,
 }
 
-pub fn run() -> Result<(), slint::PlatformError> {
+pub fn run(start_minimized: bool) -> Result<(), slint::PlatformError> {
     logging::initialize(Config::log_directory(), "gridstart.log");
     i18n::prepare(Default::default());
     let config_result = Config::load();
@@ -153,6 +153,14 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
     main.show()?;
     configure_main_window_frame(main.as_weak());
+    if start_minimized {
+        let main = main.as_weak();
+        Timer::single_shot(Duration::from_millis(50), move || {
+            if let Some(main) = main.upgrade() {
+                main.window().set_minimized(true);
+            }
+        });
+    }
     tray.show()?;
     slint::run_event_loop_until_quit()
 }
