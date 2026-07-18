@@ -234,11 +234,9 @@ impl Config {
                 "Filename template cannot be empty"
             )));
         }
-        if self
-            .capture
-            .filename_template
-            .chars()
-            .any(|ch| matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*'))
+        if self.capture.filename_template.chars().any(|ch| {
+            ch.is_control() || matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
+        }) || is_reserved_windows_filename(&self.capture.filename_template)
         {
             return Err(anyhow!(i18n::text(
                 "文件名模板包含 Windows 不允许的字符",
@@ -263,6 +261,24 @@ impl Config {
     pub fn log_directory() -> PathBuf {
         Self::directory().join("logs")
     }
+}
+
+fn is_reserved_windows_filename(filename: &str) -> bool {
+    let stem = filename
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .trim_end_matches([' ', '.'])
+        .to_ascii_uppercase();
+    matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || ["COM", "LPT"].into_iter().any(|prefix| {
+            stem.strip_prefix(prefix).is_some_and(|suffix| {
+                matches!(
+                    suffix,
+                    "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+                )
+            })
+        })
 }
 
 pub fn app_data_directory() -> PathBuf {
@@ -300,6 +316,12 @@ mod tests {
         assert_eq!(config.pin.zoom_step, 100);
 
         config.capture.filename_template = "bad/name".to_owned();
+        assert!(config.validate().is_err());
+
+        config.capture.filename_template = "CON".to_owned();
+        assert!(config.validate().is_err());
+
+        config.capture.filename_template = "lpt1.backup".to_owned();
         assert!(config.validate().is_err());
     }
 

@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum AiOcrState {
     Ready,
+    Checking,
     Preparing,
     ModelNotInstalled,
     Unsupported,
@@ -344,6 +345,11 @@ impl AiOcrState {
             Self::Ready => i18n::text(
                 "可用（Windows AI OCR）",
                 "Available (Windows AI OCR)",
+            )
+            .to_owned(),
+            Self::Checking => i18n::text(
+                "正在检测 Windows AI OCR...",
+                "Checking Windows AI OCR availability...",
             )
             .to_owned(),
             Self::Preparing => i18n::text(

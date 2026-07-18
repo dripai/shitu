@@ -26,7 +26,7 @@ use crate::{
     image::DrawStyle,
     logging,
     platform::{
-        ocr::{AiOcrState, OcrFailure, ai_availability, system_availability},
+        ocr::{AiOcrState, OcrFailure, system_availability},
         windows::window,
     },
 };
@@ -63,18 +63,7 @@ pub fn run(start_minimized: bool) -> Result<(), slint::PlatformError> {
             (false, Some(error))
         }
     };
-    let ai_ocr_state = match ai_availability() {
-        Ok(state) => {
-            logging::info(format!("Windows AI OCR state: {state:?}"));
-            state
-        }
-        Err(OcrFailure::AiUnavailable(state)) => state,
-        Err(error) => {
-            let message = error.message();
-            logging::error(format!("Windows AI OCR probe failed: {message}"));
-            AiOcrState::Failed(message)
-        }
-    };
+    let ai_ocr_state = AiOcrState::Checking;
 
     let main = MainWindow::new()?;
     let ocr_result = OcrResultWindow::new()?;
@@ -120,7 +109,10 @@ pub fn run(start_minimized: bool) -> Result<(), slint::PlatformError> {
         system_ocr_failure.as_ref(),
         &ai_ocr_state,
     );
-    if !ocr_available && initial_level != StatusLevel::Error {
+    if !ocr_available
+        && initial_level != StatusLevel::Error
+        && !matches!(ai_ocr_state, AiOcrState::Checking)
+    {
         initial_status = ocr_status.clone();
         initial_level = StatusLevel::Error;
     }
@@ -162,6 +154,7 @@ pub fn run(start_minimized: bool) -> Result<(), slint::PlatformError> {
         });
     }
     tray.show()?;
+    settings::probe_ai_ocr(main.as_weak());
     slint::run_event_loop_until_quit()
 }
 

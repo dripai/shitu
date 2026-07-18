@@ -142,6 +142,9 @@ pub fn parse_hotkey(value: &str) -> Option<HotKey> {
             "shift" => modifiers |= Modifiers::SHIFT,
             "win" | "super" | "meta" => modifiers |= Modifiers::SUPER,
             key if key.len() == 1 => {
+                if code.is_some() {
+                    return None;
+                }
                 let ch = key.chars().next()?;
                 code = match ch {
                     'a' => Some(Code::KeyA),
@@ -183,19 +186,19 @@ pub fn parse_hotkey(value: &str) -> Option<HotKey> {
                     _ => None,
                 };
             }
-            "space" => code = Some(Code::Space),
-            "f1" => code = Some(Code::F1),
-            "f2" => code = Some(Code::F2),
-            "f3" => code = Some(Code::F3),
-            "f4" => code = Some(Code::F4),
-            "f5" => code = Some(Code::F5),
-            "f6" => code = Some(Code::F6),
-            "f7" => code = Some(Code::F7),
-            "f8" => code = Some(Code::F8),
-            "f9" => code = Some(Code::F9),
-            "f10" => code = Some(Code::F10),
-            "f11" => code = Some(Code::F11),
-            "f12" => code = Some(Code::F12),
+            "space" if code.is_none() => code = Some(Code::Space),
+            "f1" if code.is_none() => code = Some(Code::F1),
+            "f2" if code.is_none() => code = Some(Code::F2),
+            "f3" if code.is_none() => code = Some(Code::F3),
+            "f4" if code.is_none() => code = Some(Code::F4),
+            "f5" if code.is_none() => code = Some(Code::F5),
+            "f6" if code.is_none() => code = Some(Code::F6),
+            "f7" if code.is_none() => code = Some(Code::F7),
+            "f8" if code.is_none() => code = Some(Code::F8),
+            "f9" if code.is_none() => code = Some(Code::F9),
+            "f10" if code.is_none() => code = Some(Code::F10),
+            "f11" if code.is_none() => code = Some(Code::F11),
+            "f12" if code.is_none() => code = Some(Code::F12),
             _ => return None,
         }
     }
@@ -221,6 +224,8 @@ mod tests {
     fn rejects_unknown_or_unmodified_key_binding() {
         assert!(parse_hotkey("Ctrl+Alt+Unknown").is_none());
         assert!(parse_hotkey("Ctrl++").is_none());
+        assert!(parse_hotkey("Ctrl+A+B").is_none());
+        assert!(parse_hotkey("Ctrl+Space+F1").is_none());
         assert!(parse_hotkey("A").is_none());
     }
 }

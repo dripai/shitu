@@ -15,7 +15,7 @@ use crate::{
     hotkey::{HotkeyState, validate_binding},
     i18n, logging,
     platform::{
-        ocr::{AiOcrState, OcrFailure, prepare_ai},
+        ocr::{AiOcrState, OcrFailure, ai_availability, prepare_ai},
         windows::{shell, startup},
     },
 };
@@ -78,18 +78,7 @@ pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
                 );
                 refresh_main_if_available(&main, &state);
             }
-            let main = main.clone();
-            thread::spawn(move || {
-                let payload = serde_json::to_string(&prepare_ai()).unwrap_or_else(|error| {
-                    serde_json::to_string(&Err::<AiOcrState, _>(OcrFailure::Failed(
-                        error.to_string(),
-                    )))
-                    .unwrap_or_default()
-                });
-                let _ = main.upgrade_in_event_loop(move |main| {
-                    main.invoke_ai_ocr_prepared(payload.into());
-                });
-            });
+            spawn_ai_ocr_operation(main.clone(), prepare_ai);
         });
     }
     {
@@ -291,6 +280,25 @@ pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
             }
         });
     }
+}
+
+pub(super) fn probe_ai_ocr(main: slint::Weak<MainWindow>) {
+    spawn_ai_ocr_operation(main, ai_availability);
+}
+
+fn spawn_ai_ocr_operation(
+    main: slint::Weak<MainWindow>,
+    operation: impl FnOnce() -> Result<AiOcrState, OcrFailure> + Send + 'static,
+) {
+    thread::spawn(move || {
+        let payload = serde_json::to_string(&operation()).unwrap_or_else(|error| {
+            serde_json::to_string(&Err::<AiOcrState, _>(OcrFailure::Failed(error.to_string())))
+                .unwrap_or_default()
+        });
+        let _ = main.upgrade_in_event_loop(move |main| {
+            main.invoke_ai_ocr_prepared(payload.into());
+        });
+    });
 }
 
 pub(super) fn populate(settings: &MainWindow, state: &AppController) {

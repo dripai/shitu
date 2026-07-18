@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use slint::{PhysicalPosition, PhysicalSize, Window};
 use windows::Win32::{
@@ -190,13 +192,10 @@ pub fn fit_to_work_area(window: &Window, image_width: u32, image_height: u32) {
             right,
             bottom,
         } = info.rcWork;
-        let available_width = (right - left - 24).max(80) as f64;
-        let available_height = (bottom - top - 24).max(60) as f64;
-        let scale = (available_width / image_width as f64)
-            .min(available_height / image_height as f64)
-            .min(1.0);
-        let width = (image_width as f64 * scale).round().max(80.0) as u32;
-        let height = (image_height as f64 * scale).round().max(60.0) as u32;
+        let available_width = (right - left - 24).max(1) as u32;
+        let available_height = (bottom - top - 24).max(1) as u32;
+        let (width, height) =
+            fitted_size(image_width, image_height, available_width, available_height);
         window.set_size(PhysicalSize::new(width, height));
         let x = left + ((right - left - width as i32) / 2);
         let y = top + ((bottom - top - height as i32) / 2);
@@ -204,4 +203,29 @@ pub fn fit_to_work_area(window: &Window, image_width: u32, image_height: u32) {
     }
 }
 
-use std::mem::size_of;
+fn fitted_size(
+    image_width: u32,
+    image_height: u32,
+    available_width: u32,
+    available_height: u32,
+) -> (u32, u32) {
+    let scale = (available_width as f64 / image_width as f64)
+        .min(available_height as f64 / image_height as f64)
+        .min(1.0);
+    (
+        (image_width as f64 * scale).round().max(1.0) as u32,
+        (image_height as f64 * scale).round().max(1.0) as u32,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fitted_size;
+
+    #[test]
+    fn fit_to_work_area_preserves_extreme_aspect_ratios() {
+        assert_eq!(fitted_size(10_000, 100, 1_900, 1_000), (1_900, 19));
+        assert_eq!(fitted_size(100, 10_000, 1_000, 1_900), (19, 1_900));
+        assert_eq!(fitted_size(800, 600, 1_900, 1_000), (800, 600));
+    }
+}
