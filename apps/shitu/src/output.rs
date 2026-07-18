@@ -34,6 +34,7 @@ pub fn save_quick(image: &CapturedImage, config: &CaptureConfig) -> Result<PathB
 }
 
 pub fn save_as_dialog(
+    parent_window: &slint::Window,
     image: &CapturedImage,
     initial_directory: &Path,
     format: ImageFormat,
@@ -41,10 +42,12 @@ pub fn save_as_dialog(
 ) -> Result<Option<PathBuf>> {
     let default_name = format!(
         "{}.{}",
-        render_filename("Screenshot_{yyyy-MM-dd_HH-mm-ss}"),
+        render_filename("Screenshot_{yyyy}{MM}{dd}{HH}{mm}{ss}"),
         extension(format)
     );
+    let parent_handle = parent_window.window_handle();
     let dialog = rfd::FileDialog::new()
+        .set_parent(&parent_handle)
         .set_directory(initial_directory)
         .set_file_name(default_name)
         .add_filter(i18n::text("PNG 图像", "PNG image"), &["png"])

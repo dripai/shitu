@@ -66,7 +66,7 @@ impl Default for CaptureConfig {
             format: ImageFormat::Png,
             jpeg_quality: 90,
             save_directory: default_picture_directory(),
-            filename_template: "Screenshot_{yyyy-MM-dd_HH-mm-ss}".to_owned(),
+            filename_template: "Screenshot_{yyyy}{MM}{dd}{HH}{mm}{ss}".to_owned(),
             auto_save: false,
             save_notification: true,
         }
@@ -266,7 +266,7 @@ impl Config {
 }
 
 pub fn app_data_directory() -> PathBuf {
-    shi_foundation::config::roaming_app_data_directory("GridStart")
+    shi_foundation::config::roaming_app_data_directory("ShiTu")
 }
 
 #[cfg(test)]

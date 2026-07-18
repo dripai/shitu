@@ -464,9 +464,10 @@ impl PinController {
     }
 
     fn save(&self) {
-        if let Some(pin) = self.pin.upgrade() {
-            pin.invoke_commit_text_editor();
-        }
+        let Some(pin) = self.pin.upgrade() else {
+            return;
+        };
+        pin.invoke_commit_text_editor();
         let (image, save_directory, format, jpeg_quality) = {
             let state = self.state.borrow();
             (
@@ -477,14 +478,12 @@ impl PinController {
             )
         };
         let result = image.and_then(|image| {
-            output::save_as_dialog(&image, &save_directory, format, jpeg_quality)
+            output::save_as_dialog(pin.window(), &image, &save_directory, format, jpeg_quality)
         });
         match result {
             Ok(Some(path)) => {
                 self.state.borrow_mut().source_path = Some(path.clone());
-                if let Some(pin) = self.pin.upgrade() {
-                    pin.set_has_source_file(true);
-                }
+                pin.set_has_source_file(true);
                 self.status(
                     format!(
                         "{} {}",

@@ -229,6 +229,9 @@ fn bind_overlay(
         let main = main.clone();
         let state = Rc::clone(&state);
         overlay.unwrap().on_save_output(move || {
+            let Some(overlay_window) = overlay.upgrade() else {
+                return;
+            };
             let (image, save_directory, format, jpeg_quality) = {
                 let state = state.borrow();
                 (
@@ -239,7 +242,13 @@ fn bind_overlay(
                 )
             };
             match image.and_then(|image| {
-                output::save_as_dialog(&image, &save_directory, format, jpeg_quality)
+                output::save_as_dialog(
+                    overlay_window.window(),
+                    &image,
+                    &save_directory,
+                    format,
+                    jpeg_quality,
+                )
             }) {
                 Ok(Some(path)) => finish_capture(
                     &overlay,
