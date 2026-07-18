@@ -95,8 +95,9 @@ export component OverlayWindow inherits Window {
         8px,
         Math.min(root.width - root.toolbar-width - 8px, root.selection-left)
     );
-    property <length> toolbar-width: 342px + (root.ocr-available ? 30px : 0px);
-    property <length> toolbar-height: root.active-tool > 0 && root.active-tool < 5 ? 68px : 38px;
+    property <length> toolbar-width: 372px + (root.ocr-available ? 30px : 0px);
+    property <length> toolbar-height: ((root.active-tool > 0 && root.active-tool < 5)
+        || root.active-tool == 6) ? 68px : 38px;
     property <length> toolbar-y: root.selection-top + root.selection-height + root.toolbar-height + 12px <= root.height
         ? root.selection-top + root.selection-height + 12px
         : Math.max(8px, root.selection-top - root.toolbar-height - 12px);

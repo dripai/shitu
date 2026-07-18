@@ -4,10 +4,11 @@ import { CaptureToolbar } from "capture-toolbar.slint";
 // A top-level Slint window keeps the pinned-image toolbar independent and interactive.
 export component PinToolbarWindow inherits Window {
     title: @tr("钉住工具栏");
-    width: root.ocr-available ? 342px : 312px;
+    width: root.ocr-available ? 372px : 342px;
     // Slint 1.17 Tooltip has no public placement property and is clipped by a
     // top-level window's bounds. Reserve transparent space below this toolbar.
-    height: (root.active-tool > 0 && root.active-tool < 5 ? 68px : 38px) + 34px;
+    height: (((root.active-tool > 0 && root.active-tool < 5) || root.active-tool == 6)
+        ? 68px : 38px) + 34px;
     background: transparent;
     no-frame: true;
 

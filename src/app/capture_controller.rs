@@ -576,9 +576,15 @@ fn copy_output(image: &CapturedImage, config: &CaptureConfig) -> Result<String> 
 }
 
 fn refresh_annotations(overlay: &slint::Weak<OverlayWindow>, state: &Rc<RefCell<AppController>>) {
-    let views = state.borrow().annotation_views();
+    let (views, preview) = {
+        let state = state.borrow();
+        (state.annotation_views(), state.annotation_preview_image())
+    };
     if let Some(overlay) = overlay.upgrade() {
         overlay.set_annotations(ModelRc::new(VecModel::from(views)));
+        if let Some(preview) = preview {
+            overlay.set_selected_image(preview.slint_image());
+        }
     }
 }
 
@@ -731,6 +737,12 @@ impl AppController {
             .as_ref()
             .map(|session| session.annotations.views())
             .unwrap_or_default()
+    }
+
+    fn annotation_preview_image(&self) -> Option<CapturedImage> {
+        let session = self.session.as_ref()?;
+        let selected = session.selected.as_ref()?;
+        Some(session.annotations.preview_base(selected))
     }
 
     fn rendered_selection(&self) -> Result<CapturedImage> {

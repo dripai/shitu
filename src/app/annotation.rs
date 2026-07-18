@@ -51,6 +51,14 @@ impl AnnotationHistory {
                 self.erase_at(point, style.radius.max(4) as f64 * 2.0);
                 return;
             }
+            6 => {
+                let (radius, block_size) = mosaic_parameters(style.radius);
+                AnnotationCommand::Mosaic {
+                    points: vec![point],
+                    radius,
+                    block_size,
+                }
+            }
             _ => {
                 self.active_before = None;
                 return;
@@ -70,7 +78,8 @@ impl AnnotationHistory {
             return;
         }
         match self.commands.last_mut() {
-            Some(AnnotationCommand::Pen { points, .. }) => {
+            Some(AnnotationCommand::Pen { points, .. })
+            | Some(AnnotationCommand::Mosaic { points, .. }) => {
                 if points.last().copied() != Some(point) {
                     points.push(point);
                 }
@@ -129,13 +138,26 @@ impl AnnotationHistory {
     }
 
     pub fn views(&self) -> Vec<AnnotationView> {
-        self.commands.iter().map(AnnotationCommand::view).collect()
+        self.commands
+            .iter()
+            .filter_map(AnnotationCommand::view)
+            .collect()
+    }
+
+    pub fn preview_base(&self, base: &CapturedImage) -> CapturedImage {
+        let mut image = base.clone();
+        for command in &self.commands {
+            command.render_mosaic(&mut image);
+        }
+        image
     }
 
     pub fn render(&self, base: &CapturedImage) -> Result<CapturedImage> {
-        let mut image = base.clone();
+        let mut image = self.preview_base(base);
         for command in &self.commands {
-            command.render(&mut image)?;
+            if !matches!(command, AnnotationCommand::Mosaic { .. }) {
+                command.render(&mut image)?;
+            }
         }
         Ok(image)
     }
@@ -168,22 +190,27 @@ enum AnnotationCommand {
         style: DrawStyle,
         font_size: u32,
     },
+    Mosaic {
+        points: Vec<(u32, u32)>,
+        radius: u32,
+        block_size: u32,
+    },
 }
 
 impl AnnotationCommand {
-    fn view(&self) -> AnnotationView {
+    fn view(&self) -> Option<AnnotationView> {
         match self {
-            Self::Pen { points, style } => path_view(pen_path(points), *style),
+            Self::Pen { points, style } => Some(path_view(pen_path(points), *style)),
             Self::Rectangle { start, end, style } => {
-                path_view(rectangle_path(*start, *end), *style)
+                Some(path_view(rectangle_path(*start, *end), *style))
             }
-            Self::Arrow { start, end, style } => path_view(arrow_path(*start, *end), *style),
+            Self::Arrow { start, end, style } => Some(path_view(arrow_path(*start, *end), *style)),
             Self::Text {
                 position,
                 text,
                 style,
                 font_size,
-            } => AnnotationView {
+            } => Some(AnnotationView {
                 kind: 1,
                 commands: String::new().into(),
                 stroke_color: style_color(*style),
@@ -192,7 +219,19 @@ impl AnnotationCommand {
                 y: position.1 as f32,
                 text: text.clone().into(),
                 font_size: *font_size as f32,
-            },
+            }),
+            Self::Mosaic { .. } => None,
+        }
+    }
+
+    fn render_mosaic(&self, image: &mut CapturedImage) {
+        if let Self::Mosaic {
+            points,
+            radius,
+            block_size,
+        } = self
+        {
+            image.pixelate_stroke(points, *radius, *block_size);
         }
     }
 
@@ -219,6 +258,7 @@ impl AnnotationCommand {
                 style,
                 font_size,
             } => image.draw_text(*position, text, *font_size, style.rgba)?,
+            Self::Mosaic { .. } => self.render_mosaic(image),
         }
         Ok(())
     }
@@ -271,7 +311,24 @@ impl AnnotationCommand {
                     && y >= position.1 as f64 - tolerance
                     && y <= position.1 as f64 + height + tolerance
             }
+            Self::Mosaic { points, radius, .. } => {
+                let tolerance = tolerance + *radius as f64;
+                points
+                    .windows(2)
+                    .any(|pair| distance_to_segment(point, pair[0], pair[1]) <= tolerance)
+                    || points
+                        .first()
+                        .is_some_and(|candidate| distance(*candidate, point) <= tolerance)
+            }
         }
+    }
+}
+
+fn mosaic_parameters(size: i32) -> (u32, u32) {
+    match size {
+        1 => (10, 6),
+        4.. => (30, 14),
+        _ => (18, 10),
     }
 }
 
@@ -427,5 +484,35 @@ mod tests {
         assert!(history.commands.is_empty());
         history.undo();
         assert_eq!(history.commands.len(), 1);
+    }
+
+    #[test]
+    fn mosaic_is_previewed_rendered_and_undoable() {
+        let rgba = (0u8..48)
+            .flat_map(|value| [value * 5, 0, 0, 255])
+            .collect::<Vec<_>>();
+        let base = CapturedImage::from_rgba(0, 0, 12, 4, &rgba).unwrap();
+        let original = base.rgba_bytes();
+        let mut history = AnnotationHistory::default();
+        history.begin(
+            6,
+            (2, 2),
+            DrawStyle {
+                rgba: [0, 0, 0, 255],
+                radius: 1,
+            },
+        );
+        history.update((9, 2));
+        history.finish();
+
+        assert!(history.views().is_empty());
+        assert_ne!(history.preview_base(&base).rgba_bytes(), original);
+        assert_eq!(
+            history.render(&base).unwrap().rgba_bytes(),
+            history.preview_base(&base).rgba_bytes()
+        );
+
+        history.undo();
+        assert_eq!(history.render(&base).unwrap().rgba_bytes(), original);
     }
 }

@@ -30,6 +30,9 @@ msgstr "Text"
 msgid "擦除标注"
 msgstr "Eraser"
 
+msgid "添加马赛克"
+msgstr "Mosaic"
+
 msgid "识别选区文字"
 msgstr "Recognize selected text"
 
@@ -60,17 +63,26 @@ msgstr "Yellow"
 msgid "小号文字"
 msgstr "Small text"
 
+msgid "小号马赛克"
+msgstr "Small mosaic brush"
+
 msgid "细线"
 msgstr "Thin line"
 
 msgid "中号文字"
 msgstr "Medium text"
 
+msgid "中号马赛克"
+msgstr "Medium mosaic brush"
+
 msgid "中等线宽"
 msgstr "Medium line"
 
 msgid "大号文字"
 msgstr "Large text"
+
+msgid "大号马赛克"
+msgstr "Large mosaic brush"
 
 msgid "粗线"
 msgstr "Thick line"

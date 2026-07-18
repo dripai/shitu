@@ -415,7 +415,7 @@ impl PinController {
     }
 
     fn set_tool(&self, tool: i32) {
-        let tool = tool.clamp(0, 5);
+        let tool = tool.clamp(0, 6);
         if let Some(pin) = self.pin.upgrade() {
             if tool != 4 {
                 pin.invoke_commit_text_editor();
@@ -434,12 +434,14 @@ impl PinController {
     fn resize_toolbar(&self, toolbar: &PinToolbarWindow) {
         let scale = toolbar.window().scale_factor();
         let logical_width = if toolbar.get_ocr_available() {
-            342.0
+            372.0
         } else {
-            312.0
+            342.0
         };
         let width = (logical_width * scale).round().max(1.0) as u32;
-        let toolbar_height = if toolbar.get_active_tool() > 0 && toolbar.get_active_tool() < 5 {
+        let toolbar_height = if (toolbar.get_active_tool() > 0 && toolbar.get_active_tool() < 5)
+            || toolbar.get_active_tool() == 6
+        {
             68.0
         } else {
             38.0
@@ -596,7 +598,14 @@ impl PinController {
         let Some(pin) = self.pin.upgrade() else {
             return;
         };
-        let views = self.state.borrow().annotations.views();
+        let (views, preview) = {
+            let state = self.state.borrow();
+            (
+                state.annotations.views(),
+                state.annotations.preview_base(&state.image),
+            )
+        };
+        pin.set_screenshot(preview.slint_image());
         pin.set_annotations(ModelRc::new(VecModel::from(views)));
     }
 

@@ -66,6 +66,7 @@ component StrokeCell inherits Rectangle {
     in property <string> tip;
     in property <bool> selected: false;
     in property <bool> text-mode: false;
+    in property <bool> mosaic-mode: false;
     callback activated();
 
     width: 28px;
@@ -77,7 +78,7 @@ component StrokeCell inherits Rectangle {
     accessible-role: button;
     accessible-label: root.tip;
 
-    if !root.text-mode: Rectangle {
+    if !root.text-mode && !root.mosaic-mode: Rectangle {
         x: 6px;
         y: (parent.height - self.height) / 2;
         width: 16px;
@@ -92,6 +93,15 @@ component StrokeCell inherits Rectangle {
         font-weight: 600;
         horizontal-alignment: center;
         vertical-alignment: center;
+    }
+    if root.mosaic-mode: Rectangle {
+        x: 7px;
+        y: 7px;
+        width: 14px;
+        height: 14px;
+        background: #d8dde4;
+        Rectangle { x: 0px; y: 0px; width: 7px; height: 7px; background: #6d7480; }
+        Rectangle { x: 7px; y: 7px; width: 7px; height: 7px; background: #6d7480; }
     }
 
     touch := TouchArea {
@@ -114,9 +124,9 @@ export component CaptureToolbar inherits Rectangle {
     in-out property <int> color-index: 0;
     in-out property <int> stroke-radius: 2;
     property <bool> tool-properties-visible: root.annotation-tools-visible
-        && root.active-tool > 0 && root.active-tool < 5;
+        && ((root.active-tool > 0 && root.active-tool < 5) || root.active-tool == 6);
     property <length> calculated-width: root.annotation-tools-visible
-        ? 312px + (root.ocr-available ? 30px : 0px) + (root.pin-action-visible ? 30px : 0px)
+        ? 342px + (root.ocr-available ? 30px : 0px) + (root.pin-action-visible ? 30px : 0px)
         : 96px + (root.ocr-available ? 30px : 0px) + (root.pin-action-visible ? 30px : 0px);
     property <length> calculated-height: root.tool-properties-visible ? 68px : 38px;
 
@@ -209,6 +219,15 @@ export component CaptureToolbar inherits Rectangle {
                     root.select-tool(root.active-tool);
                 }
             }
+            if root.annotation-tools-visible: ToolCell {
+                icon: @image-url("../src/icons/mosaic.svg");
+                tip: @tr("添加马赛克");
+                selected: root.active-tool == 6;
+                activated => {
+                    root.active-tool = root.active-tool == 6 ? 0 : 6;
+                    root.select-tool(root.active-tool);
+                }
+            }
             if root.annotation-tools-visible: Rectangle {
                 width: 1px;
                 height: 20px;
@@ -251,31 +270,31 @@ export component CaptureToolbar inherits Rectangle {
             spacing: 2px;
             alignment: center;
 
-            ColorCell {
+            if root.active-tool != 6: ColorCell {
                 swatch-color: #ec5c66;
                 tip: @tr("红色");
                 selected: root.color-index == 0;
                 activated => { root.color-index = 0; root.select-color(0); }
             }
-            ColorCell {
+            if root.active-tool != 6: ColorCell {
                 swatch-color: #4a90e2;
                 tip: @tr("蓝色");
                 selected: root.color-index == 1;
                 activated => { root.color-index = 1; root.select-color(1); }
             }
-            ColorCell {
+            if root.active-tool != 6: ColorCell {
                 swatch-color: #31a36b;
                 tip: @tr("绿色");
                 selected: root.color-index == 2;
                 activated => { root.color-index = 2; root.select-color(2); }
             }
-            ColorCell {
+            if root.active-tool != 6: ColorCell {
                 swatch-color: #f5c542;
                 tip: @tr("黄色");
                 selected: root.color-index == 3;
                 activated => { root.color-index = 3; root.select-color(3); }
             }
-            Rectangle {
+            if root.active-tool != 6: Rectangle {
                 width: 1px;
                 height: 20px;
                 background: #c7cdd5;
@@ -283,21 +302,27 @@ export component CaptureToolbar inherits Rectangle {
             StrokeCell {
                 stroke-size: 1;
                 text-mode: root.active-tool == 4;
-                tip: root.active-tool == 4 ? @tr("小号文字") : @tr("细线");
+                mosaic-mode: root.active-tool == 6;
+                tip: root.active-tool == 4 ? @tr("小号文字")
+                    : root.active-tool == 6 ? @tr("小号马赛克") : @tr("细线");
                 selected: root.stroke-radius == 1;
                 activated => { root.stroke-radius = 1; root.select-width(1); }
             }
             StrokeCell {
                 stroke-size: 2;
                 text-mode: root.active-tool == 4;
-                tip: root.active-tool == 4 ? @tr("中号文字") : @tr("中等线宽");
+                mosaic-mode: root.active-tool == 6;
+                tip: root.active-tool == 4 ? @tr("中号文字")
+                    : root.active-tool == 6 ? @tr("中号马赛克") : @tr("中等线宽");
                 selected: root.stroke-radius == 2;
                 activated => { root.stroke-radius = 2; root.select-width(2); }
             }
             StrokeCell {
                 stroke-size: 4;
                 text-mode: root.active-tool == 4;
-                tip: root.active-tool == 4 ? @tr("大号文字") : @tr("粗线");
+                mosaic-mode: root.active-tool == 6;
+                tip: root.active-tool == 4 ? @tr("大号文字")
+                    : root.active-tool == 6 ? @tr("大号马赛克") : @tr("粗线");
                 selected: root.stroke-radius == 4;
                 activated => { root.stroke-radius = 4; root.select-width(4); }
             }
