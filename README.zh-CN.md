@@ -33,7 +33,7 @@ cargo run --release --package shitu --bin ShiTu
 ## 工作区结构
 
 - `apps/shitu`：已经实现的拾图截图应用。
-- `apps/shiping`：规划中的拾屏录屏应用，目前只有可编译入口，尚未实现录屏能力。
+- `apps/shiping`：拾屏录屏应用，已实现可编译的单窗口 UI 原型；录屏引擎尚未实现。
 - `apps/shiyin`：规划中的拾音录音应用，目前只有可编译入口，尚未实现录音能力。
 - `crates/shi-foundation`：共用语言选择、国际化和日志基础设施。
 - `crates/shi-ui`：共用 Slint 组件。

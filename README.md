@@ -33,7 +33,7 @@ The release executable is `ShiTu.exe`.
 ## Workspace
 
 - `apps/shitu`: the implemented ShiTu screenshot application.
-- `apps/shiping`: a compilable placeholder for the planned ShiPing screen recorder; no recording features are implemented yet.
+- `apps/shiping`: ShiPing screen recorder with a compilable single-window UI prototype; the recording engine is not implemented yet.
 - `apps/shiyin`: a compilable placeholder for the planned ShiYin audio recorder; no recording features are implemented yet.
 - `crates/shi-foundation`: shared language selection, internationalization, and logging infrastructure.
 - `crates/shi-ui`: shared Slint components.

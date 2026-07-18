@@ -474,7 +474,7 @@ apps/
       platform/
     translations/
     ui/
-  shiping/                 # 拾屏占位入口，录屏尚未实现
+  shiping/                 # 拾屏单窗口 UI 原型，录屏引擎尚未实现
   shiyin/                  # 拾音占位入口，录音尚未实现
 crates/
   shi-foundation/          # 共用语言选择、国际化与日志

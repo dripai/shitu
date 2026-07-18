@@ -4061,6 +4061,12 @@ version = "0.1.5"
 [[package]]
 name = "shiping"
 version = "0.1.5"
+dependencies = [
+ "raw-window-handle",
+ "slint",
+ "slint-build",
+ "windows",
+]
 
 [[package]]
 name = "shitu"
