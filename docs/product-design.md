@@ -453,43 +453,33 @@ Slint 负责窗口、布局、控件状态和用户输入；Rust 负责截图会
 当前主要目录：
 
 ```text
-src/
-  app.rs
-  app/
-    annotation.rs
-    capture_controller.rs
-    pin.rs
-    settings.rs
-  capture.rs
-  config.rs
-  hotkey.rs
-  image.rs
-  logging.rs
-  output.rs
-  platform/
-    clock.rs
-    mod.rs
-    ocr.rs
-    windows/
-      clipboard.rs
-      clock.rs
-      file.rs
-      ocr.rs
-      screen_capture.rs
-      shell.rs
-      startup.rs
-      window.rs
-      window_target.rs
-ui/
-  capture-toolbar.slint
-  main-window.slint
-  overlay-window.slint
-  pin-menu-window.slint
-  pin-window.slint
-  settings-panel.slint
-  status-bar.slint
-  tray.slint
+Cargo.toml                 # workspace
+apps/
+  shitu/                   # 已实现的拾图应用
+    build.rs
+    src/
+      app.rs
+      app/
+        annotation.rs
+        capture_controller.rs
+        pin.rs
+        settings.rs
+      capture.rs
+      config.rs
+      hotkey.rs
+      image.rs
+      output.rs
+      platform/
+    translations/
+    ui/
+  shiping/                 # 拾屏占位入口，录屏尚未实现
+  shiyin/                  # 拾音占位入口，录音尚未实现
+crates/
+  shi-foundation/          # 共用语言选择、国际化与日志
+  shi-ui/                  # 共用 Slint 组件
 ```
+
+根工作区默认成员是 `apps/shitu`。拾屏和拾音当前仅用于固定后续产品边界，不能视为已有录屏或录音功能。
 
 当前已经拆出的平台服务包括：
 
@@ -502,7 +492,7 @@ ui/
 - Windows 开机启动。
 - Windows Shell 文件操作。
 
-`app.rs` 只负责应用生命周期、主窗口、托盘、状态栏和快捷键事件；截图会话、设置事务和钉住窗口命令分别由独立控制器管理。纯图像旋转、翻转和标注渲染位于 `image.rs`，Windows 截图、窗口命中与剪贴板不再混入图像领域模型。
+`apps/shitu/src/app.rs` 只负责应用生命周期、主窗口、托盘、状态栏和快捷键事件；截图会话、设置事务和钉住窗口命令分别由独立控制器管理。纯图像旋转、翻转和标注渲染位于 `image.rs`，Windows 截图、窗口命中与剪贴板不再混入图像领域模型。`shi-foundation` 不包含截图或 OCR 领域配置；`shi-ui` 当前只提供各产品可复用的状态栏。
 
 UI 不直接持有 Win32 句柄；跨线程 OCR 结果通过 Slint 事件循环回到 UI 线程更新，窗口恢复时主动请求重绘。配置和截图文件采用临时文件写入、刷新并原子替换，失败时保留原文件。
 

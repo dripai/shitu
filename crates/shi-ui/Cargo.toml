@@ -1,0 +1,6 @@
+[package]
+name = "shi-ui"
+version.workspace = true
+edition.workspace = true
+description = "Shared Slint components for the Shi application suite"
+publish = false

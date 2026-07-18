@@ -1,14 +1,20 @@
-[package]
-name = "gridstart"
+[workspace]
+resolver = "2"
+members = [
+    "apps/shitu",
+    "apps/shiping",
+    "apps/shiyin",
+    "crates/shi-foundation",
+    "crates/shi-ui",
+]
+default-members = ["apps/shitu"]
+exclude = ["tools/windows-ai-bindgen"]
+
+[workspace.package]
 version = "0.1.4"
 edition = "2024"
-description = "A lightweight Windows screenshot and pinning utility built with Rust and Slint"
 
-[[bin]]
-name = "ShiTu"
-path = "src/main.rs"
-
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0"
 global-hotkey = "0.8"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
@@ -22,7 +28,7 @@ slint = { version = "=1.17.0", default-features = false, features = [
     "renderer-femtovg",
     "compat-1-2",
     "raw-window-handle-06",
-    "system-tray"
+    "system-tray",
 ] }
 windows = { version = "0.62", features = [
     "Foundation",
@@ -43,12 +49,10 @@ windows = { version = "0.62", features = [
     "Win32_System_WinRT",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_Shell",
-    "Win32_UI_WindowsAndMessaging"
+    "Win32_UI_WindowsAndMessaging",
 ] }
 windows-core = "0.62.2"
 windows-future = "0.3.2"
-
-[build-dependencies]
 slint-build = "=1.17.0"
 winresource = "0.1.31"
 

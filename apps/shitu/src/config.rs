@@ -2,6 +2,8 @@ use std::{fs, io::Write, path::PathBuf};
 
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
+pub use shi_foundation::LanguageMode;
+pub use shi_foundation::config::default_picture_directory;
 
 use crate::i18n;
 
@@ -12,15 +14,6 @@ pub enum AppearanceMode {
     System,
     Light,
     Dark,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum LanguageMode {
-    #[default]
-    System,
-    Chinese,
-    English,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -271,17 +264,7 @@ impl Config {
 }
 
 pub fn app_data_directory() -> PathBuf {
-    std::env::var_os("APPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("GridStart")
-}
-
-pub fn default_picture_directory() -> PathBuf {
-    std::env::var_os("USERPROFILE")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("Pictures")
+    shi_foundation::config::roaming_app_data_directory("GridStart")
 }
 
 #[cfg(test)]

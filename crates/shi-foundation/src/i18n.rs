@@ -1,6 +1,15 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::config::LanguageMode;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LanguageMode {
+    #[default]
+    System,
+    Chinese,
+    English,
+}
 
 static ENGLISH: AtomicBool = AtomicBool::new(false);
 

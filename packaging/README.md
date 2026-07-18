@@ -2,7 +2,7 @@
 
 ShiTu is published to Microsoft Store as a complete x64 MSIX package. The package contains `ShiTu.exe` and its app icon, and uses the Store identity reserved for this product.
 
-`AppxManifest.xml` is a template: `tools/package-store-msix.ps1` replaces `__PACKAGE_VERSION__` with the Cargo package version in MSIX format (`X.Y.Z.0`) while preparing the staging directory. The Store submission version therefore follows the Git tag, which is already required to match `Cargo.toml`.
+`AppxManifest.xml` is a template: `tools/package-store-msix.ps1` replaces `__PACKAGE_VERSION__` with the `shitu` workspace package version in MSIX format (`X.Y.Z.0`) while preparing the staging directory. The Store submission version therefore follows the Git tag, which the release workflow requires to match the workspace version inherited by `apps/shitu`.
 
 The package declares `systemAIModels` for Windows AI OCR. It also declares `runFullTrust` because ShiTu is a packaged Win32 desktop application.
 

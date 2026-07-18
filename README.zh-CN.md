@@ -25,10 +25,18 @@
 需要 Windows 10/11 与 Rust 稳定版工具链：
 
 ```powershell
-cargo run --release
+cargo run --release --package shitu --bin ShiTu
 ```
 
 构建后的可执行文件为 `ShiTu.exe`。
+
+## 工作区结构
+
+- `apps/shitu`：已经实现的拾图截图应用。
+- `apps/shiping`：规划中的拾屏录屏应用，目前只有可编译入口，尚未实现录屏能力。
+- `apps/shiyin`：规划中的拾音录音应用，目前只有可编译入口，尚未实现录音能力。
+- `crates/shi-foundation`：共用语言选择、国际化和日志基础设施。
+- `crates/shi-ui`：共用 Slint 组件。
 
 ## OCR 说明
 

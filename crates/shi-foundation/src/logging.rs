@@ -1,12 +1,23 @@
 use std::{
     fs::{self, OpenOptions},
     io::Write,
+    path::PathBuf,
+    sync::OnceLock,
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::config::Config;
+struct LogTarget {
+    directory: PathBuf,
+    file_name: String,
+}
 
-pub fn initialize() {
+static TARGET: OnceLock<LogTarget> = OnceLock::new();
+
+pub fn initialize(directory: PathBuf, file_name: impl Into<String>) {
+    let _ = TARGET.set(LogTarget {
+        directory,
+        file_name: file_name.into(),
+    });
     std::panic::set_hook(Box::new(|panic| {
         let location = panic
             .location()
@@ -33,11 +44,13 @@ pub fn error(message: impl AsRef<str>) {
 }
 
 fn event(level: &str, message: &str) {
-    let directory = Config::log_directory();
-    if fs::create_dir_all(&directory).is_err() {
+    let Some(target) = TARGET.get() else {
+        return;
+    };
+    if fs::create_dir_all(&target.directory).is_err() {
         return;
     }
-    let path = directory.join("gridstart.log");
+    let path = target.directory.join(&target.file_name);
     let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) else {
         return;
     };

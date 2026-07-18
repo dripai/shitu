@@ -25,10 +25,18 @@ ShiTu is a lightweight, offline-first screenshot tool for Windows, built with Ru
 Windows 10/11 and a stable Rust toolchain are required:
 
 ```powershell
-cargo run --release
+cargo run --release --package shitu --bin ShiTu
 ```
 
 The release executable is `ShiTu.exe`.
+
+## Workspace
+
+- `apps/shitu`: the implemented ShiTu screenshot application.
+- `apps/shiping`: a compilable placeholder for the planned ShiPing screen recorder; no recording features are implemented yet.
+- `apps/shiyin`: a compilable placeholder for the planned ShiYin audio recorder; no recording features are implemented yet.
+- `crates/shi-foundation`: shared language selection, internationalization, and logging infrastructure.
+- `crates/shi-ui`: shared Slint components.
 
 ## OCR notes
 

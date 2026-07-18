@@ -17,7 +17,7 @@
 - 用途：截图与钉住工具图标
 - 许可：ISC License
 
-图标源码许可文本保存在 `src/icons/LICENSE`。
+图标源码许可文本保存在 `apps/shitu/src/icons/LICENSE`。
 
 ## Rust 依赖
 

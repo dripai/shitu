@@ -20,22 +20,32 @@ jobs:
       - name: Verify tag matches package version
         shell: pwsh
         run: |
-          $package = (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages | Select-Object -First 1
+          $package = (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages |
+            Where-Object name -eq 'shitu' |
+            Select-Object -First 1
+          if ($null -eq $package) {
+            throw 'Cargo workspace package shitu was not found.'
+          }
           $expectedTag = "v$($package.version)"
           if ($env:GITHUB_REF_NAME -ne $expectedTag) {
             throw "Release tag $env:GITHUB_REF_NAME must match Cargo.toml version $expectedTag"
           }
 
       - name: Test
-        run: cargo test --locked
+        run: cargo test --workspace --locked
 
       - name: Build release binary
-        run: cargo build --release --locked
+        run: cargo build --release --locked --package shitu --bin ShiTu
 
       - name: Build Microsoft Store upload asset
         shell: pwsh
         run: |
-          $package = (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages | Select-Object -First 1
+          $package = (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages |
+            Where-Object name -eq 'shitu' |
+            Select-Object -First 1
+          if ($null -eq $package) {
+            throw 'Cargo workspace package shitu was not found.'
+          }
           .\tools\package-store-msix.ps1 `
             -ExecutablePath .\target\release\ShiTu.exe `
             -Version $package.version `

@@ -1,0 +1,11 @@
+[package]
+name = "shi-foundation"
+version.workspace = true
+edition.workspace = true
+description = "Shared foundation services for the Shi application suite"
+publish = false
+
+[dependencies]
+serde.workspace = true
+slint.workspace = true
+windows = { workspace = true, features = ["Win32_Globalization"] }

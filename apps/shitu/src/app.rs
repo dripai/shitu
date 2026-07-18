@@ -43,7 +43,7 @@ enum StatusLevel {
 }
 
 pub fn run() -> Result<(), slint::PlatformError> {
-    logging::initialize();
+    logging::initialize(Config::log_directory(), "gridstart.log");
     i18n::prepare(Default::default());
     let config_result = Config::load();
     i18n::prepare(

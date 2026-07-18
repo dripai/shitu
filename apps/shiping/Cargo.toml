@@ -1,0 +1,6 @@
+[package]
+name = "shiping"
+version.workspace = true
+edition.workspace = true
+description = "Planned ShiPing screen recorder application"
+publish = false

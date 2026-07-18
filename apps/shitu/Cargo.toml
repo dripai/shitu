@@ -1,0 +1,29 @@
+[package]
+name = "shitu"
+version.workspace = true
+edition.workspace = true
+description = "A lightweight Windows screenshot and pinning utility built with Rust and Slint"
+publish = false
+
+[[bin]]
+name = "ShiTu"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+global-hotkey.workspace = true
+image.workspace = true
+raw-window-handle.workspace = true
+rfd.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+shi-foundation = { path = "../../crates/shi-foundation" }
+slint.workspace = true
+windows.workspace = true
+windows-core.workspace = true
+windows-future.workspace = true
+
+[build-dependencies]
+shi-ui = { path = "../../crates/shi-ui" }
+slint-build.workspace = true
+winresource.workspace = true
