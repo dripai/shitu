@@ -14,7 +14,7 @@ use windows::Win32::{
     System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree},
 };
 
-use crate::encoder::{AUDIO_CHANNELS, AUDIO_SAMPLE_RATE};
+use super::encoder::{AUDIO_CHANNELS, AUDIO_SAMPLE_RATE};
 
 const MAX_QUEUED_FRAMES: usize = AUDIO_SAMPLE_RATE as usize * 2;
 

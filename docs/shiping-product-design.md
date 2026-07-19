@@ -68,7 +68,17 @@
 
 这些能力会显著增加界面和录制链路复杂度，只有在基础录制稳定后再单独评估。
 
-## 6. 当前实现边界
+## 6. 源码分层
+
+- `ui/main-window.slint` 只负责视觉、命中测试、焦点和原始鼠标键盘输入，并通过语义回调表达“开始录制”“选择范围”等用户意图。
+- `src/ui/controller.rs` 绑定 Slint 回调，将用户意图转换为业务状态变更，并把录制事件渲染回界面；目标选择窗口和候选项只保存在 UI 会话状态中。
+- `src/application/state.rs` 保存录制业务唯一可变状态，包括配置、录制目标、录制器、倒计时任务和最近输出，不持有 Slint 组件或平台窗口对象。
+- `src/application/recording_service.rs` 编排录制生命周期；`src/platform/windows/` 集中实现窗口句柄、系统菜单、目标枚举、GDI 画面采集、WASAPI 音频、Media Foundation 编码和系统 Shell 调用。
+- `src/main.rs` 只负责模块装配、生成 Slint 类型和启动 UI Controller。
+
+当前分层已经隔离 Windows 实现，但尚未定义一套凭空假设的跨平台统一接口。增加 macOS 或 Linux 后端前，需要先根据对应平台官方采集、权限、音频和编码能力确定可实现的共同契约，再由 `platform` 选择具体后端。
+
+## 7. 当前实现边界
 
 - 当前仅实现 Windows 路径。画面通过 GDI 读取屏幕当前可见像素，因此窗口录制不是独立的窗口表面捕获：遮挡、屏幕外区域和窗口移动都会反映到录制结果中。
 - “自动”与“1080p”当前都以 1080p 为上限；720p 和 1080p 均保持原始宽高比、不主动放大，并将编码尺寸调整为偶数。
@@ -78,14 +88,16 @@
 - 输出目录、来源、清晰度、帧率、声音、鼠标和倒计时设置持久化到 `%APPDATA%\ShiPing\config.json`。
 - 全局快捷键、托盘和异常恢复仍为规划中，首版没有备用实现路径。
 
-## 7. 官方依据
+## 8. 官方依据
 
 - [Media Foundation：使用 Sink Writer 编码视频](https://learn.microsoft.com/en-us/windows/win32/medfound/tutorial--using-the-sink-writer-to-encode-video)
 - [`MFCreateSinkWriterFromURL`](https://learn.microsoft.com/en-us/windows/win32/api/mfreadwrite/nf-mfreadwrite-mfcreatesinkwriterfromurl) 与 [`IMFSinkWriter::SetInputMediaType`](https://learn.microsoft.com/en-us/windows/win32/api/mfreadwrite/nf-mfreadwrite-imfsinkwriter-setinputmediatype)
 - [WASAPI 回环录制](https://learn.microsoft.com/en-us/windows/win32/coreaudio/loopback-recording)
 - [AAC 编码器](https://learn.microsoft.com/en-us/windows/win32/medfound/aac-encoder) 与 [AAC 媒体类型](https://learn.microsoft.com/en-us/windows/win32/medfound/aac-media-types)
+- [Slint `TouchArea`](https://docs.slint.dev/latest/docs/slint/reference/gestures/toucharea/) 与 [`FocusScope`](https://docs.slint.dev/latest/docs/slint/reference/keyboard-input/focusscope/)
+- [Win32 `TrackPopupMenu`](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-trackpopupmenu) 与 [`CreatePopupMenu`](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createpopupmenu)
 
-## 8. 验证状态
+## 9. 验证状态
 
 - 已通过：`cargo check -p shiping`、常规单元测试、短时真实 MP4 录制测试和 Debug 构建。
 - 当前设备已验证：主界面与右键菜单、3 秒倒计时、录制/暂停/继续/停止、结果文件生成、Escape 与右键取消目标选择、可见窗口选择和区域拖选。

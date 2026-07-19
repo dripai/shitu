@@ -6,14 +6,16 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
-use windows::Win32::System::Com::{COINIT_MULTITHREADED, CoInitializeEx, CoUninitialize};
 
 use crate::{
-    audio::{AudioSources, SourceKind},
-    capture::{FrameGrabber, output_size},
-    encoder::{AUDIO_SAMPLE_RATE, MediaFoundationRuntime, Mp4Writer},
     output,
-    target::RecordingTarget,
+    platform::{
+        ComRuntime,
+        audio::{AudioSources, SourceKind},
+        capture::{FrameGrabber, output_size},
+        encoder::{AUDIO_SAMPLE_RATE, MediaFoundationRuntime, Mp4Writer},
+        target::RecordingTarget,
+    },
 };
 
 const AUDIO_CHUNK_FRAMES: u64 = 1024;
@@ -93,23 +95,6 @@ impl Drop for RecorderHandle {
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
         }
-    }
-}
-
-struct ComRuntime;
-
-impl ComRuntime {
-    fn initialize() -> Result<Self> {
-        unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }
-            .ok()
-            .context("初始化 COM 失败")?;
-        Ok(Self)
-    }
-}
-
-impl Drop for ComRuntime {
-    fn drop(&mut self) {
-        unsafe { CoUninitialize() };
     }
 }
 
@@ -331,7 +316,7 @@ mod tests {
     };
 
     use super::{Command, Event, RecorderHandle, RecordingOptions};
-    use crate::target::{RecordingTarget, primary_screen_bounds};
+    use crate::platform::target::{RecordingTarget, primary_screen_bounds};
 
     #[test]
     #[ignore = "需要 Windows 桌面、Media Foundation 编码器和实际屏幕采集"]

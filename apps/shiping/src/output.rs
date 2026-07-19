@@ -32,24 +32,8 @@ pub fn prepare(directory: &Path) -> Result<OutputPaths> {
     Err(anyhow!("无法生成不重复的录制文件名"))
 }
 
-#[cfg(windows)]
 fn timestamp() -> String {
-    use windows::Win32::System::SystemInformation::GetLocalTime;
-    let value = unsafe { GetLocalTime() };
-    format!(
-        "{:04}{:02}{:02}_{:02}{:02}{:02}",
-        value.wYear, value.wMonth, value.wDay, value.wHour, value.wMinute, value.wSecond
-    )
-}
-
-#[cfg(not(windows))]
-fn timestamp() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
-        .to_string()
+    crate::platform::local_timestamp()
 }
 
 pub fn commit(paths: &OutputPaths) -> Result<()> {

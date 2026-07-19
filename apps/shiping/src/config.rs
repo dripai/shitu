@@ -99,44 +99,8 @@ pub fn default_video_directory() -> PathBuf {
         .join("ShiPing")
 }
 
-#[cfg(windows)]
 fn replace_file(source: &std::path::Path, target: &std::path::Path) -> Result<()> {
-    use std::os::windows::ffi::OsStrExt;
-    use windows::{
-        Win32::Storage::FileSystem::{
-            MOVE_FILE_FLAGS, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
-        },
-        core::PCWSTR,
-    };
-
-    let source_wide: Vec<u16> = source
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect();
-    let target_wide: Vec<u16> = target
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect();
-    let flags = MOVE_FILE_FLAGS(MOVEFILE_REPLACE_EXISTING.0 | MOVEFILE_WRITE_THROUGH.0);
-    unsafe {
-        MoveFileExW(
-            PCWSTR(source_wide.as_ptr()),
-            PCWSTR(target_wide.as_ptr()),
-            flags,
-        )
-    }
-    .with_context(|| format!("替换配置文件失败：{}", target.display()))
-}
-
-#[cfg(not(windows))]
-fn replace_file(source: &std::path::Path, target: &std::path::Path) -> Result<()> {
-    if target.exists() {
-        fs::remove_file(target)?;
-    }
-    fs::rename(source, target)?;
-    Ok(())
+    crate::platform::replace_file(source, target)
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, anyhow};
 
-use crate::target::Bounds;
+use super::target::Bounds;
 
 pub fn output_size(source: Bounds, quality_preset: u8) -> (u32, u32) {
     let maximum = match quality_preset {
@@ -272,10 +272,10 @@ fn bitmap_info(width: i32, height: i32) -> windows::Win32::Graphics::Gdi::BITMAP
 
 #[cfg(test)]
 mod tests {
+    use super::Bounds;
     #[cfg(windows)]
     use super::bitmap_info;
     use super::output_size;
-    use crate::target::Bounds;
 
     #[test]
     fn output_size_preserves_ratio_and_even_dimensions() {
