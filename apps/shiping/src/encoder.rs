@@ -3,16 +3,18 @@ use std::{os::windows::ffi::OsStrExt, path::Path, ptr};
 use anyhow::{Context, Result};
 use windows::{
     Win32::Media::MediaFoundation::{
-        IMFAttributes, IMFMediaBuffer, IMFSample, IMFSinkWriter,
-        MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, MF_MT_AUDIO_AVG_BYTES_PER_SECOND,
-        MF_MT_AUDIO_BITS_PER_SAMPLE, MF_MT_AUDIO_BLOCK_ALIGNMENT, MF_MT_AUDIO_NUM_CHANNELS,
-        MF_MT_AUDIO_SAMPLES_PER_SECOND, MF_MT_AVG_BITRATE, MF_MT_DEFAULT_STRIDE, MF_MT_FRAME_RATE,
-        MF_MT_FRAME_SIZE, MF_MT_INTERLACE_MODE, MF_MT_MAJOR_TYPE, MF_MT_PIXEL_ASPECT_RATIO,
-        MF_MT_SUBTYPE, MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, MF_TRANSCODE_CONTAINERTYPE,
-        MF_VERSION, MFAudioFormat_AAC, MFAudioFormat_PCM, MFCreateAttributes, MFCreateMediaType,
+        CODECAPI_AVEncCommonMeanBitRate, CODECAPI_AVEncCommonRateControlMode, IMFAttributes,
+        IMFMediaBuffer, IMFSample, IMFSinkWriter, MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION,
+        MF_MT_AUDIO_AVG_BYTES_PER_SECOND, MF_MT_AUDIO_BITS_PER_SAMPLE, MF_MT_AUDIO_BLOCK_ALIGNMENT,
+        MF_MT_AUDIO_NUM_CHANNELS, MF_MT_AUDIO_SAMPLES_PER_SECOND, MF_MT_AVG_BITRATE,
+        MF_MT_DEFAULT_STRIDE, MF_MT_FRAME_RATE, MF_MT_FRAME_SIZE, MF_MT_INTERLACE_MODE,
+        MF_MT_MAJOR_TYPE, MF_MT_PIXEL_ASPECT_RATIO, MF_MT_SUBTYPE,
+        MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, MF_TRANSCODE_CONTAINERTYPE, MF_VERSION,
+        MFAudioFormat_AAC, MFAudioFormat_PCM, MFCreateAttributes, MFCreateMediaType,
         MFCreateMemoryBuffer, MFCreateSample, MFCreateSinkWriterFromURL, MFMediaType_Audio,
         MFMediaType_Video, MFSTARTUP_FULL, MFShutdown, MFStartup, MFTranscodeContainerType_MPEG4,
         MFVideoFormat_H264, MFVideoFormat_RGB32, MFVideoInterlace_Progressive,
+        eAVEncCommonRateControlMode_CBR,
     },
     core::PCWSTR,
 };
@@ -66,11 +68,13 @@ impl Mp4Writer {
             unsafe { MFCreateSinkWriterFromURL(PCWSTR(path_wide.as_ptr()), None, &attributes) }
                 .with_context(|| format!("创建 MP4 写入器失败：{}", path.display()))?;
 
-        let video_output = video_output_type(width, height, frames_per_second)?;
+        let video_bitrate = target_video_bitrate(width, height, frames_per_second);
+        let video_output = video_output_type(width, height, frames_per_second, video_bitrate)?;
         let video_stream =
             unsafe { writer.AddStream(&video_output) }.context("创建 H.264 视频流失败")?;
         let video_input = video_input_type(width, height, frames_per_second)?;
-        unsafe { writer.SetInputMediaType(video_stream, &video_input, None) }
+        let encoding_parameters = video_encoding_parameters(video_bitrate)?;
+        unsafe { writer.SetInputMediaType(video_stream, &video_input, &encoding_parameters) }
             .context("设置 RGB32 视频输入格式失败")?;
 
         let audio_stream = if include_audio {
@@ -136,10 +140,9 @@ fn video_output_type(
     width: u32,
     height: u32,
     fps: u32,
+    bitrate: u32,
 ) -> Result<windows::Win32::Media::MediaFoundation::IMFMediaType> {
     let media = unsafe { MFCreateMediaType() }.context("创建视频输出格式失败")?;
-    let bitrate =
-        (width as u64 * height as u64 * fps as u64 / 8).clamp(2_000_000, 25_000_000) as u32;
     unsafe {
         media.SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Video)?;
         media.SetGUID(&MF_MT_SUBTYPE, &MFVideoFormat_H264)?;
@@ -150,6 +153,37 @@ fn video_output_type(
         media.SetUINT64(&MF_MT_PIXEL_ASPECT_RATIO, pack_pair(1, 1))?;
     }
     Ok(media)
+}
+
+fn video_encoding_parameters(bitrate: u32) -> Result<IMFAttributes> {
+    let attributes = create_attributes(2)?;
+    unsafe {
+        attributes.SetUINT32(
+            &CODECAPI_AVEncCommonRateControlMode,
+            eAVEncCommonRateControlMode_CBR.0 as u32,
+        )?;
+        attributes.SetUINT32(&CODECAPI_AVEncCommonMeanBitRate, bitrate)?;
+    }
+    Ok(attributes)
+}
+
+fn target_video_bitrate(width: u32, height: u32, fps: u32) -> u32 {
+    const PIXELS_720P: u64 = 1280 * 720;
+    const PIXELS_1080P: u64 = 1920 * 1080;
+
+    let pixels = width as u64 * height as u64;
+    let (bitrate_720p, bitrate_1080p, maximum) = if fps >= 50 {
+        (4_000_000_u64, 6_000_000_u64, 18_000_000_u64)
+    } else {
+        (2_500_000_u64, 4_000_000_u64, 12_000_000_u64)
+    };
+    if pixels <= PIXELS_720P {
+        bitrate_720p as u32
+    } else if pixels <= PIXELS_1080P {
+        bitrate_1080p as u32
+    } else {
+        (bitrate_1080p * pixels / PIXELS_1080P).clamp(bitrate_1080p, maximum) as u32
+    }
 }
 
 fn video_input_type(
@@ -225,3 +259,23 @@ fn pack_pair(first: u32, second: u32) -> u64 {
 }
 
 use std::mem::size_of_val;
+
+#[cfg(test)]
+mod tests {
+    use super::target_video_bitrate;
+
+    #[test]
+    fn bitrate_presets_match_product_table() {
+        assert_eq!(target_video_bitrate(1280, 720, 30), 2_500_000);
+        assert_eq!(target_video_bitrate(1280, 720, 60), 4_000_000);
+        assert_eq!(target_video_bitrate(1920, 1080, 30), 4_000_000);
+        assert_eq!(target_video_bitrate(1920, 1080, 60), 6_000_000);
+    }
+
+    #[test]
+    fn original_resolution_scales_with_a_bounded_bitrate() {
+        assert_eq!(target_video_bitrate(2560, 1440, 30), 7_111_111);
+        assert_eq!(target_video_bitrate(3840, 2160, 30), 12_000_000);
+        assert_eq!(target_video_bitrate(3840, 2160, 60), 18_000_000);
+    }
+}
