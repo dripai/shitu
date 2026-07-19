@@ -31,6 +31,112 @@ pub enum RecordingTarget {
     Region(Bounds),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MonitorCandidate {
+    pub bounds: Bounds,
+    pub primary: bool,
+}
+
+pub struct MonitorCandidates {
+    values: Vec<MonitorCandidate>,
+}
+
+impl MonitorCandidates {
+    #[cfg(windows)]
+    pub fn snapshot() -> Result<Self> {
+        use std::mem::size_of;
+        use windows::Win32::{
+            Foundation::LPARAM,
+            Graphics::Gdi::{EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO},
+            UI::WindowsAndMessaging::MONITORINFOF_PRIMARY,
+        };
+
+        unsafe extern "system" fn enumerate(
+            monitor: HMONITOR,
+            _device_context: HDC,
+            _bounds: *mut windows::Win32::Foundation::RECT,
+            parameter: LPARAM,
+        ) -> windows::core::BOOL {
+            let values = unsafe { &mut *(parameter.0 as *mut Vec<MonitorCandidate>) };
+            let mut info = MONITORINFO {
+                cbSize: size_of::<MONITORINFO>() as u32,
+                ..Default::default()
+            };
+            if unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
+                values.push(MonitorCandidate {
+                    bounds: Bounds {
+                        left: info.rcMonitor.left,
+                        top: info.rcMonitor.top,
+                        width: info.rcMonitor.right.saturating_sub(info.rcMonitor.left),
+                        height: info.rcMonitor.bottom.saturating_sub(info.rcMonitor.top),
+                    },
+                    primary: info.dwFlags & MONITORINFOF_PRIMARY != 0,
+                });
+            }
+            windows::core::BOOL(1)
+        }
+
+        let mut values: Vec<MonitorCandidate> = Vec::new();
+        unsafe {
+            EnumDisplayMonitors(
+                None,
+                None,
+                Some(enumerate),
+                LPARAM((&mut values as *mut Vec<MonitorCandidate>) as isize),
+            )
+            .ok()?;
+        }
+        values.retain(|monitor| monitor.bounds.validate().is_ok());
+        values.sort_by_key(|monitor| (!monitor.primary, monitor.bounds.top, monitor.bounds.left));
+        if values.is_empty() {
+            return Err(anyhow!("未检测到可录制的显示器"));
+        }
+        Ok(Self { values })
+    }
+
+    #[cfg(not(windows))]
+    pub fn snapshot() -> Result<Self> {
+        Err(anyhow!("显示器选择仅支持 Windows"))
+    }
+
+    pub fn get(&self, index: usize) -> Option<MonitorCandidate> {
+        self.values.get(index).copied()
+    }
+
+    pub fn primary_index(&self) -> usize {
+        self.values
+            .iter()
+            .position(|monitor| monitor.primary)
+            .unwrap_or(0)
+    }
+
+    pub fn index_of(&self, bounds: Bounds) -> Option<usize> {
+        self.values
+            .iter()
+            .position(|monitor| monitor.bounds == bounds)
+    }
+
+    pub fn labels(&self) -> Vec<String> {
+        self.values
+            .iter()
+            .enumerate()
+            .map(|(index, monitor)| {
+                format!(
+                    "显示器 {} · {} × {}{}",
+                    index + 1,
+                    monitor.bounds.width,
+                    monitor.bounds.height,
+                    if monitor.primary {
+                        "（主显示器）"
+                    } else {
+                        ""
+                    }
+                )
+            })
+            .collect()
+    }
+}
+
 impl RecordingTarget {
     pub fn initial_bounds(self) -> Bounds {
         match self {
@@ -234,7 +340,7 @@ fn clipped_window_bounds(hwnd: isize, desktop: Bounds) -> Option<Bounds> {
 
 #[cfg(test)]
 mod tests {
-    use super::Bounds;
+    use super::{Bounds, MonitorCandidate, MonitorCandidates};
 
     #[test]
     fn bounds_validate_and_contain_points() {
@@ -248,5 +354,43 @@ mod tests {
         assert!(bounds.contains(-20, 10));
         assert!(bounds.contains(79, 69));
         assert!(!bounds.contains(80, 70));
+    }
+
+    #[test]
+    fn monitor_candidates_identify_primary_and_format_labels() {
+        let primary = Bounds {
+            left: 0,
+            top: 0,
+            width: 1920,
+            height: 1080,
+        };
+        let secondary = Bounds {
+            left: -2560,
+            top: 0,
+            width: 2560,
+            height: 1440,
+        };
+        let monitors = MonitorCandidates {
+            values: vec![
+                MonitorCandidate {
+                    bounds: primary,
+                    primary: true,
+                },
+                MonitorCandidate {
+                    bounds: secondary,
+                    primary: false,
+                },
+            ],
+        };
+
+        assert_eq!(monitors.primary_index(), 0);
+        assert_eq!(monitors.index_of(secondary), Some(1));
+        assert_eq!(
+            monitors.labels(),
+            vec![
+                "显示器 1 · 1920 × 1080（主显示器）",
+                "显示器 2 · 2560 × 1440",
+            ]
+        );
     }
 }

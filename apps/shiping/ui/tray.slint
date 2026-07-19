@@ -1,0 +1,38 @@
+export component RecordingTray inherits SystemTrayIcon {
+    icon: @image-url("icons/tray.svg");
+    tooltip: "拾屏";
+    title: "拾屏";
+
+    callback restore-window();
+    callback start-recording();
+    callback pause-recording();
+    callback stop-recording();
+    callback quit-application();
+
+    clicked => { root.restore-window(); }
+
+    Menu {
+        MenuItem {
+            title: "显示拾屏";
+            activated => { root.restore-window(); }
+        }
+        MenuSeparator {}
+        MenuItem {
+            title: "开始录制    F10";
+            activated => { root.start-recording(); }
+        }
+        MenuItem {
+            title: "暂停/继续录制    F11";
+            activated => { root.pause-recording(); }
+        }
+        MenuItem {
+            title: "停止录制    F12";
+            activated => { root.stop-recording(); }
+        }
+        MenuSeparator {}
+        MenuItem {
+            title: "退出拾屏";
+            activated => { root.quit-application(); }
+        }
+    }
+}

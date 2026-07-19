@@ -14,6 +14,7 @@ pub struct Config {
     pub show_cursor: bool,
     pub highlight_clicks: bool,
     pub countdown_seconds: u8,
+    pub auto_minimize_after_start: bool,
     pub save_directory: PathBuf,
 }
 
@@ -28,6 +29,7 @@ impl Default for Config {
             show_cursor: true,
             highlight_clicks: false,
             countdown_seconds: 3,
+            auto_minimize_after_start: false,
             save_directory: default_video_directory(),
         }
     }
@@ -117,6 +119,7 @@ mod tests {
         assert!(!config.microphone);
         assert!(config.show_cursor);
         assert_eq!(config.countdown_seconds, 3);
+        assert!(!config.auto_minimize_after_start);
         assert_eq!(config.save_directory, default_video_directory());
     }
 

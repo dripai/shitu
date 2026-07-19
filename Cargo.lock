@@ -4063,6 +4063,7 @@ name = "shiping"
 version = "0.1.5"
 dependencies = [
  "anyhow",
+ "global-hotkey",
  "raw-window-handle",
  "rfd",
  "serde",

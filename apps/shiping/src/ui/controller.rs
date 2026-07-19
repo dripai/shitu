@@ -6,23 +6,30 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
-use slint::{ComponentHandle, PhysicalPosition, PhysicalSize, Timer, TimerMode};
+use slint::{
+    ComponentHandle, ModelRc, PhysicalPosition, PhysicalSize, SharedString, Timer, TimerMode,
+    VecModel,
+};
 
 use crate::{
-    MainWindow, SelectionWindow,
+    MainWindow, RecordingTray, SelectionWindow,
     application::{ApplicationState, Command, Event, RecorderHandle, RecordingOptions},
     config::Config,
     platform::{
         audio::SourceKind,
         begin_window_drag, native_window_handle, shell,
-        target::{self, Bounds, RecordingTarget, WindowCandidates},
+        target::{self, Bounds, MonitorCandidates, RecordingTarget, WindowCandidates},
     },
 };
+
+use super::hotkeys::RecordingHotkeys;
 
 struct UiState {
     application: ApplicationState,
     selector: Option<SelectionWindow>,
     candidates: Option<WindowCandidates>,
+    monitors: Option<MonitorCandidates>,
+    selected_screen: Option<Bounds>,
     selection_desktop: Option<Bounds>,
 }
 
@@ -46,6 +53,7 @@ pub(crate) fn run() -> Result<(), slint::PlatformError> {
         Err(error) => (Config::default(), Some(error.to_string())),
     };
     let main = MainWindow::new()?;
+    let tray = RecordingTray::new()?;
     apply_config(&main, &config);
     if let Some(error) = load_error {
         set_status(&main, format!("配置未加载：{error}"), true);
@@ -55,9 +63,26 @@ pub(crate) fn run() -> Result<(), slint::PlatformError> {
         application: ApplicationState::new(config),
         selector: None,
         candidates: None,
+        monitors: None,
+        selected_screen: None,
         selection_desktop: None,
     }));
+    if let Err(error) = refresh_screens(&main, &state) {
+        set_status(&main, error.to_string(), true);
+    }
     bind_callbacks(&main, Rc::clone(&state));
+    bind_tray(&tray, main.as_weak());
+
+    let hotkeys = match RecordingHotkeys::register() {
+        Ok(hotkeys) => {
+            hotkeys.bind_events(main.as_weak());
+            Some(hotkeys)
+        }
+        Err(error) => {
+            set_status(&main, format!("快捷键不可用：{error}"), true);
+            None
+        }
+    };
 
     let event_timer = Timer::default();
     {
@@ -70,7 +95,11 @@ pub(crate) fn run() -> Result<(), slint::PlatformError> {
         });
     }
 
-    main.run()
+    main.show()?;
+    tray.show()?;
+    let result = slint::run_event_loop();
+    drop(hotkeys);
+    result
 }
 
 fn apply_config(main: &MainWindow, config: &Config) {
@@ -82,10 +111,74 @@ fn apply_config(main: &MainWindow, config: &Config) {
     main.set_show_cursor(config.show_cursor);
     main.set_highlight_clicks(config.highlight_clicks);
     main.set_countdown_seconds(config.countdown_seconds as i32);
+    main.set_auto_minimize_after_start(config.auto_minimize_after_start);
     main.set_save_directory(config.save_directory.to_string_lossy().into_owned().into());
 }
 
+fn bind_tray(tray: &RecordingTray, main: slint::Weak<MainWindow>) {
+    {
+        let main = main.clone();
+        tray.on_restore_window(move || restore_main_window(&main));
+    }
+    {
+        let main = main.clone();
+        tray.on_start_recording(move || {
+            if let Some(main) = main.upgrade() {
+                main.invoke_start_recording();
+            }
+        });
+    }
+    {
+        let main = main.clone();
+        tray.on_pause_recording(move || {
+            if let Some(main) = main.upgrade() {
+                main.invoke_pause_recording();
+            }
+        });
+    }
+    {
+        let main = main.clone();
+        tray.on_stop_recording(move || {
+            if let Some(main) = main.upgrade() {
+                main.invoke_stop_recording();
+            }
+        });
+    }
+    tray.on_quit_application(move || {
+        if let Some(main) = main.upgrade() {
+            main.invoke_quit_application();
+        }
+    });
+}
+
+fn restore_main_window(main: &slint::Weak<MainWindow>) {
+    let Some(main) = main.upgrade() else { return };
+    main.window().set_minimized(false);
+    let _ = main.show();
+    main.window().request_redraw();
+}
+
 fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
+    {
+        let main = main.as_weak();
+        let state = Rc::clone(&state);
+        main.unwrap().on_refresh_screens(move || {
+            let Some(main) = main.upgrade() else { return };
+            if let Err(error) = refresh_screens(&main, &state) {
+                set_status(&main, error.to_string(), true);
+            }
+        });
+    }
+    {
+        let main = main.as_weak();
+        let state = Rc::clone(&state);
+        main.unwrap().on_screen_selected(move |index| {
+            let Some(main) = main.upgrade() else { return };
+            if let Err(error) = select_screen(&main, &state, index) {
+                set_status(&main, error.to_string(), true);
+            }
+        });
+    }
     {
         let main = main.as_weak();
         let state = Rc::clone(&state);
@@ -218,6 +311,66 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
     }
 }
 
+fn refresh_screens(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<()> {
+    let monitors = MonitorCandidates::snapshot()?;
+    let labels = monitors.labels();
+    let previous = state.borrow().selected_screen;
+    let selected_index = previous
+        .and_then(|bounds| monitors.index_of(bounds))
+        .unwrap_or_else(|| monitors.primary_index());
+    let selected = monitors
+        .get(selected_index)
+        .ok_or_else(|| anyhow!("显示器列表为空"))?;
+
+    main.set_screen_options(ModelRc::new(VecModel::from(
+        labels
+            .into_iter()
+            .map(SharedString::from)
+            .collect::<Vec<_>>(),
+    )));
+    main.set_selected_screen_index(selected_index as i32);
+    main.set_selected_screen_label(format!("显示器 {}", selected_index + 1).into());
+
+    let mut state = state.borrow_mut();
+    state.selected_screen = Some(selected.bounds);
+    state.monitors = Some(monitors);
+    Ok(())
+}
+
+fn select_screen(main: &MainWindow, state: &Rc<RefCell<UiState>>, index: i32) -> Result<()> {
+    if state.borrow().recorder.is_some() || main.get_recording_state() != 0 {
+        return Err(anyhow!("录制期间不能更改显示器"));
+    }
+    let index = usize::try_from(index).map_err(|_| anyhow!("显示器索引无效"))?;
+    let monitor = state
+        .borrow()
+        .monitors
+        .as_ref()
+        .and_then(|monitors| monitors.get(index))
+        .ok_or_else(|| anyhow!("所选显示器已不存在"))?;
+
+    {
+        let mut state = state.borrow_mut();
+        state.selected_screen = Some(monitor.bounds);
+        state.target = Some(RecordingTarget::Screen(monitor.bounds));
+        state.config.source_mode = 0;
+    }
+    main.set_source_mode(0);
+    main.set_selected_screen_index(index as i32);
+    main.set_selected_screen_label(format!("显示器 {}", index + 1).into());
+    set_status(
+        main,
+        format!(
+            "已选择显示器 {}：{} × {}",
+            index + 1,
+            monitor.bounds.width,
+            monitor.bounds.height
+        ),
+        false,
+    );
+    Ok(())
+}
+
 fn bind_live_option_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
     {
         let state = Rc::clone(&state);
@@ -261,13 +414,23 @@ fn bind_live_option_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
             state.borrow_mut().config.countdown_seconds = seconds.clamp(0, 10) as u8;
         });
     }
+    {
+        let state = Rc::clone(&state);
+        main.on_auto_minimize_after_start_changed(move |enabled| {
+            state.borrow_mut().config.auto_minimize_after_start = enabled;
+        });
+    }
 }
 
 fn open_target_selector(main: &MainWindow, state: &Rc<RefCell<UiState>>, mode: i32) -> Result<()> {
     if mode == 0 {
-        state.borrow_mut().target = None;
+        let bounds = state
+            .borrow()
+            .selected_screen
+            .unwrap_or(target::primary_screen_bounds()?);
+        state.borrow_mut().target = Some(RecordingTarget::Screen(bounds));
         state.borrow_mut().config.source_mode = 0;
-        set_status(main, "已选择主显示器", false);
+        set_status(main, "已选择当前显示器", false);
         return Ok(());
     }
     if state.borrow().recorder.is_some() || main.get_recording_state() != 0 {
@@ -505,7 +668,12 @@ fn countdown_tick(
 fn recording_options(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<RecordingOptions> {
     let source_mode = main.get_source_mode();
     let target = match source_mode {
-        0 => RecordingTarget::Screen(target::primary_screen_bounds()?),
+        0 => RecordingTarget::Screen(
+            state
+                .borrow()
+                .selected_screen
+                .unwrap_or(target::primary_screen_bounds()?),
+        ),
         1 => match state.borrow().target {
             Some(target @ RecordingTarget::Window { .. }) => target,
             _ => return Err(anyhow!("请先选择要录制的窗口")),
@@ -546,6 +714,9 @@ fn handle_recorder_events(main: &MainWindow, state: &Rc<RefCell<UiState>>) {
             } => {
                 let _ = (output_path, system_available, microphone_available);
                 main.set_recording_state(1);
+                if main.get_auto_minimize_after_start() {
+                    main.window().set_minimized(true);
+                }
                 if let Some(warning) = warnings.first() {
                     set_status(main, format!("录制中；{warning}"), false);
                 } else {
@@ -615,6 +786,7 @@ fn update_config_from_main(main: &MainWindow, config: &mut Config) {
     config.show_cursor = main.get_show_cursor();
     config.highlight_clicks = main.get_highlight_clicks();
     config.countdown_seconds = main.get_countdown_seconds().clamp(0, 10) as u8;
+    config.auto_minimize_after_start = main.get_auto_minimize_after_start();
 }
 
 fn set_status(main: &MainWindow, message: impl Into<String>, error: bool) {

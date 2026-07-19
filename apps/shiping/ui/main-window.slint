@@ -185,11 +185,83 @@ component ChoiceAction {
     }
 }
 
+// Screen selection is a dynamic submenu because monitor count and geometry can change at runtime.
+// Slint's native Menu/MenuItem model keeps keyboard navigation and platform menu behavior intact.
+component RangeAction {
+    in property <string> label;
+    in property <string> accessible-name: root.label;
+    in property <string> icon-path;
+    in property <bool> icon-filled: false;
+    in property <bool> checked: false;
+    in property <bool> enabled: true;
+    in property <bool> menu-enabled: true;
+    in property <int> source-mode: 0;
+    in property <[string]> screen-options;
+    in property <int> selected-screen-index: 0;
+    out property <bool> has-hover <=> action.has-hover;
+
+    callback clicked();
+    callback refresh-screens();
+    callback screen-selected(int);
+    callback mode-selected(int);
+
+    width: 46px;
+    height: 57px;
+
+    action := CapsuleAction {
+        label: root.label;
+        accessible-name: root.accessible-name;
+        icon-path: root.icon-path;
+        icon-filled: root.icon-filled;
+        has-menu: root.menu-enabled;
+        checked: root.checked;
+        enabled: root.enabled;
+        clicked => {
+            if root.menu-enabled {
+                root.refresh-screens();
+                range-menu.show({ x: 0px, y: root.height });
+            } else {
+                root.clicked();
+            }
+        }
+    }
+
+    range-menu := ContextMenuArea {
+        enabled: root.enabled && root.menu-enabled;
+
+        Menu {
+            Menu {
+                title: "屏幕";
+                enabled: root.screen-options.length > 0;
+
+                for screen[index] in root.screen-options: MenuItem {
+                    title: screen;
+                    checkable: true;
+                    checked: root.source-mode == 0 && root.selected-screen-index == index;
+                    activated => { root.screen-selected(index); }
+                }
+            }
+            MenuItem {
+                title: "窗口";
+                checkable: true;
+                checked: root.source-mode == 1;
+                activated => { root.mode-selected(1); }
+            }
+            MenuItem {
+                title: "区域";
+                checkable: true;
+                checked: root.source-mode == 2;
+                activated => { root.mode-selected(2); }
+            }
+        }
+    }
+}
+
 export component MainWindow inherits Window {
     title: "拾屏";
     default-font-family: "Microsoft YaHei UI";
     default-font-size: 13px;
-    width: 674px;
+    width: root.settings-collapsed ? 474px : 674px;
     height: 95px;
     background: transparent;
     no-frame: true;
@@ -203,6 +275,10 @@ export component MainWindow inherits Window {
     in-out property <bool> show-cursor: true;
     in-out property <bool> highlight-clicks: false;
     in-out property <int> countdown-seconds: 3;
+    in-out property <bool> auto-minimize-after-start: false;
+    in property <[string]> screen-options;
+    in-out property <int> selected-screen-index: 0;
+    in-out property <string> selected-screen-label: "主显示器";
     in-out property <string> save-directory: "视频\\ShiPing";
     in-out property <int> recording-state: 0;
     in property <string> elapsed-text: "00:00:00";
@@ -212,7 +288,8 @@ export component MainWindow inherits Window {
 
     private property <bool> recording-active: root.recording-state == 1 || root.recording-state == 2;
     private property <bool> recording-busy: root.recording-active || root.recording-state == 3;
-    private property <string> source-label: root.source-mode == 0 ? "全屏" : root.source-mode == 1 ? "窗口" : "区域";
+    private property <bool> settings-collapsed: root.recording-state == 1;
+    private property <string> source-label: root.source-mode == 0 ? root.selected-screen-label : root.source-mode == 1 ? "窗口" : "区域";
     private property <string> quality-label: root.quality-preset == 0
         ? "自动"
         : root.quality-preset == 1 ? "720p" : root.quality-preset == 2 ? "1080p" : "原始";
@@ -225,6 +302,8 @@ export component MainWindow inherits Window {
         : root.recording-state == 2
             ? "已暂停  ·  " + root.config-summary
             : root.status-text == "" ? root.config-summary : root.status-text;
+
+    animate width { duration: 180ms; easing: ease-in-out; }
 
     callback start-recording();
     callback pause-recording();
@@ -240,6 +319,9 @@ export component MainWindow inherits Window {
     callback show-cursor-changed(bool);
     callback highlight-clicks-changed(bool);
     callback countdown-changed(int);
+    callback auto-minimize-after-start-changed(bool);
+    callback refresh-screens();
+    callback screen-selected(int);
 
     Rectangle {
         x: 5px;
@@ -407,7 +489,7 @@ export component MainWindow inherits Window {
                 background: transparent;
             }
 
-            range-action := ChoiceAction {
+            range-action := RangeAction {
                 label: root.recording-state == 1 ? "暂停" : root.recording-state == 2 ? "继续" : "范围";
                 accessible-name: root.recording-active ? self.label : "录制范围：" + root.source-label;
                 icon-path: root.recording-state == 1
@@ -419,58 +501,71 @@ export component MainWindow inherits Window {
                 menu-enabled: !root.recording-active;
                 checked: root.recording-state == 2 || (!root.recording-active && root.source-mode != 0);
                 enabled: root.recording-state != 3;
-                selected-index: root.source-mode;
-                option-count: 3;
-                option-0: "全屏";
-                option-1: "窗口";
-                option-2: "区域";
+                source-mode: root.source-mode;
+                screen-options: root.screen-options;
+                selected-screen-index: root.selected-screen-index;
                 clicked => { root.pause-recording(); }
-                selected(index) => {
+                refresh-screens => { root.refresh-screens(); }
+                screen-selected(index) => { root.screen-selected(index); }
+                mode-selected(index) => {
                     root.source-mode = index;
                     root.choose-source();
                 }
             }
 
-            quality-action := ChoiceAction {
-                label: root.quality-label;
-                accessible-name: "清晰度：" + root.quality-label;
-                icon-path: "M4 6 H20 M7 6 A1 1 0 1 0 9 6 A1 1 0 1 0 7 6 M4 12 H20 M14 12 A1 1 0 1 0 16 12 A1 1 0 1 0 14 12 M4 18 H20 M10 18 A1 1 0 1 0 12 18 A1 1 0 1 0 10 18";
-                enabled: !root.recording-busy;
-                selected-index: root.quality-preset;
-                option-count: 4;
-                option-0: "自动";
-                option-1: "720p";
-                option-2: "1080p";
-                option-3: "原始分辨率";
-                selected(index) => { root.quality-preset = index; }
-            }
+            Rectangle {
+                width: root.settings-collapsed ? 0px : 200.5px;
+                height: 57px;
+                opacity: root.settings-collapsed ? 0 : 1;
+                clip: true;
 
-            fps-action := CapsuleAction {
-                label: root.frame-label;
-                icon-path: "M12 3 A9 9 0 1 1 11.99 3 M12 7 V12 L16 14";
-                enabled: !root.recording-busy;
-                clicked => { root.frame-rate = Math.mod(root.frame-rate + 1, 2); }
-            }
+                animate width, opacity { duration: 180ms; easing: ease-in-out; }
 
-            system-audio-action := CapsuleAction {
-                label: "系统声";
-                icon-path: "M4 10 H8 L13 6 V18 L8 14 H4 Z M16 9 C18 11 18 13 16 15 M18 6 C22 10 22 14 18 18";
-                checkable: true;
-                checked: root.system-audio;
-                clicked => {
-                    root.system-audio = !root.system-audio;
-                    root.system-audio-changed(root.system-audio);
-                }
-            }
+                HorizontalLayout {
+                    spacing: 5.5px;
 
-            microphone-action := CapsuleAction {
-                label: "麦克风";
-                icon-path: "M9 5 A3 3 0 0 1 15 5 V12 A3 3 0 0 1 9 12 Z M6 11 A6 6 0 0 0 18 11 M12 17 V21 M8 21 H16";
-                checkable: true;
-                checked: root.microphone;
-                clicked => {
-                    root.microphone = !root.microphone;
-                    root.microphone-changed(root.microphone);
+                    quality-action := ChoiceAction {
+                        label: root.quality-label;
+                        accessible-name: "清晰度：" + root.quality-label;
+                        icon-path: "M4 6 H20 M7 6 A1 1 0 1 0 9 6 A1 1 0 1 0 7 6 M4 12 H20 M14 12 A1 1 0 1 0 16 12 A1 1 0 1 0 14 12 M4 18 H20 M10 18 A1 1 0 1 0 12 18 A1 1 0 1 0 10 18";
+                        enabled: !root.recording-busy;
+                        selected-index: root.quality-preset;
+                        option-count: 4;
+                        option-0: "自动";
+                        option-1: "720p";
+                        option-2: "1080p";
+                        option-3: "原始分辨率";
+                        selected(index) => { root.quality-preset = index; }
+                    }
+
+                    fps-action := CapsuleAction {
+                        label: root.frame-label;
+                        icon-path: "M12 3 A9 9 0 1 1 11.99 3 M12 7 V12 L16 14";
+                        enabled: !root.recording-busy;
+                        clicked => { root.frame-rate = Math.mod(root.frame-rate + 1, 2); }
+                    }
+
+                    system-audio-action := CapsuleAction {
+                        label: "系统声";
+                        icon-path: "M4 10 H8 L13 6 V18 L8 14 H4 Z M16 9 C18 11 18 13 16 15 M18 6 C22 10 22 14 18 18";
+                        checkable: true;
+                        checked: root.system-audio;
+                        clicked => {
+                            root.system-audio = !root.system-audio;
+                            root.system-audio-changed(root.system-audio);
+                        }
+                    }
+
+                    microphone-action := CapsuleAction {
+                        label: "麦克风";
+                        icon-path: "M9 5 A3 3 0 0 1 15 5 V12 A3 3 0 0 1 9 12 Z M6 11 A6 6 0 0 0 18 11 M12 17 V21 M8 21 H16";
+                        checkable: true;
+                        checked: root.microphone;
+                        clicked => {
+                            root.microphone = !root.microphone;
+                            root.microphone-changed(root.microphone);
+                        }
+                    }
                 }
             }
 
@@ -499,15 +594,29 @@ export component MainWindow inherits Window {
 
         Menu {
             MenuItem {
-                title: root.recording-busy ? "停止录制" : "开始录制";
-                activated => {
-                    if root.recording-busy { root.stop-recording(); }
-                    else { root.start-recording(); }
-                }
+                title: "开始录制    F10";
+                enabled: !root.recording-busy;
+                activated => { root.start-recording(); }
             }
-            if root.recording-active: MenuItem {
-                title: root.recording-state == 2 ? "继续录制" : "暂停录制";
+            MenuItem {
+                title: root.recording-state == 2 ? "继续录制    F11" : "暂停录制    F11";
+                enabled: root.recording-active;
                 activated => { root.pause-recording(); }
+            }
+            MenuItem {
+                title: "停止录制    F12";
+                enabled: root.recording-busy;
+                activated => { root.stop-recording(); }
+            }
+            MenuSeparator {}
+            MenuItem {
+                title: "开始后自动最小化";
+                checkable: true;
+                checked: root.auto-minimize-after-start;
+                activated => {
+                    root.auto-minimize-after-start = !root.auto-minimize-after-start;
+                    root.auto-minimize-after-start-changed(root.auto-minimize-after-start);
+                }
             }
             MenuSeparator {}
             MenuItem {

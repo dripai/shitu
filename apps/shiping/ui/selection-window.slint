@@ -42,10 +42,38 @@ export component SelectionWindow inherits Window {
         keyboard-focus.focus();
     }
 
-    Rectangle {
+    if !root.focus-visible: Rectangle {
         width: parent.width;
         height: parent.height;
         background: #00000066;
+    }
+
+    if root.focus-visible: Rectangle {
+        width: parent.width;
+        height: Math.max(0px, root.focus-y);
+        background: #00000070;
+    }
+
+    if root.focus-visible: Rectangle {
+        y: root.focus-y;
+        width: Math.max(0px, root.focus-x);
+        height: root.focus-height;
+        background: #00000070;
+    }
+
+    if root.focus-visible: Rectangle {
+        x: root.focus-x + root.focus-width;
+        y: root.focus-y;
+        width: Math.max(0px, parent.width - self.x);
+        height: root.focus-height;
+        background: #00000070;
+    }
+
+    if root.focus-visible: Rectangle {
+        y: root.focus-y + root.focus-height;
+        width: parent.width;
+        height: Math.max(0px, parent.height - self.y);
+        background: #00000070;
     }
 
     keyboard-focus := FocusScope {
@@ -112,18 +140,31 @@ export component SelectionWindow inherits Window {
     }
 
     if root.focus-visible: Rectangle {
+        x: root.focus-x - 4px;
+        y: root.focus-y - 4px;
+        width: Math.max(1px, root.focus-width) + 8px;
+        height: Math.max(1px, root.focus-height) + 8px;
+        border-width: 4px;
+        border-color: #10151de8;
+        background: transparent;
+        drop-shadow-offset-y: 2px;
+        drop-shadow-blur: 12px;
+        drop-shadow-color: #000000aa;
+    }
+
+    if root.focus-visible: Rectangle {
         x: root.focus-x;
         y: root.focus-y;
         width: Math.max(1px, root.focus-width);
         height: Math.max(1px, root.focus-height);
         border-width: 2px;
         border-color: #f14f5d;
-        background: #ffffff12;
+        background: transparent;
     }
 
     Rectangle {
-        x: (parent.width - self.width) / 2;
-        y: 24px;
+        x: 24px;
+        y: parent.height - self.height - 24px;
         width: 330px;
         height: 42px;
         border-radius: 8px;
