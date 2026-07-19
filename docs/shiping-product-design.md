@@ -42,7 +42,7 @@
 6. 鼠标细项、倒计时、保存目录和固定 MP4 格式不常驻占用工具条空间；保存目录与退出等低频操作放入原生右键菜单。
 7. 无标题栏窗口的所有非交互空白区域均可拖动；空闲状态不重复显示“就绪”，只保留参数摘要和“开始”动作。
 
-界面基于 Slint 1.17。已核对原生 `Button`、`Switch`、`ComboBox`、`Palette`、`TouchArea`、`FocusScope`、`PopupWindow`、`ContextMenuArea`、`Menu`、`MenuItem` 和 `MenuSeparator`，并检查了 `shi-ui` 现有的 `StatusBar`。原生 `Button` 的公开结构固定为横向图标与文字，不能表达参考设计所需的“圆形图标 + 下方标签 + 紧凑选中态”；原生 `ComboBox` 的 Fluent 实现最小宽度为 160px，也不能放入 46×57px 的快捷操作位；`ContextMenuArea.show(Point)` 在当前无边框窗口经过系统拖动后无法稳定再次弹出；公共 `StatusBar` 的固定高度和状态结构不能容纳录制状态、计时与参数摘要。因此只为六个快捷操作和录制状态区自定义视觉结构。范围与清晰度使用 Win32 `CreatePopupMenu`、`AppendMenuW` 和 `TrackPopupMenu` 创建原生选择菜单，由系统处理键盘、失焦关闭、屏幕边缘与缩放；应用右键菜单继续使用 Slint 原生 `ContextMenuArea`、`Menu` 与 `MenuItem`，没有新增自定义弹层窗口。
+界面基于 Slint 1.17。已核对原生 `Button`、`Switch`、`ComboBox`、`Palette`、`TouchArea`、`FocusScope`、`PopupWindow`、`ContextMenuArea`、`Menu`、`MenuItem` 和 `MenuSeparator`，并检查了 `shi-ui` 现有的 `StatusBar`。原生 `Button` 的公开结构固定为横向图标与文字，不能表达参考设计所需的“圆形图标 + 下方标签 + 紧凑选中态”；原生 `ComboBox` 的 Fluent 实现最小宽度为 160px，也不能放入 46×57px 的快捷操作位；公共 `StatusBar` 的固定高度和状态结构不能容纳录制状态、计时与参数摘要。因此只为六个快捷操作和录制状态区自定义视觉结构。范围、清晰度和应用右键菜单均使用 Slint 原生 `ContextMenuArea`、`Menu` 与 `MenuItem`，由 Slint 后端处理键盘、失焦关闭、屏幕边缘与缩放；无标题栏拖动通过 Slint 的 Winit 访问器调用 Winit `Window::drag_window()`，不再直接发送 Win32 窗口消息，也没有新增自定义弹层窗口。
 
 ## 4. 默认值
 
@@ -73,7 +73,7 @@
 - `ui/main-window.slint` 只负责视觉、命中测试、焦点和原始鼠标键盘输入，并通过语义回调表达“开始录制”“选择范围”等用户意图。
 - `src/ui/controller.rs` 绑定 Slint 回调，将用户意图转换为业务状态变更，并把录制事件渲染回界面；目标选择窗口和候选项只保存在 UI 会话状态中。
 - `src/application/state.rs` 保存录制业务唯一可变状态，包括配置、录制目标、录制器、倒计时任务和最近输出，不持有 Slint 组件或平台窗口对象。
-- `src/application/recording_service.rs` 编排录制生命周期；`src/platform/windows/` 集中实现窗口句柄、系统菜单、目标枚举、GDI 画面采集、WASAPI 音频、Media Foundation 编码和系统 Shell 调用。
+- `src/application/recording_service.rs` 编排录制生命周期；`src/platform/windowing.rs` 封装基于 Winit 的桌面窗口交互；`src/platform/windows/` 集中实现窗口句柄、目标枚举、GDI 画面采集、WASAPI 音频、Media Foundation 编码和系统 Shell 调用。
 - `src/main.rs` 只负责模块装配、生成 Slint 类型和启动 UI Controller。
 
 当前分层已经隔离 Windows 实现，但尚未定义一套凭空假设的跨平台统一接口。增加 macOS 或 Linux 后端前，需要先根据对应平台官方采集、权限、音频和编码能力确定可实现的共同契约，再由 `platform` 选择具体后端。
@@ -81,6 +81,7 @@
 ## 7. 当前实现边界
 
 - 当前仅实现 Windows 路径。画面通过 GDI 读取屏幕当前可见像素，因此窗口录制不是独立的窗口表面捕获：遮挡、屏幕外区域和窗口移动都会反映到录制结果中。
+- 工具条的鼠标、键盘、菜单和窗口拖动已经不直接依赖 Win32；Winit 桌面拖动覆盖 Windows、macOS、X11 和 Wayland，但完整应用仍需对应系统的录屏后端才能运行。
 - “自动”与“1080p”当前都以 1080p 为上限；720p 和 1080p 均保持原始宽高比、不主动放大，并将编码尺寸调整为偶数。
 - 视频通过 Media Foundation Sink Writer 写入 H.264/MP4，并使用 CBR 控制文件体积：720p30 为 2.5 Mbps、720p60 为 4 Mbps、1080p30 为 4 Mbps、1080p60 为 6 Mbps；原始分辨率按像素数量同比增加，30 FPS 上限 12 Mbps、60 FPS 上限 18 Mbps。
 - 声音以 48 kHz、双声道、16 位 PCM 输入 Sink Writer，由系统编码为 192 kbps AAC。系统声音与麦克风同时开启时在应用内混音。
@@ -94,8 +95,8 @@
 - [`MFCreateSinkWriterFromURL`](https://learn.microsoft.com/en-us/windows/win32/api/mfreadwrite/nf-mfreadwrite-mfcreatesinkwriterfromurl) 与 [`IMFSinkWriter::SetInputMediaType`](https://learn.microsoft.com/en-us/windows/win32/api/mfreadwrite/nf-mfreadwrite-imfsinkwriter-setinputmediatype)
 - [WASAPI 回环录制](https://learn.microsoft.com/en-us/windows/win32/coreaudio/loopback-recording)
 - [AAC 编码器](https://learn.microsoft.com/en-us/windows/win32/medfound/aac-encoder) 与 [AAC 媒体类型](https://learn.microsoft.com/en-us/windows/win32/medfound/aac-media-types)
-- [Slint `TouchArea`](https://docs.slint.dev/latest/docs/slint/reference/gestures/toucharea/) 与 [`FocusScope`](https://docs.slint.dev/latest/docs/slint/reference/keyboard-input/focusscope/)
-- [Win32 `TrackPopupMenu`](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-trackpopupmenu) 与 [`CreatePopupMenu`](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createpopupmenu)
+- [Slint `TouchArea`](https://docs.slint.dev/latest/docs/slint/reference/gestures/toucharea/)、[`FocusScope`](https://docs.slint.dev/latest/docs/slint/reference/keyboard-input/focusscope/) 与 [`ContextMenuArea`](https://docs.slint.dev/latest/docs/slint/reference/window/contextmenuarea/)
+- [Slint `WinitWindowAccessor`](https://docs.slint.dev/latest/docs/rust/slint/winit_030/trait.WinitWindowAccessor) 与 [Winit `Window::drag_window`](https://docs.rs/winit/0.30.13/winit/window/struct.Window.html#method.drag_window)
 
 ## 9. 验证状态
 

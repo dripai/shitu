@@ -11,7 +11,7 @@ rfd.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 shi-foundation = { path = "../../crates/shi-foundation" }
-slint.workspace = true
+slint = { workspace = true, features = ["unstable-winit-030"] }
 
 [target.'cfg(windows)'.dependencies]
 raw-window-handle.workspace = true

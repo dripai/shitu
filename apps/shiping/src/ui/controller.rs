@@ -14,7 +14,7 @@ use crate::{
     config::Config,
     platform::{
         audio::SourceKind,
-        begin_window_drag, native_window_handle, shell, show_native_choice_menu,
+        begin_window_drag, native_window_handle, shell,
         target::{self, Bounds, RecordingTarget, WindowCandidates},
     },
 };
@@ -125,54 +125,13 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
             }
         });
     }
-    #[cfg(target_os = "windows")]
     {
         let main = main.as_weak();
         main.unwrap().on_begin_window_drag(move || {
-            if let Some(main) = main.upgrade() {
-                begin_window_drag(main.window());
-                let main = main.as_weak();
-                Timer::single_shot(Duration::ZERO, move || {
-                    if let Some(main) = main.upgrade() {
-                        main.window()
-                            .dispatch_event(slint::platform::WindowEvent::PointerExited);
-                    }
-                });
-            }
-        });
-    }
-    #[cfg(target_os = "windows")]
-    {
-        let main = main.as_weak();
-        main.unwrap().on_show_source_menu(move || {
-            let Some(main) = main.upgrade() else { return };
-            match show_native_choice_menu(
-                main.window(),
-                &["全屏", "窗口", "区域"],
-                main.get_source_mode() as usize,
-            ) {
-                Ok(Some(index)) => {
-                    main.set_source_mode(index as i32);
-                    main.invoke_choose_source();
-                }
-                Ok(None) => {}
-                Err(error) => set_status(&main, error.to_string(), true),
-            }
-        });
-    }
-    #[cfg(target_os = "windows")]
-    {
-        let main = main.as_weak();
-        main.unwrap().on_show_quality_menu(move || {
-            let Some(main) = main.upgrade() else { return };
-            match show_native_choice_menu(
-                main.window(),
-                &["自动", "720p", "1080p", "原始分辨率"],
-                main.get_quality_preset() as usize,
-            ) {
-                Ok(Some(index)) => main.set_quality_preset(index as i32),
-                Ok(None) => {}
-                Err(error) => set_status(&main, error.to_string(), true),
+            if let Some(main) = main.upgrade()
+                && let Err(error) = begin_window_drag(main.window())
+            {
+                set_status(&main, error.to_string(), true);
             }
         });
     }
