@@ -23,12 +23,18 @@ use target::{Bounds, RecordingTarget, WindowCandidates};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 #[cfg(target_os = "windows")]
 use windows::Win32::{
-    Foundation::{HWND, LPARAM, WPARAM},
+    Foundation::{HWND, LPARAM, POINT, WPARAM},
     UI::{
         Input::KeyboardAndMouse::ReleaseCapture,
-        WindowsAndMessaging::{HTCAPTION, SendMessageW, WM_NCLBUTTONDOWN},
+        WindowsAndMessaging::{
+            AppendMenuW, CreatePopupMenu, DestroyMenu, GetCursorPos, HTCAPTION, MF_CHECKED,
+            MF_STRING, PostMessageW, SendMessageW, SetForegroundWindow, TPM_LEFTALIGN,
+            TPM_RETURNCMD, TPM_TOPALIGN, TrackPopupMenu, WM_NCLBUTTONDOWN, WM_NULL,
+        },
     },
 };
+#[cfg(target_os = "windows")]
+use windows::core::HSTRING;
 
 slint::include_modules!();
 
@@ -140,6 +146,48 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<AppState>>) {
         main.unwrap().on_begin_window_drag(move || {
             if let Some(main) = main.upgrade() {
                 begin_window_drag(main.window());
+                let main = main.as_weak();
+                Timer::single_shot(Duration::ZERO, move || {
+                    if let Some(main) = main.upgrade() {
+                        main.window()
+                            .dispatch_event(slint::platform::WindowEvent::PointerExited);
+                    }
+                });
+            }
+        });
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let main = main.as_weak();
+        main.unwrap().on_show_source_menu(move || {
+            let Some(main) = main.upgrade() else { return };
+            match show_native_choice_menu(
+                main.window(),
+                &["全屏", "窗口", "区域"],
+                main.get_source_mode() as usize,
+            ) {
+                Ok(Some(index)) => {
+                    main.set_source_mode(index as i32);
+                    main.invoke_choose_source();
+                }
+                Ok(None) => {}
+                Err(error) => set_status(&main, error.to_string(), true),
+            }
+        });
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let main = main.as_weak();
+        main.unwrap().on_show_quality_menu(move || {
+            let Some(main) = main.upgrade() else { return };
+            match show_native_choice_menu(
+                main.window(),
+                &["自动", "720p", "1080p", "原始分辨率"],
+                main.get_quality_preset() as usize,
+            ) {
+                Ok(Some(index)) => main.set_quality_preset(index as i32),
+                Ok(None) => {}
+                Err(error) => set_status(&main, error.to_string(), true),
             }
         });
     }
@@ -638,6 +686,58 @@ fn format_duration(duration: Duration) -> String {
         seconds / 60 % 60,
         seconds % 60
     )
+}
+
+#[cfg(target_os = "windows")]
+fn show_native_choice_menu(
+    window: &slint::Window,
+    labels: &[&str],
+    checked_index: usize,
+) -> Result<Option<usize>> {
+    let raw = native_hwnd(window).context("无法获取主窗口句柄")?;
+    let hwnd = HWND(raw as *mut _);
+    let menu = unsafe { CreatePopupMenu() }.context("无法创建下拉菜单")?;
+
+    let result = (|| -> Result<Option<usize>> {
+        for (index, label) in labels.iter().enumerate() {
+            let mut flags = MF_STRING;
+            if index == checked_index {
+                flags |= MF_CHECKED;
+            }
+            let title = HSTRING::from(*label);
+            unsafe { AppendMenuW(menu, flags, index + 1, &title) }
+                .with_context(|| format!("无法添加下拉选项：{label}"))?;
+        }
+
+        let mut cursor = POINT::default();
+        unsafe { GetCursorPos(&mut cursor) }.context("无法获取菜单弹出位置")?;
+        unsafe {
+            let _ = SetForegroundWindow(hwnd);
+        }
+        let command = unsafe {
+            TrackPopupMenu(
+                menu,
+                TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD,
+                cursor.x,
+                cursor.y,
+                None,
+                hwnd,
+                None,
+            )
+        }
+        .0 as usize;
+        unsafe {
+            let _ = PostMessageW(Some(hwnd), WM_NULL, WPARAM(0), LPARAM(0));
+        }
+
+        Ok(command.checked_sub(1).filter(|index| *index < labels.len()))
+    })();
+
+    let destroy_result = unsafe { DestroyMenu(menu) }.context("无法释放下拉菜单");
+    if result.is_ok() {
+        destroy_result?;
+    }
+    result
 }
 
 #[cfg(target_os = "windows")]

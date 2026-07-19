@@ -36,12 +36,13 @@
 
 1. 左侧固定显示录制状态和计时器，计时器下方显示当前来源、清晰度、帧率或简短状态。
 2. 右侧依次提供来源、清晰度、帧率、系统声、麦克风和开始/停止。
-3. 未录制时，来源按钮在全屏、窗口、区域之间切换；清晰度和帧率按钮按点击循环选项。
+3. 未录制时，“范围”按钮通过紧凑下拉明确选择全屏、窗口或区域；清晰度同样通过紧凑下拉选择自动、720p、1080p 或原始分辨率；帧率只有 30/60 FPS 两项，继续按点击循环。
 4. 录制中，来源按钮切换为暂停/继续；来源、清晰度和帧率锁定，声音仍可独立开关。
 5. 停止和保存结果继续显示在计时器下方，不打开完成弹窗。
 6. 鼠标细项、倒计时、保存目录和固定 MP4 格式不常驻占用工具条空间；保存目录与退出等低频操作放入原生右键菜单。
+7. 无标题栏窗口的所有非交互空白区域均可拖动；空闲状态不重复显示“就绪”，只保留参数摘要和“开始”动作。
 
-界面基于 Slint 1.17。已核对原生 `Button`、`Switch`、`ComboBox`、`Palette`、`TouchArea`、`FocusScope`、`ContextMenuArea`、`Menu`、`MenuItem` 和 `MenuSeparator`，并检查了 `shi-ui` 现有的 `StatusBar`。原生 `Button` 的公开结构固定为横向图标与文字，不能表达参考设计所需的“圆形图标 + 下方标签 + 紧凑选中态”；公共 `StatusBar` 的固定高度和状态结构也不能容纳录制状态、计时与参数摘要。因此这里只为六个快捷操作和录制状态区自定义视觉结构，点击、键盘和可访问语义仍由原生 `TouchArea`、`FocusScope` 和 `accessible-*` 属性承担；右键菜单完全使用 Slint 原生菜单组件，未创建自定义弹层、菜单窗口或额外窗口。
+界面基于 Slint 1.17。已核对原生 `Button`、`Switch`、`ComboBox`、`Palette`、`TouchArea`、`FocusScope`、`PopupWindow`、`ContextMenuArea`、`Menu`、`MenuItem` 和 `MenuSeparator`，并检查了 `shi-ui` 现有的 `StatusBar`。原生 `Button` 的公开结构固定为横向图标与文字，不能表达参考设计所需的“圆形图标 + 下方标签 + 紧凑选中态”；原生 `ComboBox` 的 Fluent 实现最小宽度为 160px，也不能放入 46×57px 的快捷操作位；`ContextMenuArea.show(Point)` 在当前无边框窗口经过系统拖动后无法稳定再次弹出；公共 `StatusBar` 的固定高度和状态结构不能容纳录制状态、计时与参数摘要。因此只为六个快捷操作和录制状态区自定义视觉结构。范围与清晰度使用 Win32 `CreatePopupMenu`、`AppendMenuW` 和 `TrackPopupMenu` 创建原生选择菜单，由系统处理键盘、失焦关闭、屏幕边缘与缩放；应用右键菜单继续使用 Slint 原生 `ContextMenuArea`、`Menu` 与 `MenuItem`，没有新增自定义弹层窗口。
 
 ## 4. 默认值
 
