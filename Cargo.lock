@@ -4062,7 +4062,12 @@ version = "0.1.5"
 name = "shiping"
 version = "0.1.5"
 dependencies = [
+ "anyhow",
  "raw-window-handle",
+ "rfd",
+ "serde",
+ "serde_json",
+ "shi-foundation",
  "slint",
  "slint-build",
  "windows",

@@ -1,0 +1,142 @@
+export component SelectionWindow inherits Window {
+    title: "选择录制目标";
+    background: transparent;
+    no-frame: true;
+    always-on-top: true;
+
+    in property <int> mode: 1;
+    in property <int> capture-width: 1;
+    in property <int> capture-height: 1;
+    in-out property <float> hover-left: 0;
+    in-out property <float> hover-top: 0;
+    in-out property <float> hover-right: 0;
+    in-out property <float> hover-bottom: 0;
+    in-out property <float> start-x: 0;
+    in-out property <float> start-y: 0;
+    in-out property <float> current-x: 0;
+    in-out property <float> current-y: 0;
+    in-out property <bool> selecting: false;
+
+    property <float> scale-x: Math.max(1, root.capture-width) / (root.width / 1px);
+    property <float> scale-y: Math.max(1, root.capture-height) / (root.height / 1px);
+    property <bool> hover-valid: root.hover-right > root.hover-left && root.hover-bottom > root.hover-top;
+    property <length> hover-x: root.hover-left / root.scale-x * 1px;
+    property <length> hover-y: root.hover-top / root.scale-y * 1px;
+    property <length> hover-width: (root.hover-right - root.hover-left) / root.scale-x * 1px;
+    property <length> hover-height: (root.hover-bottom - root.hover-top) / root.scale-y * 1px;
+    property <length> selection-x: Math.min(root.start-x, root.current-x) * 1px;
+    property <length> selection-y: Math.min(root.start-y, root.current-y) * 1px;
+    property <length> selection-width: Math.abs(root.current-x - root.start-x) * 1px;
+    property <length> selection-height: Math.abs(root.current-y - root.start-y) * 1px;
+    property <length> focus-x: root.mode == 1 ? root.hover-x : root.selection-x;
+    property <length> focus-y: root.mode == 1 ? root.hover-y : root.selection-y;
+    property <length> focus-width: root.mode == 1 ? root.hover-width : root.selection-width;
+    property <length> focus-height: root.mode == 1 ? root.hover-height : root.selection-height;
+    property <bool> focus-visible: root.mode == 1 ? root.hover-valid : root.selecting;
+
+    callback probe-window(float, float);
+    callback selected(int, int, int, int);
+    callback canceled();
+
+    public function take-keyboard-focus() {
+        keyboard-focus.focus();
+    }
+
+    Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: #00000066;
+    }
+
+    keyboard-focus := FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Escape {
+                root.canceled();
+                accept
+            } else {
+                reject
+            }
+        }
+    }
+
+    TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: crosshair;
+
+        moved => {
+            let x = self.mouse-x / 1px;
+            let y = self.mouse-y / 1px;
+            if root.mode == 1 {
+                root.probe-window(x * root.scale-x, y * root.scale-y);
+            } else if self.pressed {
+                root.current-x = x;
+                root.current-y = y;
+                root.selecting = true;
+            }
+        }
+
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                root.canceled();
+            } else if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                root.start-x = self.mouse-x / 1px;
+                root.start-y = self.mouse-y / 1px;
+                root.current-x = root.start-x;
+                root.current-y = root.start-y;
+                root.selecting = root.mode == 2;
+            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                if root.mode == 1 && root.hover-valid {
+                    root.selected(
+                        Math.round(root.hover-left),
+                        Math.round(root.hover-top),
+                        Math.round(root.hover-right),
+                        Math.round(root.hover-bottom)
+                    );
+                } else if root.mode == 2 {
+                    root.current-x = self.mouse-x / 1px;
+                    root.current-y = self.mouse-y / 1px;
+                    let left = Math.round(root.selection-x / 1px * root.scale-x);
+                    let top = Math.round(root.selection-y / 1px * root.scale-y);
+                    let right = Math.round((root.selection-x + root.selection-width) / 1px * root.scale-x);
+                    let bottom = Math.round((root.selection-y + root.selection-height) / 1px * root.scale-y);
+                    root.selecting = false;
+                    if right - left >= 16 && bottom - top >= 16 {
+                        root.selected(left, top, right, bottom);
+                    }
+                }
+            } else if event.kind == PointerEventKind.cancel {
+                root.selecting = false;
+            }
+        }
+    }
+
+    if root.focus-visible: Rectangle {
+        x: root.focus-x;
+        y: root.focus-y;
+        width: Math.max(1px, root.focus-width);
+        height: Math.max(1px, root.focus-height);
+        border-width: 2px;
+        border-color: #f14f5d;
+        background: #ffffff12;
+    }
+
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: 24px;
+        width: 330px;
+        height: 42px;
+        border-radius: 8px;
+        background: #161b24ee;
+        border-width: 1px;
+        border-color: #4b5566;
+
+        Text {
+            text: root.mode == 1 ? "单击选择一个可见窗口，Esc 取消" : "拖动选择固定录制区域，Esc 取消";
+            color: white;
+            font-size: 14px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}

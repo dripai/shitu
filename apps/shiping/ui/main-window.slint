@@ -117,13 +117,16 @@ export component MainWindow inherits Window {
     in-out property <int> status-level: 0;
 
     private property <bool> recording-active: root.recording-state == 1 || root.recording-state == 2;
+    private property <bool> recording-busy: root.recording-active || root.recording-state == 3;
     private property <string> source-label: root.source-mode == 0 ? "全屏" : root.source-mode == 1 ? "窗口" : "区域";
     private property <string> quality-label: root.quality-preset == 0
         ? "自动"
         : root.quality-preset == 1 ? "720p" : root.quality-preset == 2 ? "1080p" : "原始";
     private property <string> frame-label: root.frame-rate == 0 ? "30 FPS" : "60 FPS";
     private property <string> config-summary: root.source-label + "  ·  " + root.quality-label + "  ·  " + root.frame-label;
-    private property <string> detail-text: root.recording-state == 1
+    private property <string> detail-text: root.recording-state == 3
+        ? root.status-text
+        : root.recording-state == 1
         ? "录制中  ·  " + root.config-summary
         : root.recording-state == 2
             ? "已暂停  ·  " + root.config-summary
@@ -138,6 +141,11 @@ export component MainWindow inherits Window {
     callback open-output-directory();
     callback open-output-file();
     callback quit-application();
+    callback system-audio-changed(bool);
+    callback microphone-changed(bool);
+    callback show-cursor-changed(bool);
+    callback highlight-clicks-changed(bool);
+    callback countdown-changed(int);
 
     Rectangle {
         x: 5px;
@@ -227,7 +235,7 @@ export component MainWindow inherits Window {
                     width: 38px;
                     height: 38px;
                     border-radius: 19px;
-                    background: root.recording-state == 2 ? #e69a45 : #f14f5d;
+                    background: root.recording-state == 2 ? #e69a45 : root.recording-state == 3 ? #5d6d84 : #f14f5d;
                     drop-shadow-offset-y: 1.5px;
                     drop-shadow-blur: 6.5px;
                     drop-shadow-color: root.recording-state == 2 ? #e69a4566 : #f14f5d66;
@@ -237,13 +245,13 @@ export component MainWindow inherits Window {
                         y: 14.5px;
                         width: 9px;
                         height: 9px;
-                        border-radius: root.recording-active ? 2px : 4.5px;
+                        border-radius: root.recording-busy ? 2px : 4.5px;
                         background: #ffd9dd;
                     }
                 }
 
                 Text {
-                    text: root.recording-state == 1 ? "REC" : root.recording-state == 2 ? "暂停" : "就绪";
+                    text: root.recording-state == 1 ? "REC" : root.recording-state == 2 ? "暂停" : root.recording-state == 3 ? "准备" : "就绪";
                     color: root.recording-state == 2 ? #f1b66f : #ff858e;
                     font-size: 12px;
                     font-weight: 700;
@@ -266,13 +274,25 @@ export component MainWindow inherits Window {
                     vertical-alignment: center;
                 }
 
-                Text {
+                Rectangle {
                     height: 16px;
-                    text: root.detail-text;
-                    color: root.status-level == 2 ? #ff858e : #8f98a7;
-                    font-size: 12px;
-                    vertical-alignment: center;
-                    overflow: elide;
+                    background: transparent;
+
+                    Text {
+                        width: parent.width;
+                        height: parent.height;
+                        text: root.detail-text;
+                        color: root.status-level == 2 ? #ff858e : root.output-file-name != "" ? #9fc4ff : #8f98a7;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+
+                    TouchArea {
+                        enabled: root.output-file-name != "" && root.recording-state == 0;
+                        mouse-cursor: pointer;
+                        clicked => { root.open-output-file(); }
+                    }
                 }
             }
 
@@ -299,6 +319,7 @@ export component MainWindow inherits Window {
                         : "M3 9 V3 H9 M15 3 H21 V9 M21 15 V21 H15 M9 21 H3 V15";
                 icon-filled: root.recording-active;
                 checked: root.recording-state == 2 || (!root.recording-active && root.source-mode != 0);
+                enabled: root.recording-state != 3;
                 clicked => {
                     if root.recording-active {
                         root.pause-recording();
@@ -310,6 +331,7 @@ export component MainWindow inherits Window {
                         root.choose-source();
                     } else {
                         root.source-mode = 0;
+                        root.choose-source();
                     }
                 }
             }
@@ -317,14 +339,14 @@ export component MainWindow inherits Window {
             CapsuleAction {
                 label: root.quality-label;
                 icon-path: "M4 6 H20 M7 6 A1 1 0 1 0 9 6 A1 1 0 1 0 7 6 M4 12 H20 M14 12 A1 1 0 1 0 16 12 A1 1 0 1 0 14 12 M4 18 H20 M10 18 A1 1 0 1 0 12 18 A1 1 0 1 0 10 18";
-                enabled: !root.recording-active;
+                enabled: !root.recording-busy;
                 clicked => { root.quality-preset = Math.mod(root.quality-preset + 1, 4); }
             }
 
             CapsuleAction {
                 label: root.frame-label;
                 icon-path: "M12 3 A9 9 0 1 1 11.99 3 M12 7 V12 L16 14";
-                enabled: !root.recording-active;
+                enabled: !root.recording-busy;
                 clicked => { root.frame-rate = Math.mod(root.frame-rate + 1, 2); }
             }
 
@@ -333,7 +355,10 @@ export component MainWindow inherits Window {
                 icon-path: "M4 10 H8 L13 6 V18 L8 14 H4 Z M16 9 C18 11 18 13 16 15 M18 6 C22 10 22 14 18 18";
                 checkable: true;
                 checked: root.system-audio;
-                clicked => { root.system-audio = !root.system-audio; }
+                clicked => {
+                    root.system-audio = !root.system-audio;
+                    root.system-audio-changed(root.system-audio);
+                }
             }
 
             CapsuleAction {
@@ -341,16 +366,19 @@ export component MainWindow inherits Window {
                 icon-path: "M9 5 A3 3 0 0 1 15 5 V12 A3 3 0 0 1 9 12 Z M6 11 A6 6 0 0 0 18 11 M12 17 V21 M8 21 H16";
                 checkable: true;
                 checked: root.microphone;
-                clicked => { root.microphone = !root.microphone; }
+                clicked => {
+                    root.microphone = !root.microphone;
+                    root.microphone-changed(root.microphone);
+                }
             }
 
             CapsuleAction {
-                label: root.recording-active ? "停止" : "开始";
-                icon-path: root.recording-active ? "M7 7 H17 V17 H7 Z" : "M8 5 L19 12 L8 19 Z";
+                label: root.recording-busy ? "停止" : "开始";
+                icon-path: root.recording-busy ? "M7 7 H17 V17 H7 Z" : "M8 5 L19 12 L8 19 Z";
                 icon-filled: true;
                 danger: true;
                 clicked => {
-                    if root.recording-active { root.stop-recording(); }
+                    if root.recording-busy { root.stop-recording(); }
                     else { root.start-recording(); }
                 }
             }
@@ -379,9 +407,9 @@ export component MainWindow inherits Window {
 
         Menu {
             MenuItem {
-                title: root.recording-active ? "停止录制" : "开始录制";
+                title: root.recording-busy ? "停止录制" : "开始录制";
                 activated => {
-                    if root.recording-active { root.stop-recording(); }
+                    if root.recording-busy { root.stop-recording(); }
                     else { root.start-recording(); }
                 }
             }
@@ -394,13 +422,45 @@ export component MainWindow inherits Window {
                 title: "系统声音";
                 checkable: true;
                 checked: root.system-audio;
-                activated => { root.system-audio = !root.system-audio; }
+                activated => {
+                    root.system-audio = !root.system-audio;
+                    root.system-audio-changed(root.system-audio);
+                }
             }
             MenuItem {
                 title: "麦克风";
                 checkable: true;
                 checked: root.microphone;
-                activated => { root.microphone = !root.microphone; }
+                activated => {
+                    root.microphone = !root.microphone;
+                    root.microphone-changed(root.microphone);
+                }
+            }
+            MenuSeparator {}
+            MenuItem {
+                title: "显示鼠标指针";
+                checkable: true;
+                checked: root.show-cursor;
+                activated => {
+                    root.show-cursor = !root.show-cursor;
+                    root.show-cursor-changed(root.show-cursor);
+                }
+            }
+            MenuItem {
+                title: "突出鼠标点击";
+                checkable: true;
+                checked: root.highlight-clicks;
+                activated => {
+                    root.highlight-clicks = !root.highlight-clicks;
+                    root.highlight-clicks-changed(root.highlight-clicks);
+                }
+            }
+            Menu {
+                title: "开始倒计时（" + root.countdown-seconds + " 秒）";
+                enabled: !root.recording-busy;
+                MenuItem { title: "不倒计时"; checkable: true; checked: root.countdown-seconds == 0; activated => { root.countdown-seconds = 0; root.countdown-changed(0); } }
+                MenuItem { title: "3 秒"; checkable: true; checked: root.countdown-seconds == 3; activated => { root.countdown-seconds = 3; root.countdown-changed(3); } }
+                MenuItem { title: "5 秒"; checkable: true; checked: root.countdown-seconds == 5; activated => { root.countdown-seconds = 5; root.countdown-changed(5); } }
             }
             MenuSeparator {}
             MenuItem {
@@ -409,7 +469,7 @@ export component MainWindow inherits Window {
             }
             MenuItem {
                 title: "更改保存目录...";
-                enabled: !root.recording-active;
+                enabled: !root.recording-busy;
                 activated => { root.choose-output-directory(); }
             }
             MenuSeparator {}
