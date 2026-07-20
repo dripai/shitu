@@ -112,9 +112,17 @@ pub(super) fn bind(settings: &MainWindow, state: Rc<RefCell<AppController>>) {
             };
             {
                 let mut state = state.borrow_mut();
+                let explicitly_requested = matches!(state.ai_ocr_state, AiOcrState::Preparing);
                 state.ai_ocr_state = ai_state;
                 state.refresh_selected_ocr();
-                set_status_level(&main, &mut state, message, level);
+                let publish_status = should_publish_ai_operation_status(
+                    explicitly_requested,
+                    state.system_ocr_available,
+                    &state.ai_ocr_state,
+                );
+                if publish_status {
+                    set_status_level(&main, &mut state, message, level);
+                }
                 refresh_main_if_available(&main, &state);
                 if let Some(main) = main.upgrade() {
                     populate(&main, &state);
@@ -584,6 +592,14 @@ fn ocr_engine_from_index(index: i32) -> OcrEngineKind {
     }
 }
 
+fn should_publish_ai_operation_status(
+    explicitly_requested: bool,
+    system_ocr_available: bool,
+    ai_state: &AiOcrState,
+) -> bool {
+    explicitly_requested || (!system_ocr_available && !ai_state.is_ready())
+}
+
 fn report_result(
     main: &slint::Weak<MainWindow>,
     state: &Rc<RefCell<AppController>>,
@@ -662,11 +678,39 @@ fn image_format_from_index(index: i32) -> ImageFormat {
 
 #[cfg(test)]
 mod tests {
-    use super::with_rollback;
+    use super::{AiOcrState, should_publish_ai_operation_status, with_rollback};
 
     #[test]
     fn rollback_error_is_preserved() {
         let error = with_rollback("应用失败".to_owned(), Some("恢复失败".to_owned()));
         assert_eq!(error.to_string(), "应用失败；回滚失败：恢复失败");
+    }
+
+    #[test]
+    fn background_ai_probe_does_not_override_status_when_an_ocr_engine_is_available() {
+        assert!(!should_publish_ai_operation_status(
+            false,
+            true,
+            &AiOcrState::ComponentMissing,
+        ));
+        assert!(!should_publish_ai_operation_status(
+            false,
+            false,
+            &AiOcrState::Ready,
+        ));
+    }
+
+    #[test]
+    fn ai_result_is_published_when_no_engine_works_or_preparation_was_requested() {
+        assert!(should_publish_ai_operation_status(
+            false,
+            false,
+            &AiOcrState::Unsupported,
+        ));
+        assert!(should_publish_ai_operation_status(
+            true,
+            true,
+            &AiOcrState::ComponentMissing,
+        ));
     }
 }
