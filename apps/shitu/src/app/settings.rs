@@ -611,9 +611,8 @@ fn report_result(
 
 fn build_information() -> String {
     format!(
-        "Windows {} · {} · Slint 1.17.0 · {}",
+        "Windows {} · Slint 1.17.0 · {}",
         std::env::consts::ARCH,
-        env!("RUSTC_VERSION"),
         if cfg!(debug_assertions) {
             "Debug"
         } else {

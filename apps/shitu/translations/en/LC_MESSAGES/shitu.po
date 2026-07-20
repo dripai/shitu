@@ -309,17 +309,14 @@ msgstr "Clear"
 msgid "未设置时不会注册任何全局快捷键。"
 msgstr "No global hotkey is registered when left blank."
 
-msgid "构建信息"
-msgstr "Build information"
+msgid "一款轻量、便捷的截图、标注与钉图工具。"
+msgstr "A lightweight tool for screenshots, annotation, and pinning."
 
-msgid "Git 项目"
-msgstr "Git repository"
-
-msgid "问题反馈"
-msgstr "Report an issue"
+msgid "作者："
+msgstr "Author:"
 
 msgid "使用 Rust 与 Slint 构建 · © 2026"
-msgstr "Built with Rust and Slint - Copyright 2026"
+msgstr "Built with Rust and Slint · © 2026"
 
 msgid "常规"
 msgstr "General"
@@ -332,12 +329,6 @@ msgstr "Shortcuts"
 
 msgid "关于"
 msgstr "About"
-
-msgid "一个便捷的截图工具"
-msgstr "A convenient screenshot tool"
-
-msgid "版本 {}"
-msgstr "Version {}"
 
 msgid "开始截图"
 msgstr "Start capture"

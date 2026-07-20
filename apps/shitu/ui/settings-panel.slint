@@ -44,28 +44,6 @@ component CenteredTabLabel inherits Rectangle {
     }
 }
 
-component AboutLinkRow inherits HorizontalLayout {
-    in property <string> label;
-    in property <string> link-text;
-    in property <string> target-url;
-
-    height: 28px;
-    spacing: 0px;
-
-    Text {
-        width: 72px;
-        text: root.label;
-        color: Palette.alternate-foreground;
-        font-size: SettingsTypography.body-font-size;
-        vertical-alignment: center;
-    }
-    Button {
-        text: root.link-text;
-        horizontal-stretch: 1;
-        clicked => { Platform.open-url(root.target-url); }
-    }
-}
-
 component PathActionButton inherits Rectangle {
     in property <string> text;
     callback activated();
@@ -95,6 +73,63 @@ component PathActionButton inherits Rectangle {
         clicked => { root.activated(); }
         changed has-hover => { root.hover-changed(self.has-hover); }
     }
+}
+
+component AboutInfoRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+
+    height: 28px;
+    spacing: 8px;
+
+    Text {
+        width: 72px;
+        text: root.label;
+        color: Palette.alternate-foreground;
+        font-size: SettingsTypography.body-font-size;
+        vertical-alignment: center;
+    }
+    Text {
+        text: root.value;
+        color: Palette.foreground;
+        font-size: SettingsTypography.body-font-size;
+        vertical-alignment: center;
+    }
+    Rectangle { }
+}
+
+// Slint 1.17 的标准组件没有超链接控件；这里仅补充可点击文本，
+// URL 打开仍由项目已有的 Platform.open-url 处理。
+component AboutLinkRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <string> url;
+
+    height: 28px;
+    spacing: 8px;
+
+    Text {
+        width: 72px;
+        text: root.label;
+        color: Palette.alternate-foreground;
+        font-size: SettingsTypography.body-font-size;
+        vertical-alignment: center;
+    }
+    link := Text {
+        text: root.value;
+        color: touch.has-hover ? Palette.selection-background : Palette.foreground;
+        font-size: SettingsTypography.body-font-size;
+        vertical-alignment: center;
+        accessible-role: button;
+        accessible-label: root.label + " " + root.value;
+        accessible-action-default => { Platform.open-url(root.url); }
+
+        touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { Platform.open-url(root.url); }
+        }
+    }
+    Rectangle { }
 }
 
 export component SettingsPanel inherits Rectangle {
@@ -525,79 +560,69 @@ export component SettingsPanel inherits Rectangle {
                 padding: 12px;
                 spacing: 6px;
                 HorizontalLayout {
-                    height: 44px;
-                    spacing: 14px;
-                    HorizontalLayout {
-                        height: 100%;
-                        spacing: 7px;
-                        Image {
-                            width: 32px;
-                            height: 32px;
-                            source: @image-url("icons/tray.svg");
-                            image-fit: contain;
-                        }
+                    height: 52px;
+                    spacing: 10px;
+                    Image {
+                        width: 40px;
+                        height: 40px;
+                        source: @image-url("icons/tray.svg");
+                        image-fit: contain;
+                    }
+                    VerticalLayout {
+                        width: 72px;
+                        height: 44px;
+                        spacing: 2px;
                         Text {
-                            height: 32px;
+                            height: 24px;
                             text: @tr("拾图");
                             color: Palette.foreground;
-                            font-size: 16px;
+                            font-size: 18px;
                             font-weight: 700;
                             vertical-alignment: center;
                         }
-                    }
-                    VerticalLayout {
-                        height: 40px;
-                        spacing: 2px;
                         Text {
-                            height: 19px;
-                            text: @tr("一个便捷的截图工具");
-                            color: Palette.foreground;
-                            font-size: SettingsTypography.body-font-size;
-                            vertical-alignment: center;
-                        }
-                        Text {
-                            height: 19px;
-                            text: @tr("版本 {}", root.version-text);
+                            height: 18px;
+                            text: root.version-text;
                             color: Palette.alternate-foreground;
                             font-size: SettingsTypography.body-font-size;
                             vertical-alignment: center;
                         }
                     }
-                    Rectangle { }
-                }
-                Rectangle { height: 1px; background: Palette.foreground.with-alpha(0.16); }
-                HorizontalLayout {
-                    height: 38px;
                     Text {
-                        width: 72px;
-                        text: @tr("构建信息");
+                        horizontal-stretch: 1;
+                        text: @tr("一款轻量、便捷的截图、标注与钉图工具。");
                         color: Palette.alternate-foreground;
                         font-size: SettingsTypography.body-font-size;
-                        vertical-alignment: top;
-                    }
-                    Text {
-                        text: root.build-text;
-                        color: Palette.foreground;
-                        font-size: SettingsTypography.body-font-size;
+                        vertical-alignment: center;
                         wrap: word-wrap;
-                        vertical-alignment: top;
                     }
                 }
                 Rectangle { height: 1px; background: Palette.foreground.with-alpha(0.16); }
+                Text {
+                    height: 24px;
+                    text: root.build-text;
+                    color: Palette.alternate-foreground;
+                    font-size: SettingsTypography.body-font-size;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+                AboutInfoRow { label: @tr("作者："); value: "logic"; }
                 AboutLinkRow {
-                    label: @tr("Git 项目");
-                    link-text: "dripai/shitu.git";
-                    target-url: "https://github.com/dripai/shitu.git";
+                    label: "Twitter:";
+                    value: "@wz220321";
+                    url: "https://x.com/wz220321";
                 }
                 AboutLinkRow {
-                    label: @tr("问题反馈");
-                    link-text: "https://github.com/dripai/shitu/issues";
-                    target-url: "https://github.com/dripai/shitu/issues";
+                    label: "GitHub:";
+                    value: "dripai/shitu";
+                    url: "https://github.com/dripai/shitu.git";
                 }
                 Text {
+                    height: 22px;
                     text: @tr("使用 Rust 与 Slint 构建 · © 2026");
                     color: Palette.alternate-foreground;
                     font-size: SettingsTypography.body-font-size;
+                    vertical-alignment: center;
                 }
                 Rectangle { }
                 }
@@ -629,11 +654,11 @@ export component SettingsPanel inherits Rectangle {
                 clicked => { root.capture(); }
             }
             Rectangle { }
-            Button {
+            if root.current-tab != 5: Button {
                 text: @tr("恢复默认");
                 clicked => { root.restore-defaults(root.current-tab); }
             }
-            Button {
+            if root.current-tab != 5: Button {
                 text: @tr("保存");
                 clicked => { root.apply-settings(); }
             }

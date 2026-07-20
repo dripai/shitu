@@ -8,16 +8,6 @@ fn main() {
         resource.compile().expect("compile Windows resources");
     }
 
-    let rustc_version =
-        std::process::Command::new(std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()))
-            .arg("--version")
-            .output()
-            .ok()
-            .filter(|output| output.status.success())
-            .and_then(|output| String::from_utf8(output.stdout).ok())
-            .map(|value| value.trim().to_owned())
-            .unwrap_or_else(|| "Rust 版本未知".to_owned());
-    println!("cargo:rustc-env=RUSTC_VERSION={rustc_version}");
     let library_paths =
         std::collections::HashMap::from([("shi-ui".to_owned(), shi_ui::slint_library_path())]);
     let config = slint_build::CompilerConfiguration::new()
