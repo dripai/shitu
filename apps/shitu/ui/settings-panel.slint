@@ -8,7 +8,7 @@ global SettingsTypography {
 }
 
 component FieldLabel inherits Text {
-    width: 92px;
+    width: 126px;
     color: Palette.foreground;
     font-size: SettingsTypography.body-font-size;
     vertical-alignment: center;
@@ -25,9 +25,11 @@ component SectionTitle inherits Text {
 component CenteredTabLabel inherits Rectangle {
     in property <string> text;
     in property <bool> selected;
+    in property <length> cell-width;
 
     height: 32px;
-    horizontal-stretch: 1;
+    width: root.cell-width;
+    horizontal-stretch: 0;
 
     Text {
         width: 100%;
@@ -38,6 +40,7 @@ component CenteredTabLabel inherits Rectangle {
         font-weight: root.selected ? 700 : 400;
         horizontal-alignment: center;
         vertical-alignment: center;
+        overflow: elide;
     }
 }
 
@@ -243,33 +246,32 @@ export component SettingsPanel inherits Rectangle {
                     spacing: 7px;
                     SectionTitle { text: @tr("输出"); }
                     HorizontalLayout {
-                        height: 26px;
+                        height: 28px;
+                        spacing: 8px;
                         FieldLabel { text: @tr("图像格式"); }
                         ComboBox {
                             width: 112px;
                             model: ["PNG", "JPEG"];
                             current-index <=> root.image-format;
                         }
-                        Text {
-                            width: 68px;
-                            text: @tr("质量");
+                        Rectangle { }
+                    }
+                    HorizontalLayout {
+                        height: 28px;
+                        spacing: 8px;
+                        FieldLabel { text: @tr("质量"); }
+                        if root.image-format == 0: Text {
+                            text: @tr("无损");
                             color: Palette.foreground;
                             font-size: SettingsTypography.body-font-size;
                             vertical-alignment: center;
                         }
-                        if root.image-format == 0: Text {
-                            width: 72px;
-                            text: @tr("无损");
-                            color: Palette.alternate-foreground;
-                            font-size: SettingsTypography.body-font-size;
-                            vertical-alignment: center;
-                        }
                         if root.image-format == 1: HorizontalLayout {
-                            width: 142px;
-                            spacing: 6px;
+                            spacing: 8px;
+                            horizontal-stretch: 1;
 
                             quality-wheel := TouchArea {
-                                width: 104px;
+                                horizontal-stretch: 1;
 
                                 Slider {
                                     width: parent.width;
@@ -293,7 +295,7 @@ export component SettingsPanel inherits Rectangle {
                                 }
                             }
                             Text {
-                                width: 32px;
+                                width: 36px;
                                 text: "\{root.jpeg-quality}";
                                 color: Palette.foreground;
                                 font-size: SettingsTypography.body-font-size;
@@ -303,30 +305,38 @@ export component SettingsPanel inherits Rectangle {
                         }
                     }
                     HorizontalLayout {
-                        height: 26px;
-                        spacing: 6px;
+                        height: 28px;
+                        spacing: 8px;
                         FieldLabel { text: @tr("保存目录"); }
                         LineEdit {
                             text <=> root.save-directory;
                         }
+                    }
+                    HorizontalLayout {
+                        height: 28px;
+                        spacing: 8px;
+                        Rectangle { width: 126px; }
                         Button {
-                            width: 58px;
+                            width: 72px;
                             text: @tr("选择...");
                             clicked => { root.choose-save-directory(); }
                         }
                         Button {
-                            width: 72px;
+                            width: 88px;
                             text: @tr("打开目录");
                             clicked => { root.open-save-directory(); }
                         }
+                        Rectangle { }
                     }
                     HorizontalLayout {
-                        height: 26px;
+                        height: 28px;
+                        spacing: 8px;
                         FieldLabel { text: @tr("文件名模板"); }
                         LineEdit {
                             text <=> root.filename-template;
                         }
                     }
+                    Rectangle { height: 2px; }
                     CheckBox {
                         text: @tr("自动保存（执行复制或钉住时同时保存）");
                         checked <=> root.auto-save;
@@ -601,12 +611,12 @@ export component SettingsPanel inherits Rectangle {
                 height: 32px;
                 spacing: 0px;
 
-                CenteredTabLabel { text: @tr("常规"); selected: root.current-tab == 0; }
-                CenteredTabLabel { text: @tr("截图"); selected: root.current-tab == 1; }
-                CenteredTabLabel { text: "OCR"; selected: root.current-tab == 2; }
-                CenteredTabLabel { text: @tr("钉住"); selected: root.current-tab == 3; }
-                CenteredTabLabel { text: @tr("快捷键"); selected: root.current-tab == 4; }
-                CenteredTabLabel { text: @tr("关于"); selected: root.current-tab == 5; }
+                CenteredTabLabel { cell-width: tabs.width / 6; text: @tr("常规"); selected: root.current-tab == 0; }
+                CenteredTabLabel { cell-width: tabs.width / 6; text: @tr("截图"); selected: root.current-tab == 1; }
+                CenteredTabLabel { cell-width: tabs.width / 6; text: "OCR"; selected: root.current-tab == 2; }
+                CenteredTabLabel { cell-width: tabs.width / 6; text: @tr("钉住"); selected: root.current-tab == 3; }
+                CenteredTabLabel { cell-width: tabs.width / 6; text: @tr("快捷键"); selected: root.current-tab == 4; }
+                CenteredTabLabel { cell-width: tabs.width / 6; text: @tr("关于"); selected: root.current-tab == 5; }
             }
         }
 

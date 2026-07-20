@@ -38,6 +38,7 @@ export component OverlayWindow inherits Window {
     in-out property <float> press-y: 0;
     in-out property <bool> manual-drag: false;
     in-out property <bool> adjusting-selection: false;
+    property <float> toolbar-anchor-ratio: 1;
     in-out property <bool> text-editing: false;
     in-out property <float> text-editor-x: 0;
     in-out property <float> text-editor-y: 0;
@@ -94,9 +95,14 @@ export component OverlayWindow inherits Window {
         root.capture-height - root.focus-source-top,
         Math.max(1, Math.round(root.focus-height / 1px * root.source-scale-y))
     );
+    property <length> toolbar-anchor-x: root.selection-left
+        + root.selection-width * root.toolbar-anchor-ratio;
     property <length> toolbar-x: Math.max(
         8px,
-        Math.min(root.width - root.toolbar-width - 8px, root.selection-left)
+        Math.min(
+            root.width - root.toolbar-width - 8px,
+            root.toolbar-anchor-x - root.toolbar-width + 18px
+        )
     );
     property <length> toolbar-width: 372px + (root.ocr-available ? 30px : 0px);
     property <length> toolbar-height: ((root.active-tool > 0 && root.active-tool < 5)
@@ -121,6 +127,12 @@ export component OverlayWindow inherits Window {
     callback ocr-result(int, string);
     callback pin-selection();
     callback cancel-selection();
+
+    function set-toolbar-anchor(pointer-x: float) {
+        let left = Math.min(root.start-x, root.current-x);
+        let width = Math.max(1, Math.abs(root.current-x - root.start-x));
+        root.toolbar-anchor-ratio = Math.max(0, Math.min(1, (pointer-x - left) / width));
+    }
 
     function commit-selection() {
         let left = Math.max(0, Math.min(root.start-x, root.current-x));
@@ -242,6 +254,7 @@ export component OverlayWindow inherits Window {
                     root.current-y = (root.hover-view-top + root.hover-view-height) / 1px;
                 }
                 if root.selection-width >= 3px && root.selection-height >= 3px {
+                    root.set-toolbar-anchor(self.mouse-x / 1px);
                     root.completed = true;
                     root.commit-selection();
                 }
@@ -437,7 +450,9 @@ export component OverlayWindow inherits Window {
                     root.current-x = next-left + selected-width;
                     root.current-y = next-top + selected-height;
                 } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                    let pointer-x = root.selection-left / 1px + self.mouse-x / 1px;
                     root.adjusting-selection = false;
+                    root.set-toolbar-anchor(pointer-x);
                     root.commit-selection();
                 } else if event.kind == PointerEventKind.cancel {
                     root.adjusting-selection = false;
@@ -474,7 +489,9 @@ export component OverlayWindow inherits Window {
                     root.drag-start-y + delta-y
                 ));
             } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                let pointer-x = (self.x + self.mouse-x) / 1px;
                 root.adjusting-selection = false;
+                root.set-toolbar-anchor(pointer-x);
                 root.commit-selection();
             } else if event.kind == PointerEventKind.cancel {
                 root.adjusting-selection = false;
@@ -510,7 +527,9 @@ export component OverlayWindow inherits Window {
                     root.drag-start-y + delta-y
                 ));
             } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                let pointer-x = (self.x + self.mouse-x) / 1px;
                 root.adjusting-selection = false;
+                root.set-toolbar-anchor(pointer-x);
                 root.commit-selection();
             } else if event.kind == PointerEventKind.cancel {
                 root.adjusting-selection = false;
@@ -546,7 +565,9 @@ export component OverlayWindow inherits Window {
                     root.drag-current-y + delta-y
                 ));
             } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                let pointer-x = (self.x + self.mouse-x) / 1px;
                 root.adjusting-selection = false;
+                root.set-toolbar-anchor(pointer-x);
                 root.commit-selection();
             } else if event.kind == PointerEventKind.cancel {
                 root.adjusting-selection = false;
@@ -582,7 +603,9 @@ export component OverlayWindow inherits Window {
                     root.drag-current-y + delta-y
                 ));
             } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                let pointer-x = (self.x + self.mouse-x) / 1px;
                 root.adjusting-selection = false;
+                root.set-toolbar-anchor(pointer-x);
                 root.commit-selection();
             } else if event.kind == PointerEventKind.cancel {
                 root.adjusting-selection = false;

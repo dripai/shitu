@@ -124,7 +124,10 @@ msgid "关闭钉住"
 msgstr "Close pinned image"
 
 msgid "钉住"
-msgstr "Pin"
+msgstr "Pins"
+
+msgid "钉住图像"
+msgstr "Pinned image"
 
 msgid "OCR 识别"
 msgstr "OCR"
@@ -325,7 +328,7 @@ msgid "截图"
 msgstr "Capture"
 
 msgid "快捷键"
-msgstr "Hotkey"
+msgstr "Shortcuts"
 
 msgid "关于"
 msgstr "About"
