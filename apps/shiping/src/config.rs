@@ -15,6 +15,10 @@ pub struct Config {
     pub highlight_clicks: bool,
     pub countdown_seconds: u8,
     pub auto_minimize_after_start: bool,
+    pub open_directory_after_stop: bool,
+    pub start_hotkey: Option<String>,
+    pub pause_hotkey: Option<String>,
+    pub stop_hotkey: Option<String>,
     pub save_directory: PathBuf,
 }
 
@@ -30,6 +34,10 @@ impl Default for Config {
             highlight_clicks: false,
             countdown_seconds: 3,
             auto_minimize_after_start: false,
+            open_directory_after_stop: false,
+            start_hotkey: Some("F10".to_owned()),
+            pause_hotkey: Some("F11".to_owned()),
+            stop_hotkey: Some("F12".to_owned()),
             save_directory: default_video_directory(),
         }
     }
@@ -91,6 +99,18 @@ impl Config {
             self.save_directory = default_video_directory();
         }
     }
+
+    pub fn hotkeys(&self) -> [Option<String>; 3] {
+        [
+            self.start_hotkey.clone(),
+            self.pause_hotkey.clone(),
+            self.stop_hotkey.clone(),
+        ]
+    }
+
+    pub fn set_hotkeys(&mut self, hotkeys: [Option<String>; 3]) {
+        [self.start_hotkey, self.pause_hotkey, self.stop_hotkey] = hotkeys;
+    }
 }
 
 pub fn default_video_directory() -> PathBuf {
@@ -120,6 +140,10 @@ mod tests {
         assert!(config.show_cursor);
         assert_eq!(config.countdown_seconds, 3);
         assert!(!config.auto_minimize_after_start);
+        assert!(!config.open_directory_after_stop);
+        assert_eq!(config.start_hotkey.as_deref(), Some("F10"));
+        assert_eq!(config.pause_hotkey.as_deref(), Some("F11"));
+        assert_eq!(config.stop_hotkey.as_deref(), Some("F12"));
         assert_eq!(config.save_directory, default_video_directory());
     }
 
@@ -134,5 +158,8 @@ mod tests {
         assert_eq!(config.quality_preset, 3);
         assert_eq!(config.frame_rate, 1);
         assert_eq!(config.countdown_seconds, 10);
+        assert_eq!(config.start_hotkey.as_deref(), Some("F10"));
+        assert_eq!(config.pause_hotkey.as_deref(), Some("F11"));
+        assert_eq!(config.stop_hotkey.as_deref(), Some("F12"));
     }
 }

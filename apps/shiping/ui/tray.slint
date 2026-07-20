@@ -3,10 +3,16 @@ export component RecordingTray inherits SystemTrayIcon {
     tooltip: "拾屏";
     title: "拾屏";
 
+    in property <string> start-shortcut-label: "F10";
+    in property <string> pause-shortcut-label: "F11";
+    in property <string> stop-shortcut-label: "F12";
+
     callback restore-window();
     callback start-recording();
     callback pause-recording();
     callback stop-recording();
+    callback open-preferences();
+    callback open-output-directory();
     callback quit-application();
 
     clicked => { root.restore-window(); }
@@ -18,16 +24,25 @@ export component RecordingTray inherits SystemTrayIcon {
         }
         MenuSeparator {}
         MenuItem {
-            title: "开始录制    F10";
+            title: "开始录制" + (root.start-shortcut-label == "" ? "" : "    " + root.start-shortcut-label);
             activated => { root.start-recording(); }
         }
         MenuItem {
-            title: "暂停/继续录制    F11";
+            title: "暂停/继续录制" + (root.pause-shortcut-label == "" ? "" : "    " + root.pause-shortcut-label);
             activated => { root.pause-recording(); }
         }
         MenuItem {
-            title: "停止录制    F12";
+            title: "停止录制" + (root.stop-shortcut-label == "" ? "" : "    " + root.stop-shortcut-label);
             activated => { root.stop-recording(); }
+        }
+        MenuSeparator {}
+        MenuItem {
+            title: "首选项...";
+            activated => { root.open-preferences(); }
+        }
+        MenuItem {
+            title: "打开保存目录";
+            activated => { root.open-output-directory(); }
         }
         MenuSeparator {}
         MenuItem {

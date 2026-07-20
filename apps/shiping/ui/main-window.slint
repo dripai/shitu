@@ -276,6 +276,9 @@ export component MainWindow inherits Window {
     in-out property <bool> highlight-clicks: false;
     in-out property <int> countdown-seconds: 3;
     in-out property <bool> auto-minimize-after-start: false;
+    in property <string> start-shortcut-label: "F10";
+    in property <string> pause-shortcut-label: "F11";
+    in property <string> stop-shortcut-label: "F12";
     in property <[string]> screen-options;
     in-out property <int> selected-screen-index: 0;
     in-out property <string> selected-screen-label: "主显示器";
@@ -320,6 +323,7 @@ export component MainWindow inherits Window {
     callback highlight-clicks-changed(bool);
     callback countdown-changed(int);
     callback auto-minimize-after-start-changed(bool);
+    callback open-preferences();
     callback refresh-screens();
     callback screen-selected(int);
 
@@ -594,84 +598,30 @@ export component MainWindow inherits Window {
 
         Menu {
             MenuItem {
-                title: "开始录制    F10";
+                title: "开始录制" + (root.start-shortcut-label == "" ? "" : "    " + root.start-shortcut-label);
                 enabled: !root.recording-busy;
                 activated => { root.start-recording(); }
             }
             MenuItem {
-                title: root.recording-state == 2 ? "继续录制    F11" : "暂停录制    F11";
+                title: (root.recording-state == 2 ? "继续录制" : "暂停录制")
+                    + (root.pause-shortcut-label == "" ? "" : "    " + root.pause-shortcut-label);
                 enabled: root.recording-active;
                 activated => { root.pause-recording(); }
             }
             MenuItem {
-                title: "停止录制    F12";
+                title: "停止录制" + (root.stop-shortcut-label == "" ? "" : "    " + root.stop-shortcut-label);
                 enabled: root.recording-busy;
                 activated => { root.stop-recording(); }
             }
             MenuSeparator {}
             MenuItem {
-                title: "开始后自动最小化";
-                checkable: true;
-                checked: root.auto-minimize-after-start;
-                activated => {
-                    root.auto-minimize-after-start = !root.auto-minimize-after-start;
-                    root.auto-minimize-after-start-changed(root.auto-minimize-after-start);
-                }
-            }
-            MenuSeparator {}
-            MenuItem {
-                title: "系统声音";
-                checkable: true;
-                checked: root.system-audio;
-                activated => {
-                    root.system-audio = !root.system-audio;
-                    root.system-audio-changed(root.system-audio);
-                }
-            }
-            MenuItem {
-                title: "麦克风";
-                checkable: true;
-                checked: root.microphone;
-                activated => {
-                    root.microphone = !root.microphone;
-                    root.microphone-changed(root.microphone);
-                }
-            }
-            MenuSeparator {}
-            MenuItem {
-                title: "显示鼠标指针";
-                checkable: true;
-                checked: root.show-cursor;
-                activated => {
-                    root.show-cursor = !root.show-cursor;
-                    root.show-cursor-changed(root.show-cursor);
-                }
-            }
-            MenuItem {
-                title: "突出鼠标点击";
-                checkable: true;
-                checked: root.highlight-clicks;
-                activated => {
-                    root.highlight-clicks = !root.highlight-clicks;
-                    root.highlight-clicks-changed(root.highlight-clicks);
-                }
-            }
-            Menu {
-                title: "开始倒计时（" + root.countdown-seconds + " 秒）";
-                enabled: !root.recording-busy;
-                MenuItem { title: "不倒计时"; checkable: true; checked: root.countdown-seconds == 0; activated => { root.countdown-seconds = 0; root.countdown-changed(0); } }
-                MenuItem { title: "3 秒"; checkable: true; checked: root.countdown-seconds == 3; activated => { root.countdown-seconds = 3; root.countdown-changed(3); } }
-                MenuItem { title: "5 秒"; checkable: true; checked: root.countdown-seconds == 5; activated => { root.countdown-seconds = 5; root.countdown-changed(5); } }
+                title: "首选项...";
+                activated => { root.open-preferences(); }
             }
             MenuSeparator {}
             MenuItem {
                 title: "打开保存目录";
                 activated => { root.open-output-directory(); }
-            }
-            MenuItem {
-                title: "更改保存目录...";
-                enabled: !root.recording-busy;
-                activated => { root.choose-output-directory(); }
             }
             MenuSeparator {}
             MenuItem {
