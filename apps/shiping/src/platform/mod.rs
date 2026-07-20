@@ -1,6 +1,6 @@
 mod windowing;
 
-pub(crate) use windowing::begin_window_drag;
+pub(crate) use windowing::{begin_window_drag, configure_visual_overlay};
 
 #[cfg(target_os = "windows")]
 mod windows;

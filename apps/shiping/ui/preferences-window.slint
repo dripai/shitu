@@ -1,5 +1,5 @@
 import {
-    Button, ComboBox, LineEdit, Switch, TabWidget
+    Button, ComboBox, LineEdit, Switch
 } from "std-widgets.slint";
 import { StatusBar } from "@shi-ui/status-bar.slint";
 
@@ -137,6 +137,7 @@ export component PreferencesDialog inherits Dialog {
     private property <length> setting-label-width: 96px;
     private property <length> setting-row-height: 32px;
     private property <length> setting-row-spacing: 8px;
+    private property <int> current-page: 0;
 
     callback save-settings(bool);
     callback cancel-settings();
@@ -150,15 +151,66 @@ export component PreferencesDialog inherits Dialog {
         padding: 10px;
         spacing: 6px;
 
-        TabWidget {
-            orientation: Orientation.vertical;
+        HorizontalLayout {
+            spacing: 12px;
             horizontal-stretch: 1;
             vertical-stretch: 1;
 
-            Tab {
-                title: @tr("常规");
+            // Slint 1.17's vertical TabWidget has no public tab-row-height property.
+            // Keep native button focus, keyboard and accessibility behavior while limiting
+            // this navigation-only replacement to three compact rows.
+            VerticalLayout {
+                width: 80px;
+                spacing: 4px;
+                alignment: start;
 
-                Rectangle {
+                general-page-button := Button {
+                    height: 36px;
+                    text: @tr("常规");
+                    checkable: true;
+                    checked: true;
+                    clicked => {
+                        general-page-button.checked = true;
+                        recording-page-button.checked = false;
+                        shortcuts-page-button.checked = false;
+                        root.current-page = 0;
+                    }
+                }
+                recording-page-button := Button {
+                    height: 36px;
+                    text: @tr("录制");
+                    checkable: true;
+                    clicked => {
+                        general-page-button.checked = false;
+                        recording-page-button.checked = true;
+                        shortcuts-page-button.checked = false;
+                        root.current-page = 1;
+                    }
+                }
+                shortcuts-page-button := Button {
+                    height: 36px;
+                    text: @tr("快捷键");
+                    checkable: true;
+                    clicked => {
+                        general-page-button.checked = false;
+                        recording-page-button.checked = false;
+                        shortcuts-page-button.checked = true;
+                        root.current-page = 2;
+                    }
+                }
+            }
+
+            Rectangle {
+                width: 1px;
+                background: #343b47;
+            }
+
+            Rectangle {
+                horizontal-stretch: 1;
+                vertical-stretch: 1;
+                background: transparent;
+
+                if root.current-page == 0: Rectangle {
                     background: transparent;
 
                     VerticalLayout {
@@ -258,12 +310,8 @@ export component PreferencesDialog inherits Dialog {
                         Rectangle { vertical-stretch: 1; }
                     }
                 }
-            }
 
-            Tab {
-                title: @tr("录制");
-
-                Rectangle {
+                if root.current-page == 1: Rectangle {
                     background: transparent;
 
                     VerticalLayout {
@@ -327,12 +375,8 @@ export component PreferencesDialog inherits Dialog {
                         Rectangle { vertical-stretch: 1; }
                     }
                 }
-            }
 
-            Tab {
-                title: @tr("快捷键");
-
-                Rectangle {
+                if root.current-page == 2: Rectangle {
                     background: transparent;
 
                     VerticalLayout {

@@ -1,0 +1,83 @@
+// The region indicator is a separate click-through window. Its transparent center maps
+// exactly to the captured rectangle; every visible pixel is placed outside that rectangle.
+export component RegionIndicatorWindow inherits Window {
+    title: @tr("录制区域");
+    background: transparent;
+    no-frame: true;
+    always-on-top: true;
+    default-font-family: "Microsoft YaHei UI";
+    default-font-size: 13px;
+
+    in property <int> region-width: 1;
+    in property <int> region-height: 1;
+    in property <int> border-pixels: 3;
+    in property <int> label-height-pixels: 28;
+    in property <int> label-gap-pixels: 4;
+
+    private property <float> pixel-width: root.width / 1px > 0
+        ? (root.region-width + root.border-pixels * 2) / (root.width / 1px)
+        : 1;
+    private property <float> pixel-height: root.height / 1px > 0
+        ? (root.region-height + root.label-height-pixels + root.label-gap-pixels
+            + root.border-pixels * 2) / (root.height / 1px)
+        : 1;
+    private property <length> border-width: root.border-pixels / root.pixel-width * 1px;
+    private property <length> border-height: root.border-pixels / root.pixel-height * 1px;
+    private property <length> region-top: (root.label-height-pixels + root.label-gap-pixels
+        + root.border-pixels) / root.pixel-height * 1px;
+    private property <length> region-left: root.border-pixels / root.pixel-width * 1px;
+    private property <length> region-visual-width: root.region-width / root.pixel-width * 1px;
+    private property <length> region-visual-height: root.region-height / root.pixel-height * 1px;
+
+    Rectangle {
+        y: root.region-top - root.border-height;
+        width: parent.width;
+        height: root.border-height;
+        background: #3b82f6;
+    }
+
+    Rectangle {
+        x: 0px;
+        y: root.region-top - root.border-height;
+        width: root.border-width;
+        height: root.region-visual-height + root.border-height * 2;
+        background: #3b82f6;
+    }
+
+    Rectangle {
+        x: root.region-left + root.region-visual-width;
+        y: root.region-top - root.border-height;
+        width: root.border-width;
+        height: root.region-visual-height + root.border-height * 2;
+        background: #3b82f6;
+    }
+
+    Rectangle {
+        y: root.region-top + root.region-visual-height;
+        width: parent.width;
+        height: root.border-height;
+        background: #3b82f6;
+    }
+
+    Rectangle {
+        x: root.region-left;
+        width: Math.min(
+            132px,
+            root.region-visual-width + root.border-width
+        );
+        height: root.label-height-pixels / root.pixel-height * 1px;
+        border-radius: 4px;
+        background: #3b82f6;
+
+        Text {
+            width: parent.width;
+            height: parent.height;
+            text: @tr("录制区域");
+            color: white;
+            font-size: 13px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+}

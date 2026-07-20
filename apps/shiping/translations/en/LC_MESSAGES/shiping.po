@@ -33,6 +33,9 @@ msgstr "Use F1–F12 alone, or combine a regular key with Ctrl, Alt, Shift, or W
 msgid "单击选择一个可见窗口，Esc 取消"
 msgstr "Click a visible window to select it; press Esc to cancel"
 
+msgid "单击选择，Esc 取消"
+msgstr "Click to select; press Esc to cancel"
+
 msgid "范围"
 msgstr "Source"
 
@@ -74,6 +77,9 @@ msgstr "Shortcuts"
 
 msgid "录制"
 msgstr "Recording"
+
+msgid "录制区域"
+msgstr "Recording area"
 
 msgid "录制范围：{}"
 msgstr "Recording source: {}"
@@ -149,6 +155,9 @@ msgstr "Quit ShiPing"
 
 msgid "拖动选择固定录制区域，Esc 取消"
 msgstr "Drag to select a fixed recording region; press Esc to cancel"
+
+msgid "移动光标到要录制的窗口"
+msgstr "Move the pointer over the window to record"
 
 msgid "未设置"
 msgstr "Not set"

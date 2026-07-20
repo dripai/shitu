@@ -171,10 +171,11 @@ impl RecordingTarget {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WindowCandidate {
     pub hwnd: isize,
     pub bounds: Bounds,
+    pub title: String,
 }
 
 pub struct WindowCandidates {
@@ -198,9 +199,11 @@ impl WindowCandidates {
             let enumeration = unsafe { &mut *(parameter.0 as *mut Enumeration) };
             let raw = hwnd.0 as isize;
             if let Some(bounds) = clipped_window_bounds(raw, enumeration.desktop) {
-                enumeration
-                    .values
-                    .push(WindowCandidate { hwnd: raw, bounds });
+                enumeration.values.push(WindowCandidate {
+                    hwnd: raw,
+                    bounds,
+                    title: window_title(raw),
+                });
             }
             windows::core::BOOL(1)
         }
@@ -231,13 +234,35 @@ impl WindowCandidates {
     pub fn target_at(&self, x: i32, y: i32) -> Option<WindowCandidate> {
         self.values
             .iter()
-            .copied()
             .find(|candidate| candidate.bounds.contains(x, y))
+            .cloned()
     }
 
     pub fn exclude(&mut self, hwnd: isize) {
         self.values.retain(|candidate| candidate.hwnd != hwnd);
     }
+}
+
+#[cfg(windows)]
+fn window_title(hwnd: isize) -> String {
+    use windows::Win32::{
+        Foundation::HWND,
+        UI::WindowsAndMessaging::{GetWindowTextLengthW, GetWindowTextW},
+    };
+
+    let handle = HWND(hwnd as *mut _);
+    let length = unsafe { GetWindowTextLengthW(handle) };
+    if length <= 0 {
+        return String::new();
+    }
+    let mut buffer = vec![0_u16; length as usize + 1];
+    let copied = unsafe { GetWindowTextW(handle, &mut buffer) };
+    if copied <= 0 {
+        return String::new();
+    }
+    String::from_utf16_lossy(&buffer[..copied as usize])
+        .trim()
+        .to_owned()
 }
 
 #[cfg(windows)]
@@ -365,7 +390,7 @@ fn clipped_window_bounds(hwnd: isize, desktop: Bounds) -> Option<Bounds> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Bounds, MonitorCandidate, MonitorCandidates};
+    use super::{Bounds, MonitorCandidate, MonitorCandidates, WindowCandidate, WindowCandidates};
 
     #[test]
     fn bounds_validate_and_contain_points() {
@@ -417,5 +442,35 @@ mod tests {
                 "显示器 2 · 2560 × 1440",
             ]
         );
+    }
+
+    #[test]
+    fn window_candidates_use_z_order_and_keep_titles() {
+        let front = WindowCandidate {
+            hwnd: 1,
+            bounds: Bounds {
+                left: 100,
+                top: 100,
+                width: 200,
+                height: 200,
+            },
+            title: "Front window".to_owned(),
+        };
+        let back = WindowCandidate {
+            hwnd: 2,
+            bounds: Bounds {
+                left: 0,
+                top: 0,
+                width: 500,
+                height: 500,
+            },
+            title: "Back window".to_owned(),
+        };
+        let candidates = WindowCandidates {
+            values: vec![front.clone(), back],
+        };
+
+        assert_eq!(candidates.target_at(150, 150), Some(front));
+        assert!(candidates.target_at(600, 600).is_none());
     }
 }
