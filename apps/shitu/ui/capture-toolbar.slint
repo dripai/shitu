@@ -67,6 +67,8 @@ component StrokeCell inherits Rectangle {
     in property <bool> selected: false;
     in property <bool> text-mode: false;
     in property <bool> mosaic-mode: false;
+    property <length> mosaic-dot-size: root.stroke-size == 1 ? 6px
+        : root.stroke-size == 2 ? 10px : 16px;
     callback activated();
 
     width: 28px;
@@ -95,13 +97,12 @@ component StrokeCell inherits Rectangle {
         vertical-alignment: center;
     }
     if root.mosaic-mode: Rectangle {
-        x: 7px;
-        y: 7px;
-        width: 14px;
-        height: 14px;
-        background: #d8dde4;
-        Rectangle { x: 0px; y: 0px; width: 7px; height: 7px; background: #6d7480; }
-        Rectangle { x: 7px; y: 7px; width: 7px; height: 7px; background: #6d7480; }
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: root.mosaic-dot-size;
+        height: root.mosaic-dot-size;
+        border-radius: self.width / 2;
+        background: #343a43;
     }
 
     touch := TouchArea {

@@ -1,5 +1,5 @@
 import {
-    Button, CheckBox, ComboBox, LineEdit, Palette, SpinBox, TabWidget
+    Button, CheckBox, ComboBox, LineEdit, Palette, Slider, SpinBox, TabWidget
 } from "std-widgets.slint";
 
 global SettingsTypography {
@@ -252,17 +252,54 @@ export component SettingsPanel inherits Rectangle {
                         }
                         Text {
                             width: 68px;
-                            text: @tr("JPEG 质量");
+                            text: @tr("质量");
                             color: Palette.foreground;
                             font-size: SettingsTypography.body-font-size;
                             vertical-alignment: center;
                         }
-                        SpinBox {
+                        if root.image-format == 0: Text {
                             width: 72px;
-                            enabled: root.image-format == 1;
-                            value <=> root.jpeg-quality;
-                            minimum: 1;
-                            maximum: 100;
+                            text: @tr("无损");
+                            color: Palette.alternate-foreground;
+                            font-size: SettingsTypography.body-font-size;
+                            vertical-alignment: center;
+                        }
+                        if root.image-format == 1: HorizontalLayout {
+                            width: 142px;
+                            spacing: 6px;
+
+                            quality-wheel := TouchArea {
+                                width: 104px;
+
+                                Slider {
+                                    width: parent.width;
+                                    height: parent.height;
+                                    value: root.jpeg-quality;
+                                    minimum: 1;
+                                    maximum: 100;
+                                    step: 1;
+                                    changed(value) => {
+                                        root.jpeg-quality = Math.round(value);
+                                    }
+                                }
+
+                                scroll-event(event) => {
+                                    if event.delta-y < 0 {
+                                        root.jpeg-quality = Math.min(100, root.jpeg-quality + 1);
+                                    } else if event.delta-y > 0 {
+                                        root.jpeg-quality = Math.max(1, root.jpeg-quality - 1);
+                                    }
+                                    accept
+                                }
+                            }
+                            Text {
+                                width: 32px;
+                                text: "\{root.jpeg-quality}";
+                                color: Palette.foreground;
+                                font-size: SettingsTypography.body-font-size;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
                         }
                     }
                     HorizontalLayout {

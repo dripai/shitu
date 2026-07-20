@@ -13,23 +13,15 @@ export component StatusBar inherits Rectangle {
         spacing: 6px;
 
         status-indicator := Rectangle {
-            width: 12px;
+            width: 10px;
 
-            if root.status-level == 2: Text {
-                text: "×";
-                color: #cf222e;
-                font-size: 17px;
-                font-weight: 700;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
-            if root.status-level != 2: Text {
-                text: "√";
-                color: root.status-level == 1 ? #238636 : Palette.alternate-foreground;
-                font-size: 15px;
-                font-weight: 700;
-                horizontal-alignment: center;
-                vertical-alignment: center;
+            Rectangle {
+                y: (parent.height - self.height) / 2;
+                width: 10px;
+                height: 10px;
+                border-radius: self.width / 2;
+                background: root.status-level == 2 ? #cf222e
+                    : root.status-level == 1 ? #238636 : Palette.alternate-foreground;
             }
         }
         Text {

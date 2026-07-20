@@ -222,8 +222,11 @@ msgstr "Output"
 msgid "图像格式"
 msgstr "Image format"
 
-msgid "JPEG 质量"
-msgstr "JPEG quality"
+msgid "质量"
+msgstr "Quality"
+
+msgid "无损"
+msgstr "Lossless"
 
 msgid "保存目录"
 msgstr "Save folder"

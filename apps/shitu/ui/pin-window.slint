@@ -29,6 +29,9 @@ export component PinWindow inherits Window {
     in-out property <float> text-editor-x: 0;
     in-out property <float> text-editor-y: 0;
     in-out property <string> text-editor-value;
+    property <float> annotation-brush-radius: root.active-tool == 6
+        ? (root.stroke-radius == 1 ? 10 : root.stroke-radius == 4 ? 30 : 18)
+        : 10;
 
     callback close-pin();
     callback drag-pin();
@@ -227,10 +230,11 @@ export component PinWindow inherits Window {
         );
     }
 
-    if root.active-tool > 0: TouchArea {
+    annotation-touch := TouchArea {
+        visible: root.active-tool > 0;
         width: parent.width;
         height: parent.height;
-        mouse-cursor: crosshair;
+        mouse-cursor: root.active-tool == 5 || root.active-tool == 6 ? none : crosshair;
 
         pointer-event(event) => {
             let image-x = self.mouse-x / self.width * root.screenshot.width;
@@ -261,6 +265,32 @@ export component PinWindow inherits Window {
                 root.finish-annotation();
                 root.drawing = false;
             }
+        }
+    }
+
+    if (root.active-tool == 5 || root.active-tool == 6) && annotation-touch.has-hover: Rectangle {
+        property <length> brush-diameter: Math.max(
+            10px,
+            root.annotation-brush-radius * 2 * parent.width / Math.max(1, root.screenshot.width)
+        );
+        x: annotation-touch.mouse-x - self.width / 2;
+        y: annotation-touch.mouse-y - self.height / 2;
+        width: self.brush-diameter;
+        height: self.brush-diameter;
+        border-radius: self.width / 2;
+        border-width: 2px;
+        border-color: root.active-tool == 6 ? #54a5ff : #ffffff;
+        background: root.active-tool == 6 ? #54a5ff22 : #ffffff22;
+
+        Rectangle {
+            x: 1px;
+            y: 1px;
+            width: Math.max(0px, parent.width - 2px);
+            height: Math.max(0px, parent.height - 2px);
+            border-radius: self.width / 2;
+            border-width: 1px;
+            border-color: #20242bcc;
+            background: transparent;
         }
     }
 
