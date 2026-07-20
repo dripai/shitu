@@ -4069,6 +4069,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shi-foundation",
+ "shi-ui",
  "slint",
  "slint-build",
  "windows",
