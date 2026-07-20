@@ -21,7 +21,8 @@ component ShortcutEditor {
 
     HorizontalLayout {
         spacing: 8px;
-        alignment: center;
+        alignment: start;
+        cross-axis-alignment: center;
 
         Text {
             text: root.action-label;
@@ -190,7 +191,8 @@ export component PreferencesDialog inherits Dialog {
                         HorizontalLayout {
                             height: root.setting-row-height;
                             spacing: 8px;
-                            alignment: center;
+                            alignment: start;
+                            cross-axis-alignment: center;
 
                             Text {
                                 text: "开始倒计时";
@@ -213,7 +215,8 @@ export component PreferencesDialog inherits Dialog {
                         HorizontalLayout {
                             height: root.setting-row-height;
                             spacing: 8px;
-                            alignment: center;
+                            alignment: start;
+                            cross-axis-alignment: center;
 
                             Text {
                                 text: "保存目录";
@@ -255,7 +258,8 @@ export component PreferencesDialog inherits Dialog {
                         HorizontalLayout {
                             height: root.setting-row-height;
                             spacing: 8px;
-                            alignment: center;
+                            alignment: start;
+                            cross-axis-alignment: center;
                             Text { text: "默认清晰度"; color: #e7eaf0; width: root.setting-label-width; }
                             ComboBox {
                                 width: 180px;
@@ -268,7 +272,8 @@ export component PreferencesDialog inherits Dialog {
                         HorizontalLayout {
                             height: root.setting-row-height;
                             spacing: 8px;
-                            alignment: center;
+                            alignment: start;
+                            cross-axis-alignment: center;
                             Text { text: "默认帧率"; color: #e7eaf0; width: root.setting-label-width; }
                             ComboBox {
                                 width: 180px;
