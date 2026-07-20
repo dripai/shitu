@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use anyhow::{Context, Result, anyhow};
+use shi_foundation::i18n;
 use windows::Win32::{
     Media::{
         Audio::{
@@ -64,10 +65,16 @@ impl AudioSources {
 
     pub fn pump(&mut self) -> Result<()> {
         if let Some(source) = &mut self.system {
-            source.read_available().context("读取系统声音失败")?;
+            source.read_available().context(i18n::text(
+                "读取系统声音失败",
+                "Failed to read system audio",
+            ))?;
         }
         if let Some(source) = &mut self.microphone {
-            source.read_available().context("读取麦克风失败")?;
+            source.read_available().context(i18n::text(
+                "读取麦克风失败",
+                "Failed to read the microphone",
+            ))?;
         }
         Ok(())
     }
@@ -133,19 +140,33 @@ struct AudioCapture {
 impl AudioCapture {
     fn new(kind: SourceKind) -> Result<Self> {
         let enumerator: IMMDeviceEnumerator =
-            unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) }
-                .context("创建音频设备枚举器失败")?;
+            unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) }.context(
+                i18n::text(
+                    "创建音频设备枚举器失败",
+                    "Failed to create the audio device enumerator",
+                ),
+            )?;
         let (flow, flags) = match kind {
             SourceKind::System => (eRender, AUDCLNT_STREAMFLAGS_LOOPBACK),
             SourceKind::Microphone => (eCapture, 0),
         };
-        let device = unsafe { enumerator.GetDefaultAudioEndpoint(flow, eConsole) }
-            .context("没有可用的默认音频设备")?;
-        let client: IAudioClient =
-            unsafe { device.Activate(CLSCTX_ALL, None) }.context("激活音频设备失败")?;
-        let wave_pointer = unsafe { client.GetMixFormat() }.context("读取音频混合格式失败")?;
+        let device =
+            unsafe { enumerator.GetDefaultAudioEndpoint(flow, eConsole) }.context(i18n::text(
+                "没有可用的默认音频设备",
+                "No default audio device is available",
+            ))?;
+        let client: IAudioClient = unsafe { device.Activate(CLSCTX_ALL, None) }.context(
+            i18n::text("激活音频设备失败", "Failed to activate the audio device"),
+        )?;
+        let wave_pointer = unsafe { client.GetMixFormat() }.context(i18n::text(
+            "读取音频混合格式失败",
+            "Failed to read the audio mix format",
+        ))?;
         if wave_pointer.is_null() {
-            return Err(anyhow!("音频设备返回了空格式"));
+            return Err(anyhow!(i18n::text(
+                "音频设备返回了空格式",
+                "The audio device returned an empty format"
+            )));
         }
         let format = unsafe { InputFormat::from_wave_format(wave_pointer) }?;
         let initialize_result = unsafe {
@@ -161,10 +182,18 @@ impl AudioCapture {
         unsafe {
             CoTaskMemFree(Some(wave_pointer.cast()));
         }
-        initialize_result.context("初始化共享音频采集流失败")?;
-        let capture: IAudioCaptureClient =
-            unsafe { client.GetService() }.context("获取音频采集服务失败")?;
-        unsafe { client.Start() }.context("启动音频采集失败")?;
+        initialize_result.context(i18n::text(
+            "初始化共享音频采集流失败",
+            "Failed to initialize the shared audio capture stream",
+        ))?;
+        let capture: IAudioCaptureClient = unsafe { client.GetService() }.context(i18n::text(
+            "获取音频采集服务失败",
+            "Failed to obtain the audio capture service",
+        ))?;
+        unsafe { client.Start() }.context(i18n::text(
+            "启动音频采集失败",
+            "Failed to start audio capture",
+        ))?;
         Ok(Self {
             client,
             capture,
@@ -176,8 +205,10 @@ impl AudioCapture {
 
     fn read_available(&mut self) -> Result<()> {
         loop {
-            let packet_frames =
-                unsafe { self.capture.GetNextPacketSize() }.context("读取音频包大小失败")?;
+            let packet_frames = unsafe { self.capture.GetNextPacketSize() }.context(i18n::text(
+                "读取音频包大小失败",
+                "Failed to read the audio packet size",
+            ))?;
             if packet_frames == 0 {
                 break;
             }
@@ -188,18 +219,27 @@ impl AudioCapture {
                 self.capture
                     .GetBuffer(&mut data, &mut frames, &mut flags, None, None)
             }
-            .context("锁定音频采集缓冲区失败")?;
+            .context(i18n::text(
+                "锁定音频采集缓冲区失败",
+                "Failed to lock the audio capture buffer",
+            ))?;
             let parsed = if flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32 != 0 {
                 Ok(vec![[0.0, 0.0]; frames as usize])
             } else if data.is_null() {
-                Err(anyhow!("音频采集缓冲区为空"))
+                Err(anyhow!(i18n::text(
+                    "音频采集缓冲区为空",
+                    "The audio capture buffer is empty"
+                )))
             } else {
                 let byte_count = frames as usize * self.format.block_align as usize;
                 let bytes = unsafe { std::slice::from_raw_parts(data, byte_count) };
                 self.format.decode(bytes, frames as usize)
             };
             let release_result = unsafe { self.capture.ReleaseBuffer(frames) };
-            release_result.context("释放音频采集缓冲区失败")?;
+            release_result.context(i18n::text(
+                "释放音频采集缓冲区失败",
+                "Failed to release the audio capture buffer",
+            ))?;
             let decoded = parsed?;
             self.resampler.push(&decoded, &mut self.queue);
             while self.queue.len() > MAX_QUEUED_FRAMES {
@@ -242,7 +282,10 @@ impl InputFormat {
         let block_align = wave.nBlockAlign;
         let bits = wave.wBitsPerSample;
         if channels == 0 || sample_rate == 0 || block_align == 0 {
-            return Err(anyhow!("音频设备格式无效"));
+            return Err(anyhow!(i18n::text(
+                "音频设备格式无效",
+                "The audio device format is invalid"
+            )));
         }
         let subtype = if format_tag == WAVE_FORMAT_EXTENSIBLE {
             let extended = unsafe { *(pointer.cast::<WAVEFORMATEXTENSIBLE>()) };
@@ -263,7 +306,8 @@ impl InputFormat {
             SampleFormat::Pcm32
         } else {
             return Err(anyhow!(
-                "不支持的音频设备格式：tag={format_tag}, bits={bits}"
+                "{}: tag={format_tag}, bits={bits}",
+                i18n::text("不支持的音频设备格式", "Unsupported audio device format")
             ));
         };
         let bytes_per_sample = (bits as usize).div_ceil(8);
@@ -278,7 +322,10 @@ impl InputFormat {
 
     fn decode(&self, bytes: &[u8], frames: usize) -> Result<Vec<[f32; 2]>> {
         if bytes.len() < frames * self.block_align as usize {
-            return Err(anyhow!("音频采集数据长度不足"));
+            return Err(anyhow!(i18n::text(
+                "音频采集数据长度不足",
+                "The captured audio data is too short"
+            )));
         }
         let mut output = Vec::with_capacity(frames);
         for frame_index in 0..frames {

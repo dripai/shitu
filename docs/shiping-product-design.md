@@ -25,8 +25,9 @@
 | 开始倒计时 | 已实现 | 默认 3 秒，可设为关闭、3 秒或 5 秒 |
 | 本地保存 | 已实现 | 固定保存 MP4；成功完成前使用临时文件，结束后原子提交 |
 | 录制状态与计时 | 已实现 | 倒计时、录制、暂停、完成和错误状态均在紧凑控制条显示 |
-| 全局快捷键与托盘 | 已实现 | 默认 F10 开始、F11 暂停/继续、F12 停止；三项均可修改或禁用，托盘可恢复主窗口并控制录制 |
-| 首选项 | 已实现 | 集中配置常规、录制和快捷键；系统快捷键冲突会定位到具体项目，失败时不保存新配置 |
+| 全局快捷键与托盘 | 已实现 | 默认 F10 开始、F11 暂停/继续、F12 停止；三项均可直接修改或清除，托盘可恢复主窗口并控制录制 |
+| 中英文界面 | 已实现 | 默认显示英文；首选项可切换 English/简体中文，应用或确定后持久化，取消或保存失败时恢复已保存语言 |
+| 首选项 | 已实现 | 集中配置常规、录制和快捷键；“应用”保存但不关闭，“确定”保存并关闭，“取消”放弃修改；错误显示在底部状态栏 |
 | 应用图标 | 已实现 | 主窗口、首选项、选择窗口、任务栏、托盘与 Windows 可执行文件统一使用拾屏录制图标；桌面 EXE 或快捷方式读取可执行文件内嵌图标 |
 | 异常恢复 | 规划中 | 尽量保留可恢复的未完成录制 |
 
@@ -37,16 +38,16 @@
 主程序只保留一个紧凑的无标题栏圆角工具条窗口，录制前、录制中和暂停状态均在同一布局内切换：
 
 1. 左侧固定显示录制状态和计时器，计时器下方显示当前来源、清晰度、帧率或简短状态。
-2. 右侧依次提供来源、清晰度、帧率、系统声、麦克风和开始/停止。
+2. 右侧依次提供来源、清晰度、帧率、系统声、麦克风和开始/停止。清晰度以 `A/720/1080/1:1`、帧率以 `30/60` 直接显示在圆形按钮中央，不再显示底部文字；其他操作只显示图标。光标悬停在整个按钮上时显示包含当前状态和快捷键的完整提示。
 3. 未录制时，“范围”按钮提供屏幕、窗口和区域；屏幕子菜单实时列出“显示器 1、显示器 2……”及分辨率，不提供合并录制所有显示器。清晰度通过紧凑下拉选择自动、720p、1080p 或原始分辨率；帧率只有 30/60 FPS 两项，继续按点击循环。
 4. 录制中，来源按钮切换为暂停/继续；清晰度、帧率和声音设置自动收起，只保留状态、计时、暂停和停止，暂停或停止后再展开。
 5. 停止和保存结果继续显示在计时器下方，不打开完成弹窗。
 6. 鼠标细项、倒计时、保存目录和快捷键不常驻占用工具条空间；右键菜单只保留录制控制、首选项、打开保存目录和退出。
 7. 无标题栏窗口的所有非交互空白区域均可拖动；空闲状态不重复显示“就绪”，只保留参数摘要和“开始”动作。
 8. 窗口和区域选择器将操作提示固定在左下角；候选窗口或已拖选区域保持清晰，外围压暗并显示深色阴影边框。
-9. 首选项采用 600×400px 紧凑对话框，使用左侧纵向分类导航和右侧设置内容区；右侧各页统一左侧内容起点、96px 标签列、32px 设置行和 8px 行间距，提示与错误只显示在底部独立状态栏。
+9. 首选项采用 600×450px 紧凑对话框，使用左侧纵向分类导航和右侧设置内容区；右侧各页统一左侧内容起点、96px 标签列、32px 设置行和 8px 行间距，提示与错误只显示在底部独立状态栏。常规页提供界面语言切换，切换时即时预览，只有“应用”或“确定”才写入配置。
 
-界面基于 Slint 1.17，并统一使用 `fluent-dark` 样式。已核对原生 `Dialog`、`Button`、`TabWidget`、`LineEdit`、`Switch`、`ComboBox`、`Palette`、`TouchArea`、`FocusScope`、`PopupWindow`、`ContextMenuArea`、`Menu`、`MenuItem` 和 `MenuSeparator`，并检查了 `shi-ui` 现有的 `StatusBar`。原生 `Button` 的公开结构固定为横向图标与文字，不能表达参考设计所需的“圆形图标 + 下方标签 + 紧凑选中态”；原生 `ComboBox` 的 Fluent 实现最小宽度为 160px，也不能放入 46×57px 的快捷操作位；公共 `StatusBar` 的固定高度和状态结构不能容纳录制状态、计时与参数摘要。因此只为六个快捷操作、录制状态区和原始快捷键捕获框自定义必要视觉或事件结构。首选项使用原生 `Dialog`、`TabWidget` 和标准控件；范围、清晰度和应用右键菜单使用原生 `ContextMenuArea`、`Menu` 与 `MenuItem`，由 Slint 后端处理键盘、失焦关闭、屏幕边缘与缩放；无标题栏拖动通过 Slint 的 Winit 访问器调用 Winit `Window::drag_window()`，不再直接发送 Win32 窗口消息。
+界面基于 Slint 1.17，并统一使用 `fluent-dark` 样式。已核对原生 `Dialog`、`Button`、`TabWidget`、`LineEdit`、`Switch`、`ComboBox`、`Palette`、`TouchArea`、`FocusScope`、`Tooltip`、`PopupWindow`、`ContextMenuArea`、`Menu`、`MenuItem`、`MenuSeparator` 和 Slint 捆绑翻译 API，并检查了 `shi-ui` 现有的 `StatusBar`。原生 `Button` 的公开结构固定为横向图标与文字，不能表达参考设计所需的“圆形图标 + 可选状态值 + 紧凑选中态”；原生 `ComboBox` 的 Fluent 实现最小宽度为 160px，也不能放入 46×57px 的快捷操作位；公共 `StatusBar` 的固定高度和状态结构不能容纳录制状态、计时与参数摘要。因此只为六个快捷操作、录制状态区和原始快捷键捕获框自定义必要视觉或事件结构。悬浮提示直接使用原生 `Tooltip`，不自定义弹窗；首选项使用原生 `Dialog`、`TabWidget`、`ComboBox` 和标准控件；范围、清晰度和应用右键菜单使用原生 `ContextMenuArea`、`Menu` 与 `MenuItem`，由 Slint 后端处理键盘、失焦关闭、屏幕边缘与缩放；中英文文案使用 Slint `@tr`、构建期捆绑 PO 翻译和运行期 `select_bundled_translation`；无标题栏拖动通过 Slint 的 Winit 访问器调用 Winit `Window::drag_window()`，不再直接发送 Win32 窗口消息。
 
 ## 4. 默认值
 
@@ -60,7 +61,8 @@
 - 开始倒计时：3 秒。
 - 开始后自动最小化：关闭。
 - 停止并保存后打开保存目录：关闭。
-- 全局快捷键：F10 开始、F11 暂停/继续、F12 停止；均可修改或单独禁用。
+- 界面语言：英文；首选项仅提供 English 和简体中文两项。
+- 全局快捷键：F10 开始、F11 暂停/继续、F12 停止；均可直接修改或清除，不使用单独的启用开关。
 - 输出格式：首版固定为 MP4，视频使用 Media Foundation H.264，启用声音时使用 AAC。
 
 ## 5. 明确不进入首版
@@ -93,8 +95,8 @@
 - 视频通过 Media Foundation Sink Writer 写入 H.264/MP4，并使用 CBR 控制文件体积：720p30 为 2.5 Mbps、720p60 为 4 Mbps、1080p30 为 4 Mbps、1080p60 为 6 Mbps；原始分辨率按像素数量同比增加，30 FPS 上限 12 Mbps、60 FPS 上限 18 Mbps。
 - 声音以 48 kHz、双声道、16 位 PCM 输入 Sink Writer，由系统编码为 192 kbps AAC。系统声音与麦克风同时开启时在应用内混音。
 - 音频端点、媒体编码器或输出目录不可用时明确报错，不切换到其他采集源或生成伪文件。完成前使用 `.partial.mp4`，只有编码器正常结束才改名为最终文件。
-- 输出目录、来源、清晰度、帧率、声音、鼠标、倒计时、自动最小化、保存后打开目录和三项快捷键持久化到 `%APPDATA%\ShiPing\config.json`。
-- 托盘使用 Slint `SystemTrayIcon`；全局快捷键使用 `global-hotkey` 0.8.0。快捷键允许单独禁用，普通按键必须带 Ctrl、Alt、Shift 或 Win，F1–F12 可单独使用，F13–F24 不接受配置。应用新设置时先校验格式与内部重复，再整组替换；任一键被占用都会撤销新注册并恢复旧快捷键，只有整组成功后才保存配置。
+- 界面语言、输出目录、来源、清晰度、帧率、声音、鼠标、倒计时、自动最小化、保存后打开目录和三项快捷键持久化到 `%APPDATA%\ShiPing\config.json`。首次启动以及旧配置缺少语言字段时使用英文；首选项中的“应用”和“确定”调用同一保存事务，“取消”不写盘。
+- 托盘使用 Slint `SystemTrayIcon`；全局快捷键使用 `global-hotkey` 0.8.0。快捷键输入框本身就是设置入口，清空即表示不设置；普通按键必须带 Ctrl、Alt、Shift 或 Win，F1–F12 可单独使用，F13–F24 不接受配置。启动加载既有或默认快捷键时，被其他程序占用的项目自动留空并写回配置，其余项目继续注册；用户在首选项中手动应用新设置时仍先校验格式与内部重复，再整组替换，任一键冲突都会撤销新注册并恢复旧快捷键，只有整组成功后才保存配置。
 - 异常恢复仍为规划中，首版没有备用实现路径。
 
 ## 8. 官方依据
@@ -106,12 +108,14 @@
 - [`EnumDisplayMonitors`](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumdisplaymonitors) 与 [`MONITORINFO`](https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-monitorinfo)
 - [Slint `TouchArea`](https://docs.slint.dev/latest/docs/slint/reference/gestures/toucharea/)、[`FocusScope`](https://docs.slint.dev/latest/docs/slint/reference/keyboard-input/focusscope/) 与 [`ContextMenuArea`](https://docs.slint.dev/latest/docs/slint/reference/window/contextmenuarea/)
 - [Slint `Dialog`](https://docs.slint.dev/latest/docs/slint/reference/window/dialog/)、[`TabWidget`](https://docs.slint.dev/latest/docs/slint/reference/std-widgets/views/tabwidget/) 与 [`StandardButton`](https://docs.slint.dev/latest/docs/slint/reference/std-widgets/basic-widgets/standardbutton/)
+- [Slint `Tooltip`](https://docs.slint.dev/latest/docs/slint/reference/window/tooltip/)
+- [Slint 翻译指南](https://docs.slint.dev/latest/docs/slint/guide/development/translations/)（`@tr`、PO 目录和运行期语言选择）
 - [Slint `SystemTrayIcon`](https://docs.slint.dev/latest/docs/slint/reference/window/systemtrayicon/) 与 [`Window.minimized`](https://docs.slint.dev/latest/docs/slint/reference/window/window/#minimized)
 - [`global-hotkey` 0.8.0 `HotKey`](https://docs.rs/global-hotkey/0.8.0/global_hotkey/hotkey/struct.HotKey.html) 与 [`GlobalHotKeyManager`](https://docs.rs/global-hotkey/0.8.0/global_hotkey/struct.GlobalHotKeyManager.html)
 - [Slint `WinitWindowAccessor`](https://docs.slint.dev/latest/docs/rust/slint/winit_030/trait.WinitWindowAccessor) 与 [Winit `Window::drag_window`](https://docs.rs/winit/0.30.13/winit/window/struct.Window.html#method.drag_window)
 
 ## 9. 验证状态
 
-- 已通过：`cargo check -p shiping`、常规单元测试、短时真实 MP4 录制测试以及 Debug/Release 构建。
+- 已通过：`cargo test -p shiping`（19 项通过、1 项真实录制测试按环境要求忽略）、`cargo clippy -p shiping --all-targets -- -D warnings`、`cargo build -p shiping`、格式检查、英译 PO 覆盖检查和修改文件严格 UTF-8 校验。此前也已完成短时真实 MP4 录制测试和 Release 构建。
 - 当前设备已验证：主界面与右键菜单、3 秒倒计时、录制/暂停/继续/停止、结果文件生成、Escape 与右键取消目标选择、可见窗口选择和区域拖选。
-- 尚未覆盖：首选项窗口的人工交互、真实第三方快捷键冲突、多显示器含负坐标、不同 DPI/缩放组合、60 FPS 持续负载、不同音频端点格式、无 AAC/H.264 编码器设备、长时间录制和发布构建安装包。编译通过不能替代这些设备矩阵验证。
+- 尚未覆盖：中英文运行期切换与重启后恢复的人工交互、真实第三方快捷键冲突、多显示器含负坐标、不同 DPI/缩放组合、60 FPS 持续负载、不同音频端点格式、无 AAC/H.264 编码器设备、长时间录制和发布构建安装包。编译通过不能替代这些设备矩阵验证。

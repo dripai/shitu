@@ -1,5 +1,5 @@
 export component SelectionWindow inherits Window {
-    title: "选择录制目标";
+    title: @tr("选择录制目标");
     icon: @image-url("icons/tray.svg");
     background: transparent;
     no-frame: true;
@@ -174,7 +174,9 @@ export component SelectionWindow inherits Window {
         border-color: #4b5566;
 
         Text {
-            text: root.mode == 1 ? "单击选择一个可见窗口，Esc 取消" : "拖动选择固定录制区域，Esc 取消";
+            text: root.mode == 1
+                ? @tr("单击选择一个可见窗口，Esc 取消")
+                : @tr("拖动选择固定录制区域，Esc 取消");
             color: white;
             font-size: 14px;
             horizontal-alignment: center;

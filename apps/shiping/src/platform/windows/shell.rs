@@ -1,6 +1,7 @@
 use std::{ffi::OsStr, path::Path};
 
 use anyhow::{Result, anyhow};
+use shi_foundation::i18n;
 
 #[cfg(windows)]
 pub fn open_path(path: &Path) -> Result<()> {
@@ -30,12 +31,22 @@ pub fn open_path(path: &Path) -> Result<()> {
         )
     };
     if result.0 as isize <= 32 {
-        return Err(anyhow!("打开目标失败，系统返回代码 {}", result.0 as isize));
+        return Err(anyhow!(
+            "{}: {}",
+            i18n::text(
+                "打开目标失败，系统返回代码",
+                "Failed to open the target; system code"
+            ),
+            result.0 as isize
+        ));
     }
     Ok(())
 }
 
 #[cfg(not(windows))]
 pub fn open_path(_path: &Path) -> Result<()> {
-    Err(anyhow!("当前平台尚未实现打开路径"))
+    Err(anyhow!(i18n::text(
+        "当前平台尚未实现打开路径",
+        "Opening paths is not implemented on this platform"
+    )))
 }

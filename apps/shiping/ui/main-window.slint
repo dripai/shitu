@@ -1,10 +1,13 @@
 // Slint 1.17 的原生 Button 固定为横向图标与文字，无法表达参考设计需要的
-// 圆形图标、下方标签和紧凑选中态。这个组件只补足视觉结构，点击、键盘与
-// 可访问语义继续使用 Slint 原生 TouchArea、FocusScope 和 accessible-* 属性。
+// 圆形图标或数值和紧凑选中态。这个组件只补足视觉结构，点击、
+// 键盘、悬浮提示与可访问语义继续使用 Slint 原生 TouchArea、FocusScope、
+// Tooltip 和 accessible-* 属性。
 component CapsuleAction {
     in property <string> label;
     in property <string> accessible-name: root.label;
+    in property <string> tooltip-text: root.accessible-name;
     in property <string> icon-path;
+    in property <string> icon-text;
     in property <bool> icon-filled: false;
     in property <bool> has-menu: false;
     in property <bool> checked: false;
@@ -48,7 +51,7 @@ component CapsuleAction {
 
             animate background, border-color { duration: 120ms; }
 
-            Path {
+            if root.icon-text == "": Path {
                 x: 8.5px;
                 y: 8.5px;
                 width: 17px;
@@ -63,7 +66,18 @@ component CapsuleAction {
                 stroke-line-join: round;
             }
 
-            if root.has-menu: Path {
+            if root.icon-text != "": Text {
+                width: parent.width;
+                height: parent.height;
+                text: root.icon-text;
+                color: white;
+                font-size: root.icon-text == "1080" ? 9px : 11px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            if root.has-menu && root.icon-text == "": Path {
                 x: 23px;
                 y: 24px;
                 width: 7px;
@@ -77,15 +91,6 @@ component CapsuleAction {
                 stroke-line-cap: round;
                 stroke-line-join: round;
             }
-        }
-
-        Text {
-            text: root.label;
-            color: root.danger ? #ff858e : root.checked ? white : #b2bac6;
-            font-size: 12px;
-            font-weight: root.checked || root.danger ? 600 : 400;
-            horizontal-alignment: center;
-            overflow: elide;
         }
     }
 
@@ -108,6 +113,10 @@ component CapsuleAction {
             return reject;
         }
     }
+
+    Tooltip {
+        text: @markdown("\{root.tooltip-text}");
+    }
 }
 
 // Discrete choices use Slint's native menu abstraction. The backend decides whether the menu
@@ -116,6 +125,7 @@ component ChoiceAction {
     in property <string> label;
     in property <string> accessible-name: root.label;
     in property <string> icon-path;
+    in property <string> icon-text;
     in property <bool> icon-filled: false;
     in property <bool> checked: false;
     in property <bool> danger: false;
@@ -139,6 +149,7 @@ component ChoiceAction {
         label: root.label;
         accessible-name: root.accessible-name;
         icon-path: root.icon-path;
+        icon-text: root.icon-text;
         icon-filled: root.icon-filled;
         has-menu: root.menu-enabled;
         checked: root.checked;
@@ -231,7 +242,7 @@ component RangeAction {
 
         Menu {
             Menu {
-                title: "屏幕";
+                title: @tr("屏幕");
                 enabled: root.screen-options.length > 0;
 
                 for screen[index] in root.screen-options: MenuItem {
@@ -242,13 +253,13 @@ component RangeAction {
                 }
             }
             MenuItem {
-                title: "窗口";
+                title: @tr("窗口");
                 checkable: true;
                 checked: root.source-mode == 1;
                 activated => { root.mode-selected(1); }
             }
             MenuItem {
-                title: "区域";
+                title: @tr("区域");
                 checkable: true;
                 checked: root.source-mode == 2;
                 activated => { root.mode-selected(2); }
@@ -258,7 +269,7 @@ component RangeAction {
 }
 
 export component MainWindow inherits Window {
-    title: "拾屏";
+    title: @tr("拾屏");
     icon: @image-url("icons/tray.svg");
     default-font-family: "Microsoft YaHei UI";
     default-font-size: 13px;
@@ -282,7 +293,7 @@ export component MainWindow inherits Window {
     in property <string> stop-shortcut-label: "F12";
     in property <[string]> screen-options;
     in-out property <int> selected-screen-index: 0;
-    in-out property <string> selected-screen-label: "主显示器";
+    in-out property <string> selected-screen-label: @tr("主显示器");
     in-out property <string> save-directory: "视频\\ShiPing";
     in-out property <int> recording-state: 0;
     in property <string> elapsed-text: "00:00:00";
@@ -293,18 +304,20 @@ export component MainWindow inherits Window {
     private property <bool> recording-active: root.recording-state == 1 || root.recording-state == 2;
     private property <bool> recording-busy: root.recording-active || root.recording-state == 3;
     private property <bool> settings-collapsed: root.recording-state == 1;
-    private property <string> source-label: root.source-mode == 0 ? root.selected-screen-label : root.source-mode == 1 ? "窗口" : "区域";
+    private property <string> source-label: root.source-mode == 0
+        ? root.selected-screen-label
+        : root.source-mode == 1 ? @tr("窗口") : @tr("区域");
     private property <string> quality-label: root.quality-preset == 0
-        ? "自动"
-        : root.quality-preset == 1 ? "720p" : root.quality-preset == 2 ? "1080p" : "原始";
+        ? @tr("自动")
+        : root.quality-preset == 1 ? "720p" : root.quality-preset == 2 ? "1080p" : @tr("原始");
     private property <string> frame-label: root.frame-rate == 0 ? "30 FPS" : "60 FPS";
     private property <string> config-summary: root.source-label + "  ·  " + root.quality-label + "  ·  " + root.frame-label;
     private property <string> detail-text: root.recording-state == 3
         ? root.status-text
         : root.recording-state == 1
-        ? "录制中  ·  " + root.config-summary
+        ? @tr("录制中") + "  ·  " + root.config-summary
         : root.recording-state == 2
-            ? "已暂停  ·  " + root.config-summary
+            ? @tr("已暂停") + "  ·  " + root.config-summary
             : root.status-text == "" ? root.config-summary : root.status-text;
 
     animate width { duration: 180ms; easing: ease-in-out; }
@@ -433,7 +446,11 @@ export component MainWindow inherits Window {
                 }
 
                 Text {
-                    text: root.recording-state == 1 ? "REC" : root.recording-state == 2 ? "暂停" : root.recording-state == 3 ? "准备" : "就绪";
+                    text: root.recording-state == 1
+                        ? "REC"
+                        : root.recording-state == 2
+                            ? @tr("暂停")
+                            : root.recording-state == 3 ? @tr("准备") : @tr("就绪");
                     visible: root.recording-state != 0;
                     color: root.recording-state == 2 ? #f1b66f : #ff858e;
                     font-size: 12px;
@@ -492,8 +509,15 @@ export component MainWindow inherits Window {
             }
 
             range-action := RangeAction {
-                label: root.recording-state == 1 ? "暂停" : root.recording-state == 2 ? "继续" : "范围";
-                accessible-name: root.recording-active ? self.label : "录制范围：" + root.source-label;
+                label: root.recording-state == 1
+                    ? @tr("暂停") : root.recording-state == 2 ? @tr("继续") : @tr("范围");
+                accessible-name: root.recording-state == 1
+                    ? @tr("暂停录制")
+                        + (root.pause-shortcut-label == "" ? "" : " (" + root.pause-shortcut-label + ")")
+                    : root.recording-state == 2
+                        ? @tr("继续录制")
+                            + (root.pause-shortcut-label == "" ? "" : " (" + root.pause-shortcut-label + ")")
+                        : @tr("录制范围：{}", root.source-label);
                 icon-path: root.recording-state == 1
                     ? "M8 6 H11 V18 H8 Z M13 6 H16 V18 H13 Z"
                     : root.recording-state == 2
@@ -528,27 +552,32 @@ export component MainWindow inherits Window {
 
                     quality-action := ChoiceAction {
                         label: root.quality-label;
-                        accessible-name: "清晰度：" + root.quality-label;
-                        icon-path: "M4 6 H20 M7 6 A1 1 0 1 0 9 6 A1 1 0 1 0 7 6 M4 12 H20 M14 12 A1 1 0 1 0 16 12 A1 1 0 1 0 14 12 M4 18 H20 M10 18 A1 1 0 1 0 12 18 A1 1 0 1 0 10 18";
+                        accessible-name: @tr("清晰度：{}", root.quality-label);
+                        icon-text: root.quality-preset == 0
+                            ? "A" : root.quality-preset == 1 ? "720"
+                            : root.quality-preset == 2 ? "1080" : "1:1";
                         enabled: !root.recording-busy;
                         selected-index: root.quality-preset;
                         option-count: 4;
-                        option-0: "自动";
+                        option-0: @tr("自动");
                         option-1: "720p";
                         option-2: "1080p";
-                        option-3: "原始分辨率";
+                        option-3: @tr("原始分辨率");
                         selected(index) => { root.quality-preset = index; }
                     }
 
                     fps-action := CapsuleAction {
                         label: root.frame-label;
-                        icon-path: "M12 3 A9 9 0 1 1 11.99 3 M12 7 V12 L16 14";
+                        accessible-name: @tr("帧率：{}", root.frame-label);
+                        icon-text: root.frame-rate == 0 ? "30" : "60";
                         enabled: !root.recording-busy;
                         clicked => { root.frame-rate = Math.mod(root.frame-rate + 1, 2); }
                     }
 
                     system-audio-action := CapsuleAction {
-                        label: "系统声";
+                        label: @tr("系统声");
+                        accessible-name: root.system-audio
+                            ? @tr("系统声音：开启") : @tr("系统声音：关闭");
                         icon-path: "M4 10 H8 L13 6 V18 L8 14 H4 Z M16 9 C18 11 18 13 16 15 M18 6 C22 10 22 14 18 18";
                         checkable: true;
                         checked: root.system-audio;
@@ -559,7 +588,9 @@ export component MainWindow inherits Window {
                     }
 
                     microphone-action := CapsuleAction {
-                        label: "麦克风";
+                        label: @tr("麦克风");
+                        accessible-name: root.microphone
+                            ? @tr("麦克风：开启") : @tr("麦克风：关闭");
                         icon-path: "M9 5 A3 3 0 0 1 15 5 V12 A3 3 0 0 1 9 12 Z M6 11 A6 6 0 0 0 18 11 M12 17 V21 M8 21 H16";
                         checkable: true;
                         checked: root.microphone;
@@ -572,7 +603,12 @@ export component MainWindow inherits Window {
             }
 
             record-action := CapsuleAction {
-                label: root.recording-busy ? "停止" : "开始";
+                label: root.recording-busy ? @tr("停止") : @tr("开始");
+                accessible-name: root.recording-busy
+                    ? @tr("停止录制")
+                        + (root.stop-shortcut-label == "" ? "" : " (" + root.stop-shortcut-label + ")")
+                    : @tr("开始录制")
+                        + (root.start-shortcut-label == "" ? "" : " (" + root.start-shortcut-label + ")");
                 icon-path: root.recording-busy ? "M7 7 H17 V17 H7 Z" : "M8 5 L19 12 L8 19 Z";
                 icon-filled: true;
                 danger: true;
@@ -596,34 +632,36 @@ export component MainWindow inherits Window {
 
         Menu {
             MenuItem {
-                title: "开始录制" + (root.start-shortcut-label == "" ? "" : "    " + root.start-shortcut-label);
+                title: @tr("开始录制")
+                    + (root.start-shortcut-label == "" ? "" : "    " + root.start-shortcut-label);
                 enabled: !root.recording-busy;
                 activated => { root.start-recording(); }
             }
             MenuItem {
-                title: (root.recording-state == 2 ? "继续录制" : "暂停录制")
+                title: (root.recording-state == 2 ? @tr("继续录制") : @tr("暂停录制"))
                     + (root.pause-shortcut-label == "" ? "" : "    " + root.pause-shortcut-label);
                 enabled: root.recording-active;
                 activated => { root.pause-recording(); }
             }
             MenuItem {
-                title: "停止录制" + (root.stop-shortcut-label == "" ? "" : "    " + root.stop-shortcut-label);
+                title: @tr("停止录制")
+                    + (root.stop-shortcut-label == "" ? "" : "    " + root.stop-shortcut-label);
                 enabled: root.recording-busy;
                 activated => { root.stop-recording(); }
             }
             MenuSeparator {}
             MenuItem {
-                title: "首选项...";
+                title: @tr("首选项...");
                 activated => { root.open-preferences(); }
             }
             MenuSeparator {}
             MenuItem {
-                title: "打开保存目录";
+                title: @tr("打开保存目录");
                 activated => { root.open-output-directory(); }
             }
             MenuSeparator {}
             MenuItem {
-                title: "退出拾屏";
+                title: @tr("退出拾屏");
                 activated => { root.quit-application(); }
             }
         }

@@ -2,10 +2,14 @@ use std::{fs, io::Write, path::PathBuf};
 
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};
+pub use shi_foundation::LanguageMode;
+
+use shi_foundation::i18n;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
+    pub language: LanguageMode,
     pub source_mode: u8,
     pub quality_preset: u8,
     pub frame_rate: u8,
@@ -25,6 +29,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            language: LanguageMode::English,
             source_mode: 0,
             quality_preset: 2,
             frame_rate: 0,
@@ -52,11 +57,22 @@ impl Config {
                 return Ok(Self::default());
             }
             Err(error) => {
-                return Err(error).with_context(|| format!("读取配置失败：{}", path.display()));
+                return Err(error).with_context(|| {
+                    format!(
+                        "{}: {}",
+                        i18n::text("读取配置失败", "Failed to read settings"),
+                        path.display()
+                    )
+                });
             }
         };
-        let mut config: Self = serde_json::from_slice(&bytes)
-            .with_context(|| format!("配置文件格式无效：{}", path.display()))?;
+        let mut config: Self = serde_json::from_slice(&bytes).with_context(|| {
+            format!(
+                "{}: {}",
+                i18n::text("配置文件格式无效", "Invalid settings file"),
+                path.display()
+            )
+        })?;
         config.validate();
         Ok(config)
     }
@@ -65,19 +81,56 @@ impl Config {
         let mut config = self.clone();
         config.validate();
         let path = Self::path();
-        let parent = path.parent().ok_or_else(|| anyhow!("配置路径没有父目录"))?;
-        fs::create_dir_all(parent)
-            .with_context(|| format!("创建配置目录失败：{}", parent.display()))?;
+        let parent = path.parent().ok_or_else(|| {
+            anyhow!(i18n::text(
+                "配置路径没有父目录",
+                "The settings path has no parent directory"
+            ))
+        })?;
+        fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "{}: {}",
+                i18n::text(
+                    "创建配置目录失败",
+                    "Failed to create the settings directory"
+                ),
+                parent.display()
+            )
+        })?;
 
         let temporary = path.with_extension("json.tmp");
         let result = (|| -> Result<()> {
             let bytes = serde_json::to_vec_pretty(&config)?;
-            let mut file = fs::File::create(&temporary)
-                .with_context(|| format!("创建临时配置失败：{}", temporary.display()))?;
-            file.write_all(&bytes)
-                .with_context(|| format!("写入临时配置失败：{}", temporary.display()))?;
-            file.sync_all()
-                .with_context(|| format!("同步临时配置失败：{}", temporary.display()))?;
+            let mut file = fs::File::create(&temporary).with_context(|| {
+                format!(
+                    "{}: {}",
+                    i18n::text(
+                        "创建临时配置失败",
+                        "Failed to create the temporary settings file"
+                    ),
+                    temporary.display()
+                )
+            })?;
+            file.write_all(&bytes).with_context(|| {
+                format!(
+                    "{}: {}",
+                    i18n::text(
+                        "写入临时配置失败",
+                        "Failed to write the temporary settings file"
+                    ),
+                    temporary.display()
+                )
+            })?;
+            file.sync_all().with_context(|| {
+                format!(
+                    "{}: {}",
+                    i18n::text(
+                        "同步临时配置失败",
+                        "Failed to sync the temporary settings file"
+                    ),
+                    temporary.display()
+                )
+            })?;
             replace_file(&temporary, &path)
         })();
         if result.is_err() {
@@ -127,11 +180,12 @@ fn replace_file(source: &std::path::Path, target: &std::path::Path) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use super::{Config, default_video_directory};
+    use super::{Config, LanguageMode, default_video_directory};
 
     #[test]
     fn defaults_match_product_design() {
         let config = Config::default();
+        assert_eq!(config.language, LanguageMode::English);
         assert_eq!(config.source_mode, 0);
         assert_eq!(config.quality_preset, 2);
         assert_eq!(config.frame_rate, 0);
@@ -154,6 +208,7 @@ mod tests {
         )
         .unwrap();
         config.validate();
+        assert_eq!(config.language, LanguageMode::English);
         assert_eq!(config.source_mode, 2);
         assert_eq!(config.quality_preset, 3);
         assert_eq!(config.frame_rate, 1);
@@ -161,5 +216,18 @@ mod tests {
         assert_eq!(config.start_hotkey.as_deref(), Some("F10"));
         assert_eq!(config.pause_hotkey.as_deref(), Some("F11"));
         assert_eq!(config.stop_hotkey.as_deref(), Some("F12"));
+    }
+
+    #[test]
+    fn selected_language_is_serialized() {
+        let config = Config {
+            language: LanguageMode::Chinese,
+            ..Config::default()
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("\"language\":\"chinese\""));
+
+        let restored: Config = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.language, LanguageMode::Chinese);
     }
 }

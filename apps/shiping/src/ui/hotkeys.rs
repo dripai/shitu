@@ -11,6 +11,7 @@ use global_hotkey::{
 };
 
 use crate::MainWindow;
+use shi_foundation::i18n;
 
 const ACTION_COUNT: usize = 3;
 const START_ACTION: usize = 0;
@@ -23,6 +24,7 @@ type HotkeySet = [Option<HotKey>; ACTION_COUNT];
 pub(super) struct ShortcutIssue {
     pub action: Option<usize>,
     pub message: String,
+    pub is_conflict: bool,
 }
 
 impl ShortcutIssue {
@@ -30,6 +32,15 @@ impl ShortcutIssue {
         Self {
             action: Some(action),
             message: message.into(),
+            is_conflict: false,
+        }
+    }
+
+    fn conflict(action: usize, message: impl Into<String>) -> Self {
+        Self {
+            action: Some(action),
+            message: message.into(),
+            is_conflict: true,
         }
     }
 
@@ -37,6 +48,7 @@ impl ShortcutIssue {
         Self {
             action: None,
             message: message.into(),
+            is_conflict: false,
         }
     }
 }
@@ -87,7 +99,10 @@ pub(super) struct RecordingHotkeys {
 impl RecordingHotkeys {
     pub(super) fn new() -> Result<Self> {
         Ok(Self {
-            manager: GlobalHotKeyManager::new().context("无法创建全局快捷键管理器")?,
+            manager: GlobalHotKeyManager::new().context(i18n::text(
+                "无法创建全局快捷键管理器",
+                "Failed to create the global shortcut manager",
+            ))?,
             registered: [None; ACTION_COUNT],
             action_ids: Arc::new(RwLock::new([None; ACTION_COUNT])),
         })
@@ -156,6 +171,36 @@ impl RecordingHotkeys {
     }
 }
 
+pub(super) fn skip_conflicting_shortcuts<F>(
+    mut configured: [Option<String>; ACTION_COUNT],
+    mut configure: F,
+) -> std::result::Result<([Option<String>; ACTION_COUNT], Vec<ShortcutIssue>), ShortcutIssue>
+where
+    F: FnMut(
+        [Option<String>; ACTION_COUNT],
+    ) -> std::result::Result<[Option<String>; ACTION_COUNT], ShortcutIssue>,
+{
+    let mut conflicts = Vec::new();
+    loop {
+        match configure(configured.clone()) {
+            Ok(registered) => return Ok((registered, conflicts)),
+            Err(issue) if issue.is_conflict => {
+                let Some(action) = issue.action else {
+                    return Err(issue);
+                };
+                let Some(shortcut) = configured.get_mut(action) else {
+                    return Err(issue);
+                };
+                if shortcut.take().is_none() {
+                    return Err(issue);
+                }
+                conflicts.push(issue);
+            }
+            Err(issue) => return Err(issue),
+        }
+    }
+}
+
 pub(super) fn shortcut_from_key_event(
     text: &str,
     control: bool,
@@ -163,8 +208,12 @@ pub(super) fn shortcut_from_key_event(
     shift: bool,
     meta: bool,
 ) -> std::result::Result<String, ShortcutIssue> {
-    let key = key_name_from_event(text)
-        .ok_or_else(|| ShortcutIssue::general("这个按键暂不支持作为全局快捷键"))?;
+    let key = key_name_from_event(text).ok_or_else(|| {
+        ShortcutIssue::general(i18n::text(
+            "这个按键暂不支持作为全局快捷键",
+            "This key is not supported as a global shortcut",
+        ))
+    })?;
     let mut parts = Vec::with_capacity(5);
     if control {
         parts.push("control".to_owned());
@@ -179,10 +228,12 @@ pub(super) fn shortcut_from_key_event(
         parts.push("super".to_owned());
     }
     parts.push(key);
-    let hotkey = parts
-        .join("+")
-        .parse::<HotKey>()
-        .map_err(|error| ShortcutIssue::general(format!("无法识别这个快捷键：{error}")))?;
+    let hotkey = parts.join("+").parse::<HotKey>().map_err(|error| {
+        ShortcutIssue::general(format!(
+            "{}: {error}",
+            i18n::text("无法识别这个快捷键", "Could not recognize this shortcut")
+        ))
+    })?;
     validate_hotkey(hotkey).map_err(ShortcutIssue::general)?;
     Ok(hotkey.to_string())
 }
@@ -226,11 +277,17 @@ fn parse_shortcuts(
         let Some(value) = value else { continue };
         let value = value.trim();
         if value.is_empty() {
-            return Err(ShortcutIssue::action(index, "启用后必须设置快捷键"));
+            continue;
         }
-        let hotkey = value
-            .parse::<HotKey>()
-            .map_err(|error| ShortcutIssue::action(index, format!("快捷键格式无效：{error}")))?;
+        let hotkey = value.parse::<HotKey>().map_err(|error| {
+            ShortcutIssue::action(
+                index,
+                format!(
+                    "{}: {error}",
+                    i18n::text("快捷键格式无效", "Invalid shortcut format")
+                ),
+            )
+        })?;
         validate_hotkey(hotkey).map_err(|message| ShortcutIssue::action(index, message))?;
         if let Some(previous) = hotkeys[..index]
             .iter()
@@ -238,7 +295,11 @@ fn parse_shortcuts(
         {
             return Err(ShortcutIssue::action(
                 index,
-                format!("与{}快捷键重复", action_label(previous)),
+                format!(
+                    "{}: {}",
+                    i18n::text("快捷键重复", "Duplicate shortcut"),
+                    action_label(previous)
+                ),
             ));
         }
         hotkeys[index] = Some(hotkey);
@@ -249,10 +310,14 @@ fn parse_shortcuts(
 
 fn validate_hotkey(hotkey: HotKey) -> std::result::Result<(), String> {
     if is_unsupported_function_key(hotkey.key) {
-        return Err("功能键仅支持 F1–F12".to_owned());
+        return Err(i18n::text("功能键仅支持 F1–F12", "Only F1–F12 are supported").to_owned());
     }
     if hotkey.mods.is_empty() && !is_supported_function_key(hotkey.key) {
-        return Err("普通按键必须同时按下 Ctrl、Alt、Shift 或 Win".to_owned());
+        return Err(i18n::text(
+            "普通按键必须同时按下 Ctrl、Alt、Shift 或 Win",
+            "A regular key must be combined with Ctrl, Alt, Shift, or Win",
+        )
+        .to_owned());
     }
     Ok(())
 }
@@ -328,10 +393,10 @@ fn key_name_from_event(text: &str) -> Option<String> {
 
 fn action_label(index: usize) -> &'static str {
     match index {
-        START_ACTION => "开始录制",
-        PAUSE_ACTION => "暂停/继续",
-        STOP_ACTION => "停止录制",
-        _ => "录制",
+        START_ACTION => i18n::text("开始录制", "Start recording"),
+        PAUSE_ACTION => i18n::text("暂停/继续", "Pause/Resume"),
+        STOP_ACTION => i18n::text("停止录制", "Stop recording"),
+        _ => i18n::text("录制", "Recording"),
     }
 }
 
@@ -349,8 +414,13 @@ fn replace_registered<R: HotkeyRegistrar>(
             }),
             Err(restore_issue) => Err(ReplaceFailure {
                 issue: ShortcutIssue::general(format!(
-                    "{}；旧快捷键也未能恢复：{}",
-                    issue.message, restore_issue.message
+                    "{}{}: {}",
+                    issue.message,
+                    i18n::text(
+                        "；旧快捷键也未能恢复",
+                        "; the previous shortcuts could not be restored"
+                    ),
+                    restore_issue.message
                 )),
                 restored_old: false,
             }),
@@ -370,15 +440,28 @@ fn register_set<R: HotkeyRegistrar>(
             for registered_hotkey in registered {
                 let _ = registrar.unregister(registered_hotkey);
             }
-            let message = match error {
-                RegistrationFailure::Conflict => {
-                    format!("{}快捷键已被其他程序占用", action_label(index))
-                }
-                RegistrationFailure::Other(error) => {
-                    format!("{}快捷键注册失败：{error}", action_label(index))
-                }
+            let issue = match error {
+                RegistrationFailure::Conflict => ShortcutIssue::conflict(
+                    index,
+                    format!(
+                        "{}: {}",
+                        action_label(index),
+                        i18n::text(
+                            "快捷键已被其他程序占用",
+                            "the shortcut is already used by another application"
+                        )
+                    ),
+                ),
+                RegistrationFailure::Other(error) => ShortcutIssue::action(
+                    index,
+                    format!(
+                        "{}: {}: {error}",
+                        action_label(index),
+                        i18n::text("快捷键注册失败", "shortcut registration failed")
+                    ),
+                ),
             };
-            return Err(ShortcutIssue::action(index, message));
+            return Err(issue);
         }
         registered.push(hotkey);
     }
@@ -395,7 +478,11 @@ fn unregister_set<R: HotkeyRegistrar>(
         if let Err(error) = registrar.unregister(hotkey) {
             let issue = ShortcutIssue::action(
                 index,
-                format!("无法更新{}快捷键：{error}", action_label(index)),
+                format!(
+                    "{}: {}: {error}",
+                    i18n::text("无法更新快捷键", "Could not update the shortcut"),
+                    action_label(index)
+                ),
             );
             return match register_set(registrar, unregistered) {
                 Ok(()) => Err(ReplaceFailure {
@@ -408,8 +495,13 @@ fn unregister_set<R: HotkeyRegistrar>(
                     }
                     Err(ReplaceFailure {
                         issue: ShortcutIssue::general(format!(
-                            "{}；旧快捷键也未能恢复：{}",
-                            issue.message, restore_issue.message
+                            "{}{}: {}",
+                            issue.message,
+                            i18n::text(
+                                "；旧快捷键也未能恢复",
+                                "; the previous shortcuts could not be restored"
+                            ),
+                            restore_issue.message
                         )),
                         restored_old: false,
                     })
@@ -428,8 +520,8 @@ mod tests {
     use global_hotkey::hotkey::HotKey;
 
     use super::{
-        HotkeyRegistrar, display_shortcut, parse_shortcuts, replace_registered,
-        shortcut_from_key_event, validate_hotkey,
+        HotkeyRegistrar, ShortcutIssue, display_shortcut, parse_shortcuts, replace_registered,
+        shortcut_from_key_event, skip_conflicting_shortcuts, validate_hotkey,
     };
 
     #[derive(Default)]
@@ -491,6 +583,38 @@ mod tests {
     }
 
     #[test]
+    fn empty_shortcut_is_treated_as_unset() {
+        let (_, canonical) =
+            parse_shortcuts([Some("   ".to_owned()), Some("F11".to_owned()), None]).unwrap();
+        assert_eq!(canonical, [None, Some("F11".to_owned()), None]);
+    }
+
+    #[test]
+    fn startup_skips_only_conflicting_shortcuts() {
+        let configured = [
+            Some("F10".to_owned()),
+            Some("F11".to_owned()),
+            Some("F12".to_owned()),
+        ];
+        let (registered, conflicts) = skip_conflicting_shortcuts(configured, |values| {
+            if values[2].is_some() {
+                Err(ShortcutIssue::conflict(2, "F12 is occupied"))
+            } else {
+                Ok(values)
+            }
+        })
+        .unwrap();
+
+        assert_eq!(
+            registered,
+            [Some("F10".to_owned()), Some("F11".to_owned()), None]
+        );
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].action, Some(2));
+        assert!(conflicts[0].is_conflict);
+    }
+
+    #[test]
     fn failed_replacement_restores_the_previous_shortcuts() {
         let registrar = FakeRegistrar::default();
         let old_start = "F10".parse::<HotKey>().unwrap();
@@ -508,6 +632,7 @@ mod tests {
 
         let failure = result.unwrap_err();
         assert!(failure.restored_old);
+        assert!(failure.issue.is_conflict);
         let registered = registrar.registered.borrow();
         assert!(registered.contains(&old_start));
         assert!(registered.contains(&old_pause));

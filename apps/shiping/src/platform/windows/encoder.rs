@@ -1,6 +1,7 @@
 use std::{os::windows::ffi::OsStrExt, path::Path, ptr};
 
 use anyhow::{Context, Result};
+use shi_foundation::i18n;
 use windows::{
     Win32::Media::MediaFoundation::{
         CODECAPI_AVEncCommonMeanBitRate, CODECAPI_AVEncCommonRateControlMode, IMFAttributes,
@@ -27,7 +28,10 @@ pub struct MediaFoundationRuntime;
 
 impl MediaFoundationRuntime {
     pub fn start() -> Result<Self> {
-        unsafe { MFStartup(MF_VERSION, MFSTARTUP_FULL) }.context("初始化 Media Foundation 失败")?;
+        unsafe { MFStartup(MF_VERSION, MFSTARTUP_FULL) }.context(i18n::text(
+            "初始化 Media Foundation 失败",
+            "Failed to initialize Media Foundation",
+        ))?;
         Ok(Self)
     }
 }
@@ -66,29 +70,48 @@ impl Mp4Writer {
             .collect();
         let writer =
             unsafe { MFCreateSinkWriterFromURL(PCWSTR(path_wide.as_ptr()), None, &attributes) }
-                .with_context(|| format!("创建 MP4 写入器失败：{}", path.display()))?;
+                .with_context(|| {
+                    format!(
+                        "{}: {}",
+                        i18n::text("创建 MP4 写入器失败", "Failed to create the MP4 writer"),
+                        path.display()
+                    )
+                })?;
 
         let video_bitrate = target_video_bitrate(width, height, frames_per_second);
         let video_output = video_output_type(width, height, frames_per_second, video_bitrate)?;
-        let video_stream =
-            unsafe { writer.AddStream(&video_output) }.context("创建 H.264 视频流失败")?;
+        let video_stream = unsafe { writer.AddStream(&video_output) }.context(i18n::text(
+            "创建 H.264 视频流失败",
+            "Failed to create the H.264 video stream",
+        ))?;
         let video_input = video_input_type(width, height, frames_per_second)?;
         let encoding_parameters = video_encoding_parameters(video_bitrate)?;
         unsafe { writer.SetInputMediaType(video_stream, &video_input, &encoding_parameters) }
-            .context("设置 RGB32 视频输入格式失败")?;
+            .context(i18n::text(
+                "设置 RGB32 视频输入格式失败",
+                "Failed to set the RGB32 video input format",
+            ))?;
 
         let audio_stream = if include_audio {
             let output = audio_output_type()?;
-            let stream = unsafe { writer.AddStream(&output) }.context("创建 AAC 音频流失败")?;
+            let stream = unsafe { writer.AddStream(&output) }.context(i18n::text(
+                "创建 AAC 音频流失败",
+                "Failed to create the AAC audio stream",
+            ))?;
             let input = audio_input_type()?;
-            unsafe { writer.SetInputMediaType(stream, &input, None) }
-                .context("设置 PCM 音频输入格式失败")?;
+            unsafe { writer.SetInputMediaType(stream, &input, None) }.context(i18n::text(
+                "设置 PCM 音频输入格式失败",
+                "Failed to set the PCM audio input format",
+            ))?;
             Some(stream)
         } else {
             None
         };
 
-        unsafe { writer.BeginWriting() }.context("开始写入 MP4 失败")?;
+        unsafe { writer.BeginWriting() }.context(i18n::text(
+            "开始写入 MP4 失败",
+            "Failed to start writing the MP4 file",
+        ))?;
         Ok(Self {
             writer,
             video_stream,
@@ -104,7 +127,10 @@ impl Mp4Writer {
             frame_index as i64 * self.frame_duration,
             self.frame_duration,
         )?;
-        unsafe { self.writer.WriteSample(self.video_stream, &sample) }.context("写入视频帧失败")
+        unsafe { self.writer.WriteSample(self.video_stream, &sample) }.context(i18n::text(
+            "写入视频帧失败",
+            "Failed to write a video frame",
+        ))
     }
 
     pub fn write_audio(&self, start_frame: u64, pcm: &[i16]) -> Result<()> {
@@ -120,11 +146,17 @@ impl Mp4Writer {
         let time = start_frame as i64 * HUNDRED_NS_PER_SECOND / AUDIO_SAMPLE_RATE as i64;
         let duration = frame_count as i64 * HUNDRED_NS_PER_SECOND / AUDIO_SAMPLE_RATE as i64;
         let sample = sample_from_bytes(bytes, time, duration)?;
-        unsafe { self.writer.WriteSample(stream, &sample) }.context("写入音频采样失败")
+        unsafe { self.writer.WriteSample(stream, &sample) }.context(i18n::text(
+            "写入音频采样失败",
+            "Failed to write audio samples",
+        ))
     }
 
     pub fn finalize(mut self) -> Result<()> {
-        unsafe { self.writer.Finalize() }.context("完成 MP4 文件失败")?;
+        unsafe { self.writer.Finalize() }.context(i18n::text(
+            "完成 MP4 文件失败",
+            "Failed to finalize the MP4 file",
+        ))?;
         self.finalized = true;
         Ok(())
     }
@@ -132,8 +164,14 @@ impl Mp4Writer {
 
 fn create_attributes(capacity: u32) -> Result<IMFAttributes> {
     let mut value = None;
-    unsafe { MFCreateAttributes(&mut value, capacity) }.context("创建媒体属性失败")?;
-    value.context("Media Foundation 未返回属性对象")
+    unsafe { MFCreateAttributes(&mut value, capacity) }.context(i18n::text(
+        "创建媒体属性失败",
+        "Failed to create media attributes",
+    ))?;
+    value.context(i18n::text(
+        "Media Foundation 未返回属性对象",
+        "Media Foundation did not return an attributes object",
+    ))
 }
 
 fn video_output_type(
@@ -142,7 +180,10 @@ fn video_output_type(
     fps: u32,
     bitrate: u32,
 ) -> Result<windows::Win32::Media::MediaFoundation::IMFMediaType> {
-    let media = unsafe { MFCreateMediaType() }.context("创建视频输出格式失败")?;
+    let media = unsafe { MFCreateMediaType() }.context(i18n::text(
+        "创建视频输出格式失败",
+        "Failed to create the video output format",
+    ))?;
     unsafe {
         media.SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Video)?;
         media.SetGUID(&MF_MT_SUBTYPE, &MFVideoFormat_H264)?;
@@ -191,7 +232,10 @@ fn video_input_type(
     height: u32,
     fps: u32,
 ) -> Result<windows::Win32::Media::MediaFoundation::IMFMediaType> {
-    let media = unsafe { MFCreateMediaType() }.context("创建视频输入格式失败")?;
+    let media = unsafe { MFCreateMediaType() }.context(i18n::text(
+        "创建视频输入格式失败",
+        "Failed to create the video input format",
+    ))?;
     unsafe {
         media.SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Video)?;
         media.SetGUID(&MF_MT_SUBTYPE, &MFVideoFormat_RGB32)?;
@@ -205,7 +249,10 @@ fn video_input_type(
 }
 
 fn audio_output_type() -> Result<windows::Win32::Media::MediaFoundation::IMFMediaType> {
-    let media = unsafe { MFCreateMediaType() }.context("创建音频输出格式失败")?;
+    let media = unsafe { MFCreateMediaType() }.context(i18n::text(
+        "创建音频输出格式失败",
+        "Failed to create the audio output format",
+    ))?;
     unsafe {
         media.SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Audio)?;
         media.SetGUID(&MF_MT_SUBTYPE, &MFAudioFormat_AAC)?;
@@ -219,7 +266,10 @@ fn audio_output_type() -> Result<windows::Win32::Media::MediaFoundation::IMFMedi
 }
 
 fn audio_input_type() -> Result<windows::Win32::Media::MediaFoundation::IMFMediaType> {
-    let media = unsafe { MFCreateMediaType() }.context("创建音频输入格式失败")?;
+    let media = unsafe { MFCreateMediaType() }.context(i18n::text(
+        "创建音频输入格式失败",
+        "Failed to create the audio input format",
+    ))?;
     unsafe {
         media.SetGUID(&MF_MT_MAJOR_TYPE, &MFMediaType_Audio)?;
         media.SetGUID(&MF_MT_SUBTYPE, &MFAudioFormat_PCM)?;
@@ -236,8 +286,9 @@ fn audio_input_type() -> Result<windows::Win32::Media::MediaFoundation::IMFMedia
 }
 
 fn sample_from_bytes(bytes: &[u8], time: i64, duration: i64) -> Result<IMFSample> {
-    let buffer: IMFMediaBuffer =
-        unsafe { MFCreateMemoryBuffer(bytes.len() as u32) }.context("创建媒体缓冲区失败")?;
+    let buffer: IMFMediaBuffer = unsafe { MFCreateMemoryBuffer(bytes.len() as u32) }.context(
+        i18n::text("创建媒体缓冲区失败", "Failed to create the media buffer"),
+    )?;
     let mut destination = ptr::null_mut();
     unsafe {
         buffer.Lock(&mut destination, None, None)?;
@@ -245,7 +296,10 @@ fn sample_from_bytes(bytes: &[u8], time: i64, duration: i64) -> Result<IMFSample
         buffer.Unlock()?;
         buffer.SetCurrentLength(bytes.len() as u32)?;
     }
-    let sample = unsafe { MFCreateSample() }.context("创建媒体采样失败")?;
+    let sample = unsafe { MFCreateSample() }.context(i18n::text(
+        "创建媒体采样失败",
+        "Failed to create a media sample",
+    ))?;
     unsafe {
         sample.AddBuffer(&buffer)?;
         sample.SetSampleTime(time)?;

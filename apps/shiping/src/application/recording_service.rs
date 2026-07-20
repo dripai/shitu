@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
+use shi_foundation::i18n;
 
 use crate::{
     output,
@@ -72,7 +73,10 @@ impl RecorderHandle {
         let thread = thread::Builder::new()
             .name("shiping-recorder".to_owned())
             .spawn(move || recording_thread(options, command_receiver, event_sender))
-            .context("创建录制线程失败")?;
+            .context(i18n::text(
+                "创建录制线程失败",
+                "Failed to create the recording thread",
+            ))?;
         Ok(Self {
             commands: command_sender,
             events: event_receiver,
@@ -132,28 +136,46 @@ fn run_with_output(
     let mut audio = AudioSources::initialize();
     if options.system_audio && !audio.system_available() {
         return Err(anyhow!(
-            "系统声音已启用，但采集设备不可用：{}",
-            audio.error(SourceKind::System).unwrap_or("未知原因")
+            "{}: {}",
+            i18n::text(
+                "系统声音已启用，但采集设备不可用",
+                "System audio is enabled, but the capture device is unavailable"
+            ),
+            audio
+                .error(SourceKind::System)
+                .unwrap_or_else(|| i18n::text("未知原因", "Unknown reason"))
         ));
     }
     if options.microphone && !audio.microphone_available() {
         return Err(anyhow!(
-            "麦克风已启用，但采集设备不可用：{}",
-            audio.error(SourceKind::Microphone).unwrap_or("未知原因")
+            "{}: {}",
+            i18n::text(
+                "麦克风已启用，但采集设备不可用",
+                "The microphone is enabled, but the capture device is unavailable"
+            ),
+            audio
+                .error(SourceKind::Microphone)
+                .unwrap_or_else(|| i18n::text("未知原因", "Unknown reason"))
         ));
     }
 
     let mut warnings = Vec::new();
     if !audio.system_available() {
         warnings.push(format!(
-            "系统声音不可用：{}",
-            audio.error(SourceKind::System).unwrap_or("未知原因")
+            "{}: {}",
+            i18n::text("系统声音不可用", "System audio is unavailable"),
+            audio
+                .error(SourceKind::System)
+                .unwrap_or_else(|| i18n::text("未知原因", "Unknown reason"))
         ));
     }
     if !audio.microphone_available() {
         warnings.push(format!(
-            "麦克风不可用：{}",
-            audio.error(SourceKind::Microphone).unwrap_or("未知原因")
+            "{}: {}",
+            i18n::text("麦克风不可用", "The microphone is unavailable"),
+            audio
+                .error(SourceKind::Microphone)
+                .unwrap_or_else(|| i18n::text("未知原因", "Unknown reason"))
         ));
     }
 
@@ -212,7 +234,12 @@ fn run_with_output(
                                 SourceKind::System,
                                 audio
                                     .error(SourceKind::System)
-                                    .unwrap_or("系统声音设备不可用")
+                                    .unwrap_or_else(|| {
+                                        i18n::text(
+                                            "系统声音设备不可用",
+                                            "The system audio device is unavailable",
+                                        )
+                                    })
                                     .to_owned(),
                             ))
                             .ok();
@@ -227,7 +254,12 @@ fn run_with_output(
                                 SourceKind::Microphone,
                                 audio
                                     .error(SourceKind::Microphone)
-                                    .unwrap_or("麦克风设备不可用")
+                                    .unwrap_or_else(|| {
+                                        i18n::text(
+                                            "麦克风设备不可用",
+                                            "The microphone device is unavailable",
+                                        )
+                                    })
                                     .to_owned(),
                             ))
                             .ok();

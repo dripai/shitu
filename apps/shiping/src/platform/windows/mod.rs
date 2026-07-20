@@ -1,6 +1,7 @@
 use std::{os::windows::ffi::OsStrExt, path::Path};
 
 use anyhow::{Context, Result};
+use shi_foundation::i18n;
 
 pub(crate) mod audio;
 pub(crate) mod capture;
@@ -25,7 +26,7 @@ impl ComRuntime {
     pub(crate) fn initialize() -> Result<Self> {
         unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }
             .ok()
-            .context("初始化 COM 失败")?;
+            .context(i18n::text("初始化 COM 失败", "Failed to initialize COM"))?;
         Ok(Self)
     }
 }
@@ -55,7 +56,13 @@ pub(crate) fn replace_file(source: &Path, target: &Path) -> Result<()> {
             flags,
         )
     }
-    .with_context(|| format!("替换配置文件失败：{}", target.display()))
+    .with_context(|| {
+        format!(
+            "{}: {}",
+            i18n::text("替换配置文件失败", "Failed to replace the settings file"),
+            target.display()
+        )
+    })
 }
 
 pub(crate) fn local_timestamp() -> String {

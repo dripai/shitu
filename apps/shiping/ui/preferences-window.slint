@@ -8,7 +8,6 @@ import { StatusBar } from "@shi-ui/status-bar.slint";
 // remain provided by Slint's native FocusScope and controls.
 component ShortcutEditor {
     in property <string> action-label;
-    in-out property <bool> shortcut-enabled;
     in-out property <string> shortcut-text;
     in property <string> error-text;
     in property <bool> controls-enabled: true;
@@ -32,12 +31,6 @@ component ShortcutEditor {
             vertical-alignment: center;
         }
 
-        Switch {
-            text: "启用";
-            enabled: root.controls-enabled;
-            checked <=> root.shortcut-enabled;
-        }
-
         shortcut-box := Rectangle {
             height: 32px;
             horizontal-stretch: 1;
@@ -46,33 +39,33 @@ component ShortcutEditor {
             border-color: root.error-text != ""
                 ? #f06b74
                 : keyboard-focus.has-focus ? #7789a6 : #4b5565;
-            background: root.shortcut-enabled && root.controls-enabled ? #252b35 : #20252d;
-            opacity: root.shortcut-enabled && root.controls-enabled ? 1 : 0.56;
+            background: root.controls-enabled ? #252b35 : #20252d;
+            opacity: root.controls-enabled ? 1 : 0.56;
             accessible-role: text-input;
-            accessible-label: root.action-label + "快捷键";
+            accessible-label: root.action-label + @tr("快捷键");
             accessible-value: root.shortcut-text;
-            accessible-enabled: root.shortcut-enabled && root.controls-enabled;
+            accessible-enabled: root.controls-enabled;
 
             Text {
                 x: 11px;
                 width: parent.width - 22px;
                 text: keyboard-focus.has-focus
-                    ? "请按下快捷键，Esc 取消"
-                    : root.shortcut-text == "" ? "未设置" : root.shortcut-text;
+                    ? @tr("请按下快捷键，Esc 取消")
+                    : root.shortcut-text == "" ? @tr("未设置") : root.shortcut-text;
                 color: keyboard-focus.has-focus ? #ffffff : #c7ced9;
                 vertical-alignment: center;
                 overflow: elide;
             }
 
             TouchArea {
-                enabled: root.shortcut-enabled && root.controls-enabled;
+                enabled: root.controls-enabled;
                 clicked => { keyboard-focus.focus(); }
             }
 
             keyboard-focus := FocusScope {
                 x: 0px;
                 width: 0px;
-                enabled: root.shortcut-enabled && root.controls-enabled;
+                enabled: root.controls-enabled;
                 focus-on-tab-navigation: true;
 
                 key-pressed(event) => {
@@ -100,10 +93,9 @@ component ShortcutEditor {
         }
 
         Button {
-            text: "清除";
-            enabled: root.controls-enabled && (root.shortcut-enabled || root.shortcut-text != "");
+            text: @tr("清除");
+            enabled: root.controls-enabled && root.shortcut-text != "";
             clicked => {
-                root.shortcut-enabled = false;
                 root.shortcut-text = "";
             }
         }
@@ -111,15 +103,16 @@ component ShortcutEditor {
 }
 
 export component PreferencesDialog inherits Dialog {
-    title: "拾屏首选项";
+    title: @tr("拾屏首选项");
     icon: @image-url("icons/tray.svg");
     default-font-family: "Microsoft YaHei UI";
     default-font-size: 13px;
     width: 600px;
-    height: 400px;
+    height: 450px;
     background: #1f242c;
 
     in-out property <bool> recording-active: false;
+    in-out property <int> language-mode: 0;
     in-out property <bool> auto-minimize-after-start: false;
     in-out property <bool> open-directory-after-stop: false;
     in-out property <int> countdown-seconds: 3;
@@ -132,13 +125,10 @@ export component PreferencesDialog inherits Dialog {
     in-out property <bool> show-cursor: true;
     in-out property <bool> highlight-clicks: false;
 
-    in-out property <bool> start-shortcut-enabled: true;
     in-out property <string> start-shortcut;
     in-out property <string> start-shortcut-error;
-    in-out property <bool> pause-shortcut-enabled: true;
     in-out property <string> pause-shortcut;
     in-out property <string> pause-shortcut-error;
-    in-out property <bool> stop-shortcut-enabled: true;
     in-out property <string> stop-shortcut;
     in-out property <string> stop-shortcut-error;
     in-out property <string> status-text;
@@ -151,6 +141,7 @@ export component PreferencesDialog inherits Dialog {
     callback save-settings(bool);
     callback cancel-settings();
     callback reset-settings();
+    callback preview-language(int);
     callback choose-output-directory();
     callback open-output-directory();
     callback shortcut-captured(int, string, bool, bool, bool, bool);
@@ -165,7 +156,7 @@ export component PreferencesDialog inherits Dialog {
             vertical-stretch: 1;
 
             Tab {
-                title: "常规";
+                title: @tr("常规");
 
                 Rectangle {
                     background: transparent;
@@ -175,16 +166,39 @@ export component PreferencesDialog inherits Dialog {
                         spacing: root.setting-row-spacing;
                         alignment: start;
 
+                        HorizontalLayout {
+                            height: root.setting-row-height;
+                            spacing: 8px;
+                            alignment: start;
+                            cross-axis-alignment: center;
+
+                            Text {
+                                text: @tr("界面语言");
+                                color: #e7eaf0;
+                                width: root.setting-label-width;
+                            }
+                            language-combo := ComboBox {
+                                width: 180px;
+                                enabled: !root.recording-active;
+                                model: ["English", @tr("简体中文")];
+                                current-index <=> root.language-mode;
+                                selected(value) => {
+                                    root.preview-language(language-combo.current-index);
+                                }
+                            }
+                            Rectangle { horizontal-stretch: 1; }
+                        }
+
                         Switch {
                             height: root.setting-row-height;
-                            text: "开始录制后自动最小化到托盘";
+                            text: @tr("开始录制后自动最小化到托盘");
                             enabled: !root.recording-active;
                             checked <=> root.auto-minimize-after-start;
                         }
 
                         Switch {
                             height: root.setting-row-height;
-                            text: "停止录制并保存后打开保存目录";
+                            text: @tr("停止录制并保存后打开保存目录");
                             enabled: !root.recording-active;
                             checked <=> root.open-directory-after-stop;
                         }
@@ -196,18 +210,19 @@ export component PreferencesDialog inherits Dialog {
                             cross-axis-alignment: center;
 
                             Text {
-                                text: "开始倒计时";
+                                text: @tr("开始倒计时");
                                 color: #e7eaf0;
                                 width: root.setting-label-width;
                             }
                             ComboBox {
                                 width: 150px;
                                 enabled: !root.recording-active;
-                                model: ["关闭", "3 秒", "5 秒"];
+                                model: [@tr("关闭"), @tr("3 秒"), @tr("5 秒")];
                                 current-index: root.countdown-seconds == 0
                                     ? 0 : root.countdown-seconds == 3 ? 1 : 2;
                                 selected(value) => {
-                                    root.countdown-seconds = value == "关闭" ? 0 : value == "3 秒" ? 3 : 5;
+                                    root.countdown-seconds = value == @tr("关闭")
+                                        ? 0 : value == @tr("3 秒") ? 3 : 5;
                                 }
                             }
                             Rectangle { horizontal-stretch: 1; }
@@ -220,7 +235,7 @@ export component PreferencesDialog inherits Dialog {
                             cross-axis-alignment: center;
 
                             Text {
-                                text: "保存目录";
+                                text: @tr("保存目录");
                                 color: #e7eaf0;
                                 width: root.setting-label-width;
                             }
@@ -230,12 +245,12 @@ export component PreferencesDialog inherits Dialog {
                                 horizontal-stretch: 1;
                             }
                             Button {
-                                text: "选择...";
+                                text: @tr("选择...");
                                 enabled: !root.recording-active;
                                 clicked => { root.choose-output-directory(); }
                             }
                             Button {
-                                text: "打开";
+                                text: @tr("打开");
                                 clicked => { root.open-output-directory(); }
                             }
                         }
@@ -246,7 +261,7 @@ export component PreferencesDialog inherits Dialog {
             }
 
             Tab {
-                title: "录制";
+                title: @tr("录制");
 
                 Rectangle {
                     background: transparent;
@@ -261,11 +276,11 @@ export component PreferencesDialog inherits Dialog {
                             spacing: 8px;
                             alignment: start;
                             cross-axis-alignment: center;
-                            Text { text: "默认清晰度"; color: #e7eaf0; width: root.setting-label-width; }
+                            Text { text: @tr("默认清晰度"); color: #e7eaf0; width: root.setting-label-width; }
                             ComboBox {
                                 width: 180px;
                                 enabled: !root.recording-active;
-                                model: ["自动", "720p", "1080p", "原始分辨率"];
+                                model: [@tr("自动"), "720p", "1080p", @tr("原始分辨率")];
                                 current-index <=> root.quality-preset;
                             }
                             Rectangle { horizontal-stretch: 1; }
@@ -275,7 +290,7 @@ export component PreferencesDialog inherits Dialog {
                             spacing: 8px;
                             alignment: start;
                             cross-axis-alignment: center;
-                            Text { text: "默认帧率"; color: #e7eaf0; width: root.setting-label-width; }
+                            Text { text: @tr("默认帧率"); color: #e7eaf0; width: root.setting-label-width; }
                             ComboBox {
                                 width: 180px;
                                 enabled: !root.recording-active;
@@ -286,25 +301,25 @@ export component PreferencesDialog inherits Dialog {
                         }
                         Switch {
                             height: root.setting-row-height;
-                            text: "默认录制系统声音";
+                            text: @tr("默认录制系统声音");
                             enabled: !root.recording-active;
                             checked <=> root.system-audio;
                         }
                         Switch {
                             height: root.setting-row-height;
-                            text: "默认录制麦克风";
+                            text: @tr("默认录制麦克风");
                             enabled: !root.recording-active;
                             checked <=> root.microphone;
                         }
                         Switch {
                             height: root.setting-row-height;
-                            text: "显示鼠标指针";
+                            text: @tr("显示鼠标指针");
                             enabled: !root.recording-active;
                             checked <=> root.show-cursor;
                         }
                         Switch {
                             height: root.setting-row-height;
-                            text: "突出鼠标点击";
+                            text: @tr("突出鼠标点击");
                             enabled: !root.recording-active;
                             checked <=> root.highlight-clicks;
                         }
@@ -315,7 +330,7 @@ export component PreferencesDialog inherits Dialog {
             }
 
             Tab {
-                title: "快捷键";
+                title: @tr("快捷键");
 
                 Rectangle {
                     background: transparent;
@@ -326,18 +341,17 @@ export component PreferencesDialog inherits Dialog {
                         alignment: start;
 
                         Text {
-                            text: "单独使用 F1–F12，或为普通按键组合 Ctrl、Alt、Shift、Win。";
+                            text: @tr("单独使用 F1–F12，或为普通按键组合 Ctrl、Alt、Shift、Win。");
                             color: #9fa8b5;
                             font-size: 12px;
                             height: 24px;
                         }
 
                         ShortcutEditor {
-                            action-label: "开始录制";
+                            action-label: @tr("开始录制");
                             label-width: root.setting-label-width;
                             row-height: root.setting-row-height;
                             controls-enabled: !root.recording-active;
-                            shortcut-enabled <=> root.start-shortcut-enabled;
                             shortcut-text <=> root.start-shortcut;
                             error-text: root.start-shortcut-error;
                             captured(text, control, alt, shift, meta) => {
@@ -345,11 +359,10 @@ export component PreferencesDialog inherits Dialog {
                             }
                         }
                         ShortcutEditor {
-                            action-label: "暂停/继续";
+                            action-label: @tr("暂停/继续");
                             label-width: root.setting-label-width;
                             row-height: root.setting-row-height;
                             controls-enabled: !root.recording-active;
-                            shortcut-enabled <=> root.pause-shortcut-enabled;
                             shortcut-text <=> root.pause-shortcut;
                             error-text: root.pause-shortcut-error;
                             captured(text, control, alt, shift, meta) => {
@@ -357,11 +370,10 @@ export component PreferencesDialog inherits Dialog {
                             }
                         }
                         ShortcutEditor {
-                            action-label: "停止录制";
+                            action-label: @tr("停止录制");
                             label-width: root.setting-label-width;
                             row-height: root.setting-row-height;
                             controls-enabled: !root.recording-active;
-                            shortcut-enabled <=> root.stop-shortcut-enabled;
                             shortcut-text <=> root.stop-shortcut;
                             error-text: root.stop-shortcut-error;
                             captured(text, control, alt, shift, meta) => {
@@ -379,31 +391,31 @@ export component PreferencesDialog inherits Dialog {
             status-text: root.status-text != ""
                 ? root.status-text
                 : root.recording-active
-                    ? "录制进行中：停止录制后才能应用修改"
-                    : "就绪";
+                    ? @tr("录制进行中：停止录制后才能应用修改")
+                    : @tr("修改后请单击“应用”或“确定”保存");
             status-level: root.status-error ? 2 : 0;
         }
     }
 
     Button {
-        text: "恢复默认";
+        text: @tr("恢复默认");
         enabled: !root.recording-active;
         dialog-button-role: reset;
         clicked => { root.reset-settings(); }
     }
     Button {
-        text: "取消";
+        text: @tr("取消");
         dialog-button-role: reject;
         clicked => { root.cancel-settings(); }
     }
     Button {
-        text: "应用";
+        text: @tr("应用");
         enabled: !root.recording-active;
         dialog-button-role: apply;
         clicked => { root.save-settings(false); }
     }
     Button {
-        text: "确定";
+        text: @tr("确定");
         enabled: !root.recording-active;
         dialog-button-role: accept;
         clicked => { root.save-settings(true); }

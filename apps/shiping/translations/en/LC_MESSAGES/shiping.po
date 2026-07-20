@@ -1,0 +1,217 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: shiping\n"
+"Language: en\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "3 秒"
+msgstr "3 seconds"
+
+msgid "5 秒"
+msgstr "5 seconds"
+
+msgid "保存目录"
+msgstr "Save folder"
+
+msgid "常规"
+msgstr "General"
+
+msgid "窗口"
+msgstr "Window"
+
+msgid "打开"
+msgstr "Open"
+
+msgid "打开保存目录"
+msgstr "Open save folder"
+
+msgid "单独使用 F1–F12，或为普通按键组合 Ctrl、Alt、Shift、Win。"
+msgstr "Use F1–F12 alone, or combine a regular key with Ctrl, Alt, Shift, or Win."
+
+msgid "单击选择一个可见窗口，Esc 取消"
+msgstr "Click a visible window to select it; press Esc to cancel"
+
+msgid "范围"
+msgstr "Source"
+
+msgid "关闭"
+msgstr "Off"
+
+msgid "恢复默认"
+msgstr "Restore defaults"
+
+msgid "继续"
+msgstr "Resume"
+
+msgid "继续录制"
+msgstr "Resume recording"
+
+msgid "简体中文"
+msgstr "Simplified Chinese"
+
+msgid "界面语言"
+msgstr "Language"
+
+msgid "就绪"
+msgstr "Ready"
+
+msgid "开始"
+msgstr "Start"
+
+msgid "开始倒计时"
+msgstr "Countdown"
+
+msgid "开始录制"
+msgstr "Start recording"
+
+msgid "开始录制后自动最小化到托盘"
+msgstr "Minimize to the system tray after recording starts"
+
+msgid "快捷键"
+msgstr "Shortcuts"
+
+msgid "录制"
+msgstr "Recording"
+
+msgid "录制范围：{}"
+msgstr "Recording source: {}"
+
+msgid "录制进行中：停止录制后才能应用修改"
+msgstr "Recording is active; stop it before applying changes"
+
+msgid "录制中"
+msgstr "Recording"
+
+msgid "麦克风"
+msgstr "Microphone"
+
+msgid "默认录制麦克风"
+msgstr "Record the microphone by default"
+
+msgid "默认录制系统声音"
+msgstr "Record system audio by default"
+
+msgid "默认清晰度"
+msgstr "Default quality"
+
+msgid "默认帧率"
+msgstr "Default frame rate"
+
+msgid "帧率：{}"
+msgstr "Frame rate: {}"
+
+msgid "屏幕"
+msgstr "Screen"
+
+msgid "清除"
+msgstr "Clear"
+
+msgid "清晰度：{}"
+msgstr "Quality: {}"
+
+msgid "请按下快捷键，Esc 取消"
+msgstr "Press a shortcut; press Esc to cancel"
+
+msgid "区域"
+msgstr "Region"
+
+msgid "取消"
+msgstr "Cancel"
+
+msgid "确定"
+msgstr "OK"
+
+msgid "拾屏"
+msgstr "ShiPing"
+
+msgid "拾屏首选项"
+msgstr "ShiPing Preferences"
+
+msgid "首选项..."
+msgstr "Preferences..."
+
+msgid "停止"
+msgstr "Stop"
+
+msgid "停止录制"
+msgstr "Stop recording"
+
+msgid "停止录制并保存后打开保存目录"
+msgstr "Open the save folder after recording stops and is saved"
+
+msgid "突出鼠标点击"
+msgstr "Highlight mouse clicks"
+
+msgid "退出拾屏"
+msgstr "Quit ShiPing"
+
+msgid "拖动选择固定录制区域，Esc 取消"
+msgstr "Drag to select a fixed recording region; press Esc to cancel"
+
+msgid "未设置"
+msgstr "Not set"
+
+msgid "系统声"
+msgstr "System audio"
+
+msgid "系统声音：关闭"
+msgstr "System audio: Off"
+
+msgid "系统声音：开启"
+msgstr "System audio: On"
+
+msgid "麦克风：关闭"
+msgstr "Microphone: Off"
+
+msgid "麦克风：开启"
+msgstr "Microphone: On"
+
+msgid "显示拾屏"
+msgstr "Show ShiPing"
+
+msgid "显示鼠标指针"
+msgstr "Show the mouse pointer"
+
+msgid "修改后请单击“应用”或“确定”保存"
+msgstr "Click Apply or OK to save changes"
+
+msgid "选择..."
+msgstr "Browse..."
+
+msgid "选择录制目标"
+msgstr "Select recording target"
+
+msgid "已暂停"
+msgstr "Paused"
+
+msgid "应用"
+msgstr "Apply"
+
+msgid "原始"
+msgstr "Original"
+
+msgid "原始分辨率"
+msgstr "Original resolution"
+
+msgid "暂停"
+msgstr "Pause"
+
+msgid "暂停/继续"
+msgstr "Pause/Resume"
+
+msgid "暂停/继续录制"
+msgstr "Pause/Resume recording"
+
+msgid "暂停录制"
+msgstr "Pause recording"
+
+msgid "主显示器"
+msgstr "Primary display"
+
+msgid "准备"
+msgstr "Preparing"
+
+msgid "自动"
+msgstr "Auto"

@@ -7,6 +7,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
+use shi_foundation::i18n;
 use slint::{
     ComponentHandle, ModelRc, PhysicalPosition, PhysicalSize, SharedString, Timer, TimerMode,
     VecModel,
@@ -15,7 +16,7 @@ use slint::{
 use crate::{
     MainWindow, PreferencesDialog, RecordingTray, SelectionWindow,
     application::{ApplicationState, Command, Event, RecorderHandle, RecordingOptions},
-    config::Config,
+    config::{Config, LanguageMode},
     platform::{
         audio::SourceKind,
         begin_window_drag, native_window_handle, shell,
@@ -23,7 +24,10 @@ use crate::{
     },
 };
 
-use super::hotkeys::{RecordingHotkeys, ShortcutIssue, display_shortcut, shortcut_from_key_event};
+use super::hotkeys::{
+    RecordingHotkeys, ShortcutIssue, display_shortcut, shortcut_from_key_event,
+    skip_conflicting_shortcuts,
+};
 
 struct UiState {
     application: ApplicationState,
@@ -50,18 +54,43 @@ impl DerefMut for UiState {
 }
 
 pub(crate) fn run() -> Result<(), slint::PlatformError> {
-    let (config, load_error) = match Config::load() {
+    shi_foundation::i18n::prepare(LanguageMode::English);
+    let config_result = Config::load();
+    shi_foundation::i18n::prepare(
+        config_result
+            .as_ref()
+            .map(|config| config.language)
+            .unwrap_or(LanguageMode::English),
+    );
+    let (config, load_error) = match config_result {
         Ok(config) => (config, None),
         Err(error) => (Config::default(), Some(error.to_string())),
     };
     let main = MainWindow::new()?;
+    let language_error = shi_foundation::i18n::apply(config.language).err();
     let tray = RecordingTray::new()?;
     let preferences = PreferencesDialog::new()?;
     apply_config(&main, &config);
     apply_shortcut_labels(&main, &tray, &config);
     let initial_hotkeys = config.hotkeys();
     if let Some(error) = load_error {
-        set_status(&main, format!("配置未加载：{error}"), true);
+        set_status(
+            &main,
+            format!(
+                "{}: {error}",
+                shi_foundation::i18n::text("配置未加载", "Settings were not loaded")
+            ),
+            true,
+        );
+    } else if let Some(error) = language_error {
+        set_status(
+            &main,
+            format!(
+                "{}: {error}",
+                shi_foundation::i18n::text("语言初始化失败", "Failed to initialize the language")
+            ),
+            true,
+        );
     }
 
     let state = Rc::new(RefCell::new(UiState {
@@ -76,24 +105,77 @@ pub(crate) fn run() -> Result<(), slint::PlatformError> {
     if let Err(error) = refresh_screens(&main, &state) {
         set_status(&main, error.to_string(), true);
     }
+    let mut startup_shortcut_notice = None;
     let (hotkeys, hotkey_issue) = match RecordingHotkeys::new() {
         Ok(mut hotkeys) => {
             hotkeys.bind_events(main.as_weak());
-            let issue = hotkeys.reconfigure(initial_hotkeys).err();
-            (Some(hotkeys), issue)
+            match skip_conflicting_shortcuts(initial_hotkeys.clone(), |configured| {
+                hotkeys.reconfigure(configured)
+            }) {
+                Ok((registered, conflicts)) => {
+                    let issue = if registered != initial_hotkeys {
+                        let config = {
+                            let mut state = state.borrow_mut();
+                            state.config.set_hotkeys(registered);
+                            state.config.clone()
+                        };
+                        apply_shortcut_labels(&main, &tray, &config);
+                        config.save().err().map(|error| ShortcutIssue {
+                            action: None,
+                            message: format!(
+                                "{}: {error}",
+                                i18n::text(
+                                    "保存已清除的冲突快捷键失败",
+                                    "Failed to save the cleared conflicting shortcuts"
+                                )
+                            ),
+                            is_conflict: false,
+                        })
+                    } else {
+                        None
+                    };
+                    if !conflicts.is_empty() {
+                        startup_shortcut_notice = Some(format!(
+                            "{}: {}",
+                            i18n::text(
+                                "冲突的快捷键已留空",
+                                "Conflicting shortcuts were left unset"
+                            ),
+                            conflicts
+                                .into_iter()
+                                .map(|conflict| conflict.message)
+                                .collect::<Vec<_>>()
+                                .join(i18n::text("；", "; "))
+                        ));
+                    }
+                    (Some(hotkeys), issue)
+                }
+                Err(issue) => (Some(hotkeys), Some(issue)),
+            }
         }
         Err(error) => (
             None,
             Some(ShortcutIssue {
                 action: None,
                 message: error.to_string(),
+                is_conflict: false,
             }),
         ),
     };
     let hotkeys = Rc::new(RefCell::new(hotkeys));
     if let Some(issue) = hotkey_issue {
-        set_status(&main, format!("快捷键不可用：{}", issue.message), true);
+        set_status(
+            &main,
+            format!(
+                "{}: {}",
+                i18n::text("快捷键不可用", "Shortcuts are unavailable"),
+                issue.message
+            ),
+            true,
+        );
         state.borrow_mut().hotkey_issue = Some(issue);
+    } else if let Some(notice) = startup_shortcut_notice {
+        set_status(&main, notice, false);
     }
 
     bind_callbacks(&main, Rc::clone(&state));
@@ -238,19 +320,106 @@ fn bind_preferences(
         });
     }
     {
+        let main = main.as_weak();
         let preferences = preferences.as_weak();
+        let state = Rc::clone(&state);
         preferences.unwrap().on_cancel_settings(move || {
-            if let Some(preferences) = preferences.upgrade() {
-                let _ = preferences.hide();
+            let (Some(main), Some(preferences)) = (main.upgrade(), preferences.upgrade()) else {
+                return;
+            };
+            match restore_saved_language(&main, &preferences, &state) {
+                Ok(()) => {
+                    set_status(
+                        &main,
+                        i18n::text("已取消首选项修改", "Preferences changes discarded"),
+                        false,
+                    );
+                    let _ = preferences.hide();
+                }
+                Err(error) => {
+                    preferences.set_status_text(
+                        format!(
+                            "{}: {error}",
+                            i18n::text("设置恢复失败", "Failed to restore settings")
+                        )
+                        .into(),
+                    );
+                    preferences.set_status_error(true);
+                }
             }
         });
     }
     {
+        let main = main.as_weak();
         let preferences = preferences.as_weak();
+        let state = Rc::clone(&state);
         preferences.unwrap().on_reset_settings(move || {
-            if let Some(preferences) = preferences.upgrade() {
-                sync_preferences(&preferences, &Config::default(), false);
-                preferences.set_status_text("已恢复默认值；单击应用或确定后生效".into());
+            let (Some(main), Some(preferences)) = (main.upgrade(), preferences.upgrade()) else {
+                return;
+            };
+            let defaults = Config::default();
+            if let Err(error) = i18n::apply(defaults.language) {
+                preferences.set_status_text(
+                    format!(
+                        "{}: {error}",
+                        i18n::text("语言切换失败", "Failed to change the language")
+                    )
+                    .into(),
+                );
+                preferences.set_status_error(true);
+                return;
+            }
+            sync_preferences(&preferences, &defaults, false);
+            preferences.set_status_text(
+                i18n::text(
+                    "已恢复默认值；单击应用或确定后保存",
+                    "Defaults restored; click Apply or OK to save",
+                )
+                .into(),
+            );
+            if let Err(error) = refresh_screens(&main, &state) {
+                set_status(&main, error.to_string(), true);
+            }
+        });
+    }
+    {
+        let main = main.as_weak();
+        let preferences = preferences.as_weak();
+        let state = Rc::clone(&state);
+        preferences.unwrap().on_preview_language(move |index| {
+            let (Some(main), Some(preferences)) = (main.upgrade(), preferences.upgrade()) else {
+                return;
+            };
+            match i18n::apply(language_from_index(index)) {
+                Ok(()) => {
+                    if let Err(error) = refresh_screens(&main, &state) {
+                        set_status(&main, error.to_string(), true);
+                    } else {
+                        set_status(
+                            &main,
+                            i18n::text("语言预览已应用", "Language preview applied"),
+                            false,
+                        );
+                    }
+                    preferences.set_status_text(
+                        i18n::text(
+                            "语言已预览；单击应用或确定后保存",
+                            "Language preview applied; click Apply or OK to save",
+                        )
+                        .into(),
+                    );
+                    preferences.set_status_error(false);
+                }
+                Err(error) => {
+                    preferences.set_status_text(
+                        format!(
+                            "{}: {error}",
+                            i18n::text("语言切换失败", "Failed to change the language")
+                        )
+                        .into(),
+                    );
+                    preferences.set_status_error(true);
+                }
             }
         });
     }
@@ -262,12 +431,21 @@ fn bind_preferences(
             };
             let current = PathBuf::from(preferences.get_save_directory().to_string());
             if let Some(directory) = rfd::FileDialog::new()
-                .set_title("选择拾屏保存目录")
+                .set_title(i18n::text(
+                    "选择拾屏保存目录",
+                    "Select the ShiPing save folder",
+                ))
                 .set_directory(current)
                 .pick_folder()
             {
                 preferences.set_save_directory(directory.to_string_lossy().into_owned().into());
-                preferences.set_status_text("保存目录将在应用设置后生效".into());
+                preferences.set_status_text(
+                    i18n::text(
+                        "保存目录将在应用设置后生效",
+                        "The save folder will change after the settings are applied",
+                    )
+                    .into(),
+                );
                 preferences.set_status_error(false);
             }
         });
@@ -280,10 +458,19 @@ fn bind_preferences(
             };
             let directory = PathBuf::from(preferences.get_save_directory().to_string());
             let result = if directory.as_os_str().is_empty() {
-                Err(anyhow!("保存目录不能为空"))
+                Err(anyhow!(i18n::text(
+                    "保存目录不能为空",
+                    "The save folder cannot be empty"
+                )))
             } else {
                 std::fs::create_dir_all(&directory)
-                    .with_context(|| format!("创建保存目录失败：{}", directory.display()))
+                    .with_context(|| {
+                        format!(
+                            "{}: {}",
+                            i18n::text("创建保存目录失败", "Failed to create the save folder"),
+                            directory.display()
+                        )
+                    })
                     .and_then(|_| shell::open_path(&directory))
             };
             if let Err(error) = result {
@@ -303,7 +490,13 @@ fn bind_preferences(
                 match shortcut_from_key_event(&text, control, alt, shift, meta) {
                     Ok(shortcut) => {
                         set_shortcut_value(&preferences, action, display_shortcut(Some(&shortcut)));
-                        preferences.set_status_text("快捷键将在应用设置后生效".into());
+                        preferences.set_status_text(
+                            i18n::text(
+                                "快捷键将在应用设置后生效",
+                                "The shortcut will change after the settings are applied",
+                            )
+                            .into(),
+                        );
                         preferences.set_status_error(false);
                     }
                     Err(mut issue) => {
@@ -328,21 +521,47 @@ fn bind_preferences(
             clear_shortcut_errors(&preferences);
             match apply_preferences(&main, &tray, &preferences, &state, &hotkeys) {
                 Ok(()) => {
-                    preferences.set_status_text("设置已应用".into());
+                    preferences
+                        .set_status_text(i18n::text("设置已应用", "Settings applied").into());
                     preferences.set_status_error(false);
-                    set_status(&main, "首选项已更新", false);
+                    set_status(
+                        &main,
+                        i18n::text("首选项已更新", "Preferences updated"),
+                        false,
+                    );
                     if close_after {
                         let _ = preferences.hide();
                     }
                 }
-                Err(issue) => show_shortcut_issue(&preferences, &issue),
+                Err(mut issue) => {
+                    if let Err(error) = restore_saved_language(&main, &preferences, &state) {
+                        issue.message.push_str(&format!(
+                            "{}{}: {error}",
+                            i18n::text("；", "; "),
+                            i18n::text("设置恢复失败", "Failed to restore settings")
+                        ));
+                    }
+                    show_shortcut_issue(&preferences, &issue);
+                }
             }
         });
     }
 }
 
+fn restore_saved_language(
+    main: &MainWindow,
+    preferences: &PreferencesDialog,
+    state: &Rc<RefCell<UiState>>,
+) -> std::result::Result<(), String> {
+    let language = state.borrow().config.language;
+    i18n::apply(language).map_err(|error| error.to_string())?;
+    preferences.set_language_mode(language_index(language));
+    refresh_screens(main, state).map_err(|error| error.to_string())
+}
+
 fn sync_preferences(preferences: &PreferencesDialog, config: &Config, recording_active: bool) {
     preferences.set_recording_active(recording_active);
+    preferences.set_language_mode(language_index(config.language));
     preferences.set_auto_minimize_after_start(config.auto_minimize_after_start);
     preferences.set_open_directory_after_stop(config.open_directory_after_stop);
     preferences.set_countdown_seconds(config.countdown_seconds as i32);
@@ -353,11 +572,8 @@ fn sync_preferences(preferences: &PreferencesDialog, config: &Config, recording_
     preferences.set_microphone(config.microphone);
     preferences.set_show_cursor(config.show_cursor);
     preferences.set_highlight_clicks(config.highlight_clicks);
-    preferences.set_start_shortcut_enabled(config.start_hotkey.is_some());
     preferences.set_start_shortcut(display_shortcut(config.start_hotkey.as_deref()).into());
-    preferences.set_pause_shortcut_enabled(config.pause_hotkey.is_some());
     preferences.set_pause_shortcut(display_shortcut(config.pause_hotkey.as_deref()).into());
-    preferences.set_stop_shortcut_enabled(config.stop_hotkey.is_some());
     preferences.set_stop_shortcut(display_shortcut(config.stop_hotkey.as_deref()).into());
     clear_shortcut_errors(preferences);
     preferences.set_status_text("".into());
@@ -374,7 +590,12 @@ fn apply_preferences(
     if state.borrow().recorder.is_some() || main.get_recording_state() != 0 {
         return Err(ShortcutIssue {
             action: None,
-            message: "录制期间不能应用首选项".to_owned(),
+            message: i18n::text(
+                "录制期间不能应用首选项",
+                "Preferences cannot be applied while recording",
+            )
+            .to_owned(),
+            is_conflict: false,
         });
     }
 
@@ -382,12 +603,14 @@ fn apply_preferences(
     if save_directory.as_os_str().is_empty() {
         return Err(ShortcutIssue {
             action: None,
-            message: "保存目录不能为空".to_owned(),
+            message: i18n::text("保存目录不能为空", "The save folder cannot be empty").to_owned(),
+            is_conflict: false,
         });
     }
 
     let old_config = state.borrow().config.clone();
     let mut new_config = old_config.clone();
+    new_config.language = language_from_index(preferences.get_language_mode());
     new_config.auto_minimize_after_start = preferences.get_auto_minimize_after_start();
     new_config.open_directory_after_stop = preferences.get_open_directory_after_stop();
     new_config.countdown_seconds = preferences.get_countdown_seconds().clamp(0, 10) as u8;
@@ -399,6 +622,17 @@ fn apply_preferences(
     new_config.show_cursor = preferences.get_show_cursor();
     new_config.highlight_clicks = preferences.get_highlight_clicks();
 
+    if let Err(error) = i18n::apply(new_config.language) {
+        return Err(ShortcutIssue {
+            action: None,
+            message: format!(
+                "{}: {error}",
+                i18n::text("语言切换失败", "Failed to change the language")
+            ),
+            is_conflict: false,
+        });
+    }
+
     let requested = preference_hotkeys(preferences);
     let canonical = {
         let mut hotkeys = hotkeys.borrow_mut();
@@ -408,7 +642,12 @@ fn apply_preferences(
             None => {
                 return Err(ShortcutIssue {
                     action: None,
-                    message: "全局快捷键管理器不可用；可以禁用全部快捷键后保存其他设置".to_owned(),
+                    message: i18n::text(
+                        "全局快捷键管理器不可用；可以清除全部快捷键后保存其他设置",
+                        "The global shortcut manager is unavailable; clear all shortcuts to save the other settings"
+                    )
+                    .to_owned(),
+                    is_conflict: false,
                 });
             }
         }
@@ -422,12 +661,20 @@ fn apply_preferences(
                 Err(issue) => {
                     let disabled = hotkeys.reconfigure([None, None, None]);
                     format!(
-                        "；旧快捷键恢复失败：{}{}",
+                        "{}{}: {}{}",
+                        i18n::text("；", "; "),
+                        i18n::text(
+                            "旧快捷键恢复失败",
+                            "Failed to restore the previous shortcuts"
+                        ),
                         issue.message,
                         if disabled.is_ok() {
-                            "；已停用本次快捷键"
+                            i18n::text("；已停用本次快捷键", "; the new shortcuts were disabled")
                         } else {
-                            "；停用本次快捷键也失败"
+                            i18n::text(
+                                "；停用本次快捷键也失败",
+                                "; disabling the new shortcuts also failed",
+                            )
                         }
                     )
                 }
@@ -436,7 +683,11 @@ fn apply_preferences(
         };
         return Err(ShortcutIssue {
             action: None,
-            message: format!("保存配置失败：{error}{rollback_message}"),
+            message: format!(
+                "{}: {error}{rollback_message}",
+                i18n::text("保存配置失败", "Failed to save settings")
+            ),
+            is_conflict: false,
         });
     }
 
@@ -450,30 +701,41 @@ fn apply_preferences(
 
 fn preference_hotkeys(preferences: &PreferencesDialog) -> [Option<String>; 3] {
     [
-        preferences
-            .get_start_shortcut_enabled()
-            .then(|| preferences.get_start_shortcut().to_string()),
-        preferences
-            .get_pause_shortcut_enabled()
-            .then(|| preferences.get_pause_shortcut().to_string()),
-        preferences
-            .get_stop_shortcut_enabled()
-            .then(|| preferences.get_stop_shortcut().to_string()),
+        configured_shortcut(preferences.get_start_shortcut().as_str()),
+        configured_shortcut(preferences.get_pause_shortcut().as_str()),
+        configured_shortcut(preferences.get_stop_shortcut().as_str()),
     ]
+}
+
+fn configured_shortcut(value: &str) -> Option<String> {
+    let value = value.trim();
+    (!value.is_empty()).then(|| value.to_owned())
+}
+
+fn language_index(language: LanguageMode) -> i32 {
+    match language {
+        LanguageMode::Chinese => 1,
+        LanguageMode::English | LanguageMode::System => 0,
+    }
+}
+
+fn language_from_index(index: i32) -> LanguageMode {
+    if index == 1 {
+        LanguageMode::Chinese
+    } else {
+        LanguageMode::English
+    }
 }
 
 fn set_shortcut_value(preferences: &PreferencesDialog, action: i32, value: String) {
     match action {
         0 => {
-            preferences.set_start_shortcut_enabled(true);
             preferences.set_start_shortcut(value.into());
         }
         1 => {
-            preferences.set_pause_shortcut_enabled(true);
             preferences.set_pause_shortcut(value.into());
         }
         2 => {
-            preferences.set_stop_shortcut_enabled(true);
             preferences.set_stop_shortcut(value.into());
         }
         _ => {}
@@ -543,7 +805,11 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
             if let Some(recorder) = state.borrow().recorder.as_ref() {
                 recorder.send(Command::TogglePause);
             } else if let Some(main) = main.upgrade() {
-                set_status(&main, "当前没有可暂停的录制", true);
+                set_status(
+                    &main,
+                    i18n::text("当前没有可暂停的录制", "There is no recording to pause"),
+                    true,
+                );
             }
         });
     }
@@ -554,14 +820,22 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
             let Some(main) = main.upgrade() else { return };
             if let Some(recorder) = state.borrow().recorder.as_ref() {
                 recorder.send(Command::Stop);
-                set_status(&main, "正在完成 MP4 文件...", false);
+                set_status(
+                    &main,
+                    i18n::text("正在完成 MP4 文件...", "Finalizing the MP4 file..."),
+                    false,
+                );
             } else if main.get_recording_state() == 3 {
                 let mut state = state.borrow_mut();
                 state.countdown_token = state.countdown_token.wrapping_add(1);
                 state.pending_options = None;
                 main.set_recording_state(0);
                 main.set_elapsed_text("00:00:00".into());
-                set_status(&main, "已取消开始录制", false);
+                set_status(
+                    &main,
+                    i18n::text("已取消开始录制", "Recording start canceled"),
+                    false,
+                );
             }
         });
     }
@@ -594,12 +868,22 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
         main.unwrap().on_choose_output_directory(move || {
             let Some(main) = main.upgrade() else { return };
             if state.borrow().recorder.is_some() || main.get_recording_state() != 0 {
-                set_status(&main, "录制期间不能更改保存目录", true);
+                set_status(
+                    &main,
+                    i18n::text(
+                        "录制期间不能更改保存目录",
+                        "The save folder cannot be changed while recording",
+                    ),
+                    true,
+                );
                 return;
             }
             let current = state.borrow().config.save_directory.clone();
             let Some(directory) = rfd::FileDialog::new()
-                .set_title("选择拾屏保存目录")
+                .set_title(i18n::text(
+                    "选择拾屏保存目录",
+                    "Select the ShiPing save folder",
+                ))
                 .set_directory(current)
                 .pick_folder()
             else {
@@ -608,8 +892,19 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
             state.borrow_mut().config.save_directory = directory.clone();
             main.set_save_directory(directory.to_string_lossy().into_owned().into());
             match state.borrow().config.save() {
-                Ok(()) => set_status(&main, "保存目录已更新", false),
-                Err(error) => set_status(&main, format!("保存配置失败：{error}"), true),
+                Ok(()) => set_status(
+                    &main,
+                    i18n::text("保存目录已更新", "Save folder updated"),
+                    false,
+                ),
+                Err(error) => set_status(
+                    &main,
+                    format!(
+                        "{}: {error}",
+                        i18n::text("保存配置失败", "Failed to save settings")
+                    ),
+                    true,
+                ),
             }
         });
     }
@@ -620,7 +915,13 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
             let Some(main) = main.upgrade() else { return };
             let directory = state.borrow().config.save_directory.clone();
             let result = std::fs::create_dir_all(&directory)
-                .with_context(|| format!("创建保存目录失败：{}", directory.display()))
+                .with_context(|| {
+                    format!(
+                        "{}: {}",
+                        i18n::text("创建保存目录失败", "Failed to create the save folder"),
+                        directory.display()
+                    )
+                })
                 .and_then(|_| shell::open_path(&directory));
             if let Err(error) = result {
                 set_status(&main, error.to_string(), true);
@@ -633,7 +934,14 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
         main.unwrap().on_open_output_file(move || {
             let Some(main) = main.upgrade() else { return };
             let Some(path) = state.borrow().last_output.clone() else {
-                set_status(&main, "还没有可打开的录制文件", true);
+                set_status(
+                    &main,
+                    i18n::text(
+                        "还没有可打开的录制文件",
+                        "There is no recorded file to open yet",
+                    ),
+                    true,
+                );
                 return;
             };
             if let Err(error) = shell::open_path(&path) {
@@ -667,7 +975,7 @@ fn refresh_screens(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<()
         .unwrap_or_else(|| monitors.primary_index());
     let selected = monitors
         .get(selected_index)
-        .ok_or_else(|| anyhow!("显示器列表为空"))?;
+        .ok_or_else(|| anyhow!(i18n::text("显示器列表为空", "The display list is empty")))?;
 
     main.set_screen_options(ModelRc::new(VecModel::from(
         labels
@@ -676,7 +984,9 @@ fn refresh_screens(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<()
             .collect::<Vec<_>>(),
     )));
     main.set_selected_screen_index(selected_index as i32);
-    main.set_selected_screen_label(format!("显示器 {}", selected_index + 1).into());
+    main.set_selected_screen_label(
+        format!("{} {}", i18n::text("显示器", "Display"), selected_index + 1).into(),
+    );
 
     let mut state = state.borrow_mut();
     state.selected_screen = Some(selected.bounds);
@@ -686,15 +996,24 @@ fn refresh_screens(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<()
 
 fn select_screen(main: &MainWindow, state: &Rc<RefCell<UiState>>, index: i32) -> Result<()> {
     if state.borrow().recorder.is_some() || main.get_recording_state() != 0 {
-        return Err(anyhow!("录制期间不能更改显示器"));
+        return Err(anyhow!(i18n::text(
+            "录制期间不能更改显示器",
+            "The display cannot be changed while recording"
+        )));
     }
-    let index = usize::try_from(index).map_err(|_| anyhow!("显示器索引无效"))?;
+    let index = usize::try_from(index)
+        .map_err(|_| anyhow!(i18n::text("显示器索引无效", "The display index is invalid")))?;
     let monitor = state
         .borrow()
         .monitors
         .as_ref()
         .and_then(|monitors| monitors.get(index))
-        .ok_or_else(|| anyhow!("所选显示器已不存在"))?;
+        .ok_or_else(|| {
+            anyhow!(i18n::text(
+                "所选显示器已不存在",
+                "The selected display is no longer available"
+            ))
+        })?;
 
     {
         let mut state = state.borrow_mut();
@@ -704,11 +1023,14 @@ fn select_screen(main: &MainWindow, state: &Rc<RefCell<UiState>>, index: i32) ->
     }
     main.set_source_mode(0);
     main.set_selected_screen_index(index as i32);
-    main.set_selected_screen_label(format!("显示器 {}", index + 1).into());
+    main.set_selected_screen_label(
+        format!("{} {}", i18n::text("显示器", "Display"), index + 1).into(),
+    );
     set_status(
         main,
         format!(
-            "已选择显示器 {}：{} × {}",
+            "{} {}: {} × {}",
+            i18n::text("已选择显示器", "Selected display"),
             index + 1,
             monitor.bounds.width,
             monitor.bounds.height
@@ -777,11 +1099,18 @@ fn open_target_selector(main: &MainWindow, state: &Rc<RefCell<UiState>>, mode: i
             .unwrap_or(target::primary_screen_bounds()?);
         state.borrow_mut().target = Some(RecordingTarget::Screen(bounds));
         state.borrow_mut().config.source_mode = 0;
-        set_status(main, "已选择当前显示器", false);
+        set_status(
+            main,
+            i18n::text("已选择当前显示器", "Current display selected"),
+            false,
+        );
         return Ok(());
     }
     if state.borrow().recorder.is_some() || main.get_recording_state() != 0 {
-        return Err(anyhow!("录制期间不能更改目标"));
+        return Err(anyhow!(i18n::text(
+            "录制期间不能更改目标",
+            "The recording target cannot be changed while recording"
+        )));
     }
     let desktop = target::virtual_desktop_bounds()?;
     let result = (|| -> Result<()> {
@@ -894,9 +1223,12 @@ fn selected_target(
     bottom: i32,
 ) -> Result<RecordingTarget> {
     let state = state.borrow();
-    let desktop = state
-        .selection_desktop
-        .ok_or_else(|| anyhow!("目标选择会话已结束"))?;
+    let desktop = state.selection_desktop.ok_or_else(|| {
+        anyhow!(i18n::text(
+            "目标选择会话已结束",
+            "The target selection session has ended"
+        ))
+    })?;
     if mode == 1 {
         let x = desktop.left + (left + right) / 2;
         let y = desktop.top + (top + bottom) / 2;
@@ -904,7 +1236,12 @@ fn selected_target(
             .candidates
             .as_ref()
             .and_then(|values| values.target_at(x, y))
-            .ok_or_else(|| anyhow!("光标位置没有可录制窗口"))?;
+            .ok_or_else(|| {
+                anyhow!(i18n::text(
+                    "光标位置没有可录制窗口",
+                    "There is no recordable window at the pointer position"
+                ))
+            })?;
         Ok(RecordingTarget::Window {
             hwnd: candidate.hwnd,
             initial_bounds: candidate.bounds,
@@ -939,13 +1276,18 @@ fn finish_selector(
             (
                 selector,
                 mode,
-                format!("已选择 {} × {} 录制目标", bounds.width, bounds.height),
+                format!(
+                    "{}: {} × {}",
+                    i18n::text("已选择录制目标", "Recording target selected"),
+                    bounds.width,
+                    bounds.height
+                ),
             )
         } else {
             (
                 selector,
                 state.config.source_mode as i32,
-                "已取消目标选择".to_owned(),
+                i18n::text("已取消目标选择", "Target selection canceled").to_owned(),
             )
         }
     };
@@ -959,7 +1301,10 @@ fn finish_selector(
 
 fn begin_countdown(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<()> {
     if state.borrow().recorder.is_some() || main.get_recording_state() != 0 {
-        return Err(anyhow!("已有录制任务正在进行"));
+        return Err(anyhow!(i18n::text(
+            "已有录制任务正在进行",
+            "A recording task is already active"
+        )));
     }
     let options = recording_options(main, state)?;
     {
@@ -996,7 +1341,11 @@ fn countdown_tick(
             Ok(recorder) => {
                 state.borrow_mut().recorder = Some(recorder);
                 main_window.set_elapsed_text("00:00:00".into());
-                set_status(&main_window, "正在初始化录制设备...", false);
+                set_status(
+                    &main_window,
+                    i18n::text("正在初始化录制设备...", "Initializing recording devices..."),
+                    false,
+                );
             }
             Err(error) => {
                 main_window.set_recording_state(0);
@@ -1006,7 +1355,14 @@ fn countdown_tick(
         return;
     }
     main_window.set_elapsed_text(format!("00:00:{remaining:02}").into());
-    set_status(&main_window, format!("{remaining} 秒后开始录制"), false);
+    set_status(
+        &main_window,
+        format!(
+            "{remaining} {}",
+            i18n::text("秒后开始录制", "seconds until recording starts")
+        ),
+        false,
+    );
     Timer::single_shot(Duration::from_secs(1), move || {
         countdown_tick(main, state, token, remaining - 1);
     });
@@ -1023,13 +1379,28 @@ fn recording_options(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<
         ),
         1 => match state.borrow().target {
             Some(target @ RecordingTarget::Window { .. }) => target,
-            _ => return Err(anyhow!("请先选择要录制的窗口")),
+            _ => {
+                return Err(anyhow!(i18n::text(
+                    "请先选择要录制的窗口",
+                    "Select a window to record first"
+                )));
+            }
         },
         2 => match state.borrow().target {
             Some(target @ RecordingTarget::Region(_)) => target,
-            _ => return Err(anyhow!("请先选择录制区域")),
+            _ => {
+                return Err(anyhow!(i18n::text(
+                    "请先选择录制区域",
+                    "Select a recording region first"
+                )));
+            }
         },
-        _ => return Err(anyhow!("录制目标类型无效")),
+        _ => {
+            return Err(anyhow!(i18n::text(
+                "录制目标类型无效",
+                "The recording target type is invalid"
+            )));
+        }
     };
     target.current_bounds()?;
     Ok(RecordingOptions {
@@ -1065,9 +1436,13 @@ fn handle_recorder_events(main: &MainWindow, state: &Rc<RefCell<UiState>>) {
                     main.window().set_minimized(true);
                 }
                 if let Some(warning) = warnings.first() {
-                    set_status(main, format!("录制中；{warning}"), false);
+                    set_status(
+                        main,
+                        format!("{}; {warning}", i18n::text("录制中", "Recording")),
+                        false,
+                    );
                 } else {
-                    set_status(main, "录制中", false);
+                    set_status(main, i18n::text("录制中", "Recording"), false);
                 }
             }
             Event::Progress(duration) => {
@@ -1078,9 +1453,9 @@ fn handle_recorder_events(main: &MainWindow, state: &Rc<RefCell<UiState>>) {
                 set_status(
                     main,
                     if paused {
-                        "录制已暂停"
+                        i18n::text("录制已暂停", "Recording paused")
                     } else {
-                        "录制已继续"
+                        i18n::text("录制已继续", "Recording resumed")
                     },
                     false,
                 );
@@ -1109,7 +1484,7 @@ fn handle_recorder_events(main: &MainWindow, state: &Rc<RefCell<UiState>>) {
                 let file_name = output_path
                     .file_name()
                     .and_then(|value| value.to_str())
-                    .unwrap_or("录制文件")
+                    .unwrap_or_else(|| i18n::text("录制文件", "recording"))
                     .to_owned();
                 main.set_output_file_name(file_name.clone().into());
                 let open_error = state
@@ -1119,25 +1494,46 @@ fn handle_recorder_events(main: &MainWindow, state: &Rc<RefCell<UiState>>) {
                     .then(|| {
                         output_path
                             .parent()
-                            .ok_or_else(|| anyhow!("录制文件没有父目录"))
+                            .ok_or_else(|| {
+                                anyhow!(i18n::text(
+                                    "录制文件没有父目录",
+                                    "The recorded file has no parent directory"
+                                ))
+                            })
                             .and_then(shell::open_path)
                     })
                     .and_then(Result::err);
                 if let Some(error) = open_error {
                     set_status(
                         main,
-                        format!("已保存：{file_name}；打开目录失败：{error}"),
+                        format!(
+                            "{}: {file_name}; {}: {error}",
+                            i18n::text("已保存", "Saved"),
+                            i18n::text("打开目录失败", "Failed to open the save folder")
+                        ),
                         true,
                     );
                 } else {
-                    set_status(main, format!("已保存：{file_name}（单击打开）"), false);
+                    set_status(
+                        main,
+                        format!(
+                            "{}: {file_name} {}",
+                            i18n::text("已保存", "Saved"),
+                            i18n::text("（单击打开）", "(click to open)")
+                        ),
+                        false,
+                    );
                 }
             }
             Event::Failed(message) => {
                 state.borrow_mut().recorder.take();
                 main.set_recording_state(0);
                 main.set_output_file_name("".into());
-                set_status(main, format!("录制失败：{message}"), true);
+                set_status(
+                    main,
+                    format!("{}: {message}", i18n::text("录制失败", "Recording failed")),
+                    true,
+                );
             }
         }
     }
@@ -1168,4 +1564,19 @@ fn format_duration(duration: Duration) -> String {
         seconds / 60 % 60,
         seconds % 60
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{language_from_index, language_index};
+    use crate::config::LanguageMode;
+
+    #[test]
+    fn preferences_map_only_english_and_chinese() {
+        assert_eq!(language_index(LanguageMode::English), 0);
+        assert_eq!(language_index(LanguageMode::Chinese), 1);
+        assert_eq!(language_from_index(0), LanguageMode::English);
+        assert_eq!(language_from_index(1), LanguageMode::Chinese);
+        assert_eq!(language_from_index(99), LanguageMode::English);
+    }
 }

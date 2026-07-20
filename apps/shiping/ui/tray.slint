@@ -1,7 +1,7 @@
 export component RecordingTray inherits SystemTrayIcon {
     icon: @image-url("icons/tray.svg");
-    tooltip: "拾屏";
-    title: "拾屏";
+    tooltip: @tr("拾屏");
+    title: @tr("拾屏");
 
     in property <string> start-shortcut-label: "F10";
     in property <string> pause-shortcut-label: "F11";
@@ -19,34 +19,37 @@ export component RecordingTray inherits SystemTrayIcon {
 
     Menu {
         MenuItem {
-            title: "显示拾屏";
+            title: @tr("显示拾屏");
             activated => { root.restore-window(); }
         }
         MenuSeparator {}
         MenuItem {
-            title: "开始录制" + (root.start-shortcut-label == "" ? "" : "    " + root.start-shortcut-label);
+            title: @tr("开始录制")
+                + (root.start-shortcut-label == "" ? "" : "    " + root.start-shortcut-label);
             activated => { root.start-recording(); }
         }
         MenuItem {
-            title: "暂停/继续录制" + (root.pause-shortcut-label == "" ? "" : "    " + root.pause-shortcut-label);
+            title: @tr("暂停/继续录制")
+                + (root.pause-shortcut-label == "" ? "" : "    " + root.pause-shortcut-label);
             activated => { root.pause-recording(); }
         }
         MenuItem {
-            title: "停止录制" + (root.stop-shortcut-label == "" ? "" : "    " + root.stop-shortcut-label);
+            title: @tr("停止录制")
+                + (root.stop-shortcut-label == "" ? "" : "    " + root.stop-shortcut-label);
             activated => { root.stop-recording(); }
         }
         MenuSeparator {}
         MenuItem {
-            title: "首选项...";
+            title: @tr("首选项...");
             activated => { root.open-preferences(); }
         }
         MenuItem {
-            title: "打开保存目录";
+            title: @tr("打开保存目录");
             activated => { root.open-output-directory(); }
         }
         MenuSeparator {}
         MenuItem {
-            title: "退出拾屏";
+            title: @tr("退出拾屏");
             activated => { root.quit-application(); }
         }
     }

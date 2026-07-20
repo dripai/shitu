@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, anyhow};
+use shi_foundation::i18n;
 
 use super::target::Bounds;
 
@@ -51,28 +52,37 @@ impl FrameGrabber {
 
         let screen_dc = unsafe { GetDC(None) };
         if screen_dc.0.is_null() {
-            return Err(anyhow!("GetDC 失败"));
+            return Err(anyhow!(i18n::text("GetDC 失败", "GetDC failed")));
         }
         let memory_dc = unsafe { CreateCompatibleDC(Some(screen_dc)) };
         if memory_dc.0.is_null() {
             unsafe {
                 let _ = windows::Win32::Graphics::Gdi::ReleaseDC(None, screen_dc);
             }
-            return Err(anyhow!("CreateCompatibleDC 失败"));
+            return Err(anyhow!(i18n::text(
+                "CreateCompatibleDC 失败",
+                "CreateCompatibleDC failed"
+            )));
         }
         let info = bitmap_info(width as i32, height as i32);
         let mut pixels: *mut c_void = ptr::null_mut();
         let bitmap = unsafe {
             CreateDIBSection(Some(screen_dc), &info, DIB_RGB_COLORS, &mut pixels, None, 0)
         }
-        .context("CreateDIBSection 失败")?;
+        .context(i18n::text(
+            "CreateDIBSection 失败",
+            "CreateDIBSection failed",
+        ))?;
         if pixels.is_null() {
             unsafe {
                 let _ = windows::Win32::Graphics::Gdi::DeleteObject(bitmap.into());
                 let _ = windows::Win32::Graphics::Gdi::DeleteDC(memory_dc);
                 let _ = windows::Win32::Graphics::Gdi::ReleaseDC(None, screen_dc);
             }
-            return Err(anyhow!("DIB 像素缓冲区为空"));
+            return Err(anyhow!(i18n::text(
+                "DIB 像素缓冲区为空",
+                "The DIB pixel buffer is empty"
+            )));
         }
         let previous = unsafe { SelectObject(memory_dc, bitmap.into()) };
         unsafe {
@@ -112,7 +122,10 @@ impl FrameGrabber {
             )
         };
         if !copied.as_bool() {
-            return Err(anyhow!("StretchBlt 采集屏幕失败"));
+            return Err(anyhow!(i18n::text(
+                "StretchBlt 采集屏幕失败",
+                "StretchBlt failed to capture the screen"
+            )));
         }
         if highlight_clicks {
             self.draw_click_highlight(source);

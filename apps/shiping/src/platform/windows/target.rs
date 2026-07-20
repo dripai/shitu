@@ -1,4 +1,5 @@
 use anyhow::{Result, anyhow};
+use shi_foundation::i18n;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Bounds {
@@ -11,7 +12,10 @@ pub struct Bounds {
 impl Bounds {
     pub fn validate(self) -> Result<Self> {
         if self.width < 16 || self.height < 16 {
-            return Err(anyhow!("录制区域至少需要 16 × 16 像素"));
+            return Err(anyhow!(i18n::text(
+                "录制区域至少需要 16 × 16 像素",
+                "The recording region must be at least 16 × 16 pixels"
+            )));
         }
         Ok(self)
     }
@@ -89,14 +93,20 @@ impl MonitorCandidates {
         values.retain(|monitor| monitor.bounds.validate().is_ok());
         values.sort_by_key(|monitor| (!monitor.primary, monitor.bounds.top, monitor.bounds.left));
         if values.is_empty() {
-            return Err(anyhow!("未检测到可录制的显示器"));
+            return Err(anyhow!(i18n::text(
+                "未检测到可录制的显示器",
+                "No recordable display was detected"
+            )));
         }
         Ok(Self { values })
     }
 
     #[cfg(not(windows))]
     pub fn snapshot() -> Result<Self> {
-        Err(anyhow!("显示器选择仅支持 Windows"))
+        Err(anyhow!(i18n::text(
+            "显示器选择仅支持 Windows",
+            "Display selection is only supported on Windows"
+        )))
     }
 
     pub fn get(&self, index: usize) -> Option<MonitorCandidate> {
@@ -122,12 +132,13 @@ impl MonitorCandidates {
             .enumerate()
             .map(|(index, monitor)| {
                 format!(
-                    "显示器 {} · {} × {}{}",
+                    "{} {} · {} × {}{}",
+                    i18n::text("显示器", "Display"),
                     index + 1,
                     monitor.bounds.width,
                     monitor.bounds.height,
                     if monitor.primary {
-                        "（主显示器）"
+                        i18n::text("（主显示器）", " (primary)")
                     } else {
                         ""
                     }
@@ -149,7 +160,12 @@ impl RecordingTarget {
         match self {
             Self::Screen(bounds) | Self::Region(bounds) => bounds.validate(),
             Self::Window { hwnd, .. } => window_bounds(hwnd)
-                .ok_or_else(|| anyhow!("所选窗口已关闭、隐藏或最小化"))?
+                .ok_or_else(|| {
+                    anyhow!(i18n::text(
+                        "所选窗口已关闭、隐藏或最小化",
+                        "The selected window was closed, hidden, or minimized"
+                    ))
+                })?
                 .validate(),
         }
     }
@@ -206,7 +222,10 @@ impl WindowCandidates {
 
     #[cfg(not(windows))]
     pub fn snapshot(_desktop: Bounds) -> Result<Self> {
-        Err(anyhow!("窗口选择仅支持 Windows"))
+        Err(anyhow!(i18n::text(
+            "窗口选择仅支持 Windows",
+            "Window selection is only supported on Windows"
+        )))
     }
 
     pub fn target_at(&self, x: i32, y: i32) -> Option<WindowCandidate> {
@@ -238,7 +257,10 @@ pub fn virtual_desktop_bounds() -> Result<Bounds> {
 
 #[cfg(not(windows))]
 pub fn virtual_desktop_bounds() -> Result<Bounds> {
-    Err(anyhow!("屏幕录制仅支持 Windows"))
+    Err(anyhow!(i18n::text(
+        "屏幕录制仅支持 Windows",
+        "Screen recording is only supported on Windows"
+    )))
 }
 
 #[cfg(windows)]
@@ -255,7 +277,10 @@ pub fn primary_screen_bounds() -> Result<Bounds> {
 
 #[cfg(not(windows))]
 pub fn primary_screen_bounds() -> Result<Bounds> {
-    Err(anyhow!("屏幕录制仅支持 Windows"))
+    Err(anyhow!(i18n::text(
+        "屏幕录制仅支持 Windows",
+        "Screen recording is only supported on Windows"
+    )))
 }
 
 #[cfg(windows)]

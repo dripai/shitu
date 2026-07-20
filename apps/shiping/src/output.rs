@@ -4,6 +4,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, anyhow};
+use shi_foundation::i18n;
 
 pub struct OutputPaths {
     pub partial: PathBuf,
@@ -11,8 +12,13 @@ pub struct OutputPaths {
 }
 
 pub fn prepare(directory: &Path) -> Result<OutputPaths> {
-    fs::create_dir_all(directory)
-        .with_context(|| format!("创建保存目录失败：{}", directory.display()))?;
+    fs::create_dir_all(directory).with_context(|| {
+        format!(
+            "{}: {}",
+            i18n::text("创建保存目录失败", "Failed to create the save folder"),
+            directory.display()
+        )
+    })?;
     let timestamp = timestamp();
     for suffix in 0..10_000_u32 {
         let stem = if suffix == 0 {
@@ -29,7 +35,10 @@ pub fn prepare(directory: &Path) -> Result<OutputPaths> {
             });
         }
     }
-    Err(anyhow!("无法生成不重复的录制文件名"))
+    Err(anyhow!(i18n::text(
+        "无法生成不重复的录制文件名",
+        "Could not generate a unique recording filename"
+    )))
 }
 
 fn timestamp() -> String {
@@ -39,7 +48,8 @@ fn timestamp() -> String {
 pub fn commit(paths: &OutputPaths) -> Result<()> {
     fs::rename(&paths.partial, &paths.final_path).with_context(|| {
         format!(
-            "完成录制文件失败：{} -> {}",
+            "{}: {} -> {}",
+            i18n::text("完成录制文件失败", "Failed to finalize the recorded file"),
             paths.partial.display(),
             paths.final_path.display()
         )
