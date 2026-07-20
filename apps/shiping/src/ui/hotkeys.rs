@@ -248,13 +248,16 @@ fn parse_shortcuts(
 }
 
 fn validate_hotkey(hotkey: HotKey) -> std::result::Result<(), String> {
-    if hotkey.mods.is_empty() && !is_function_key(hotkey.key) {
+    if is_unsupported_function_key(hotkey.key) {
+        return Err("功能键仅支持 F1–F12".to_owned());
+    }
+    if hotkey.mods.is_empty() && !is_supported_function_key(hotkey.key) {
         return Err("普通按键必须同时按下 Ctrl、Alt、Shift 或 Win".to_owned());
     }
     Ok(())
 }
 
-fn is_function_key(key: Code) -> bool {
+fn is_supported_function_key(key: Code) -> bool {
     matches!(
         key,
         Code::F1
@@ -269,7 +272,13 @@ fn is_function_key(key: Code) -> bool {
             | Code::F10
             | Code::F11
             | Code::F12
-            | Code::F13
+    )
+}
+
+fn is_unsupported_function_key(key: Code) -> bool {
+    matches!(
+        key,
+        Code::F13
             | Code::F14
             | Code::F15
             | Code::F16
@@ -420,7 +429,7 @@ mod tests {
 
     use super::{
         HotkeyRegistrar, display_shortcut, parse_shortcuts, replace_registered,
-        shortcut_from_key_event,
+        shortcut_from_key_event, validate_hotkey,
     };
 
     #[derive(Default)]
@@ -456,6 +465,21 @@ mod tests {
         let letter = shortcut_from_key_event("a", true, false, true, false).unwrap();
         assert_eq!(display_shortcut(Some(&letter)), "Ctrl + Shift + A");
         assert!(shortcut_from_key_event("a", false, false, false, false).is_err());
+    }
+
+    #[test]
+    fn rejects_function_keys_above_f12() {
+        let captured = shortcut_from_key_event("\u{F710}", false, false, false, false).unwrap_err();
+        assert!(captured.message.contains("F1–F12"));
+
+        let f13 = "F13".parse::<HotKey>().unwrap();
+        assert!(validate_hotkey(f13).is_err());
+        let modified_f13 = "control+F13".parse::<HotKey>().unwrap();
+        assert!(validate_hotkey(modified_f13).is_err());
+
+        let configured = parse_shortcuts([Some("F13".to_owned()), None, None]).unwrap_err();
+        assert_eq!(configured.action, Some(0));
+        assert!(configured.message.contains("F1–F12"));
     }
 
     #[test]

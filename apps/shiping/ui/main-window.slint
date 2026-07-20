@@ -259,6 +259,7 @@ component RangeAction {
 
 export component MainWindow inherits Window {
     title: "拾屏";
+    icon: @image-url("icons/tray.svg");
     default-font-family: "Microsoft YaHei UI";
     default-font-size: 13px;
     width: root.settings-collapsed ? 474px : 674px;
@@ -377,18 +378,15 @@ export component MainWindow inherits Window {
                     y: 6.5px;
                     width: 44px;
                     height: 44px;
-                    border-radius: 11px;
-                    border-width: 1px;
-                    border-color: #414957;
-                    background: #252b36;
+                    background: transparent;
 
                     Path {
-                        x: 9px;
-                        y: 9px;
-                        width: 26px;
-                        height: 26px;
-                        viewbox-width: 24;
-                        viewbox-height: 24;
+                        width: 44px;
+                        height: 44px;
+                        viewbox-x: 3;
+                        viewbox-y: 3;
+                        viewbox-width: 18;
+                        viewbox-height: 18;
                         commands: "M9 4 H4 V9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15";
                         fill: transparent;
                         stroke: #e8ebf0;
@@ -398,11 +396,11 @@ export component MainWindow inherits Window {
                     }
 
                     Rectangle {
-                        x: 18px;
-                        y: 18px;
-                        width: 8px;
-                        height: 8px;
-                        border-radius: 4px;
+                        x: 16px;
+                        y: 16px;
+                        width: 12px;
+                        height: 12px;
+                        border-radius: 6px;
                         background: #f14f5d;
                     }
                 }

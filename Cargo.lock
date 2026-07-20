@@ -4073,6 +4073,7 @@ dependencies = [
  "slint",
  "slint-build",
  "windows",
+ "winresource",
 ]
 
 [[package]]

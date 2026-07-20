@@ -21,3 +21,4 @@ windows.workspace = true
 [build-dependencies]
 shi-ui = { path = "../../crates/shi-ui" }
 slint-build.workspace = true
+winresource.workspace = true

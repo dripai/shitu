@@ -112,6 +112,7 @@ component ShortcutEditor {
 
 export component PreferencesDialog inherits Dialog {
     title: "拾屏首选项";
+    icon: @image-url("icons/tray.svg");
     default-font-family: "Microsoft YaHei UI";
     default-font-size: 13px;
     width: 600px;
@@ -325,7 +326,7 @@ export component PreferencesDialog inherits Dialog {
                         alignment: start;
 
                         Text {
-                            text: "单独使用 F1–F24，或为普通按键组合 Ctrl、Alt、Shift、Win。";
+                            text: "单独使用 F1–F12，或为普通按键组合 Ctrl、Alt、Shift、Win。";
                             color: #9fa8b5;
                             font-size: 12px;
                             height: 24px;
