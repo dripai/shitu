@@ -50,13 +50,22 @@ impl fmt::Display for ShortcutIssue {
 impl std::error::Error for ShortcutIssue {}
 
 trait HotkeyRegistrar {
-    fn register(&self, hotkey: HotKey) -> std::result::Result<(), String>;
+    fn register(&self, hotkey: HotKey) -> std::result::Result<(), RegistrationFailure>;
     fn unregister(&self, hotkey: HotKey) -> std::result::Result<(), String>;
 }
 
+#[derive(Debug)]
+enum RegistrationFailure {
+    Conflict,
+    Other(String),
+}
+
 impl HotkeyRegistrar for GlobalHotKeyManager {
-    fn register(&self, hotkey: HotKey) -> std::result::Result<(), String> {
-        GlobalHotKeyManager::register(self, hotkey).map_err(|error| error.to_string())
+    fn register(&self, hotkey: HotKey) -> std::result::Result<(), RegistrationFailure> {
+        GlobalHotKeyManager::register(self, hotkey).map_err(|error| match error {
+            global_hotkey::Error::AlreadyRegistered(_) => RegistrationFailure::Conflict,
+            error => RegistrationFailure::Other(error.to_string()),
+        })
     }
 
     fn unregister(&self, hotkey: HotKey) -> std::result::Result<(), String> {
@@ -352,10 +361,15 @@ fn register_set<R: HotkeyRegistrar>(
             for registered_hotkey in registered {
                 let _ = registrar.unregister(registered_hotkey);
             }
-            return Err(ShortcutIssue::action(
-                index,
-                format!("{}不可用或已被占用：{error}", action_label(index)),
-            ));
+            let message = match error {
+                RegistrationFailure::Conflict => {
+                    format!("{}快捷键已被其他程序占用", action_label(index))
+                }
+                RegistrationFailure::Other(error) => {
+                    format!("{}快捷键注册失败：{error}", action_label(index))
+                }
+            };
+            return Err(ShortcutIssue::action(index, message));
         }
         registered.push(hotkey);
     }
@@ -416,9 +430,9 @@ mod tests {
     }
 
     impl HotkeyRegistrar for FakeRegistrar {
-        fn register(&self, hotkey: HotKey) -> Result<(), String> {
+        fn register(&self, hotkey: HotKey) -> Result<(), super::RegistrationFailure> {
             if self.rejected.borrow().contains(&hotkey) {
-                return Err("已被其他程序占用".to_owned());
+                return Err(super::RegistrationFailure::Conflict);
             }
             self.registered.borrow_mut().insert(hotkey);
             Ok(())

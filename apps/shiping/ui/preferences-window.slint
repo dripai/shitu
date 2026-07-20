@@ -14,20 +14,20 @@ component ShortcutEditor {
 
     callback captured(string, bool, bool, bool, bool);
 
-    height: 76px;
+    height: 64px;
 
     VerticalLayout {
-        spacing: 5px;
+        spacing: 3px;
 
         HorizontalLayout {
-            spacing: 12px;
+            spacing: 8px;
             alignment: center;
 
             Text {
                 text: root.action-label;
                 color: #e7eaf0;
                 font-size: 13px;
-                width: 92px;
+                width: 76px;
                 vertical-alignment: center;
             }
 
@@ -38,7 +38,7 @@ component ShortcutEditor {
             }
 
             shortcut-box := Rectangle {
-                height: 34px;
+                height: 32px;
                 horizontal-stretch: 1;
                 border-radius: 5px;
                 border-width: keyboard-focus.has-focus ? 2px : 1px;
@@ -112,7 +112,7 @@ component ShortcutEditor {
             text: root.error-text;
             color: #f4878f;
             font-size: 11px;
-            height: 16px;
+            height: 13px;
             overflow: elide;
         }
     }
@@ -122,8 +122,8 @@ export component PreferencesDialog inherits Dialog {
     title: "拾屏首选项";
     default-font-family: "Microsoft YaHei UI";
     default-font-size: 13px;
-    width: 680px;
-    height: 520px;
+    width: 600px;
+    height: 400px;
     background: #1f242c;
 
     in-out property <bool> recording-active: false;
@@ -159,11 +159,11 @@ export component PreferencesDialog inherits Dialog {
     callback shortcut-captured(int, string, bool, bool, bool, bool);
 
     VerticalLayout {
-        padding: 16px;
-        spacing: 10px;
+        padding: 10px;
+        spacing: 6px;
 
         if root.recording-active: Rectangle {
-            height: 34px;
+            height: 30px;
             border-radius: 5px;
             background: #493f2d;
 
@@ -177,6 +177,7 @@ export component PreferencesDialog inherits Dialog {
         }
 
         TabWidget {
+            orientation: Orientation.vertical;
             horizontal-stretch: 1;
             vertical-stretch: 1;
 
@@ -187,31 +188,36 @@ export component PreferencesDialog inherits Dialog {
                     background: transparent;
 
                     VerticalLayout {
-                        padding: 20px;
-                        spacing: 18px;
+                        padding: 12px;
+                        spacing: 8px;
+                        alignment: start;
 
                         Switch {
+                            height: 30px;
                             text: "开始录制后自动最小化到托盘";
                             enabled: !root.recording-active;
                             checked <=> root.auto-minimize-after-start;
                         }
 
                         Switch {
+                            height: 30px;
                             text: "停止录制并保存后打开保存目录";
                             enabled: !root.recording-active;
                             checked <=> root.open-directory-after-stop;
                         }
 
                         HorizontalLayout {
-                            spacing: 12px;
+                            height: 34px;
+                            spacing: 8px;
                             alignment: center;
 
                             Text {
                                 text: "开始倒计时";
                                 color: #e7eaf0;
-                                width: 110px;
+                                width: 76px;
                             }
                             ComboBox {
+                                width: 150px;
                                 enabled: !root.recording-active;
                                 model: ["关闭", "3 秒", "5 秒"];
                                 current-index: root.countdown-seconds == 0
@@ -220,34 +226,36 @@ export component PreferencesDialog inherits Dialog {
                                     root.countdown-seconds = value == "关闭" ? 0 : value == "3 秒" ? 3 : 5;
                                 }
                             }
+                            Rectangle { horizontal-stretch: 1; }
                         }
 
-                        VerticalLayout {
-                            spacing: 7px;
+                        HorizontalLayout {
+                            height: 34px;
+                            spacing: 8px;
+                            alignment: center;
 
                             Text {
                                 text: "保存目录";
                                 color: #e7eaf0;
+                                width: 76px;
                             }
-                            HorizontalLayout {
-                                spacing: 8px;
-
-                                LineEdit {
-                                    text: root.save-directory;
-                                    read-only: true;
-                                    horizontal-stretch: 1;
-                                }
-                                Button {
-                                    text: "选择...";
-                                    enabled: !root.recording-active;
-                                    clicked => { root.choose-output-directory(); }
-                                }
-                                Button {
-                                    text: "打开";
-                                    clicked => { root.open-output-directory(); }
-                                }
+                            LineEdit {
+                                text: root.save-directory;
+                                read-only: true;
+                                horizontal-stretch: 1;
+                            }
+                            Button {
+                                text: "选择...";
+                                enabled: !root.recording-active;
+                                clicked => { root.choose-output-directory(); }
+                            }
+                            Button {
+                                text: "打开";
+                                clicked => { root.open-output-directory(); }
                             }
                         }
+
+                        Rectangle { vertical-stretch: 1; }
                     }
                 }
             }
@@ -258,27 +266,40 @@ export component PreferencesDialog inherits Dialog {
                 Rectangle {
                     background: transparent;
 
-                    GridLayout {
-                        padding: 20px;
-                        spacing: 14px;
+                    VerticalLayout {
+                        padding: 12px;
+                        spacing: 8px;
+                        alignment: start;
 
-                        Row {
-                            Text { text: "默认清晰度"; color: #e7eaf0; }
+                        HorizontalLayout {
+                            height: 34px;
+                            spacing: 8px;
+                            alignment: center;
+                            Text { text: "默认清晰度"; color: #e7eaf0; width: 90px; }
                             ComboBox {
+                                width: 180px;
                                 enabled: !root.recording-active;
                                 model: ["自动", "720p", "1080p", "原始分辨率"];
                                 current-index <=> root.quality-preset;
                             }
+                            Rectangle { horizontal-stretch: 1; }
                         }
-                        Row {
-                            Text { text: "默认帧率"; color: #e7eaf0; }
+                        HorizontalLayout {
+                            height: 34px;
+                            spacing: 8px;
+                            alignment: center;
+                            Text { text: "默认帧率"; color: #e7eaf0; width: 90px; }
                             ComboBox {
+                                width: 180px;
                                 enabled: !root.recording-active;
                                 model: ["30 FPS", "60 FPS"];
                                 current-index <=> root.frame-rate;
                             }
+                            Rectangle { horizontal-stretch: 1; }
                         }
-                        Row {
+                        HorizontalLayout {
+                            height: 32px;
+                            spacing: 24px;
                             Switch {
                                 text: "默认录制系统声音";
                                 enabled: !root.recording-active;
@@ -290,7 +311,9 @@ export component PreferencesDialog inherits Dialog {
                                 checked <=> root.microphone;
                             }
                         }
-                        Row {
+                        HorizontalLayout {
+                            height: 32px;
+                            spacing: 24px;
                             Switch {
                                 text: "显示鼠标指针";
                                 enabled: !root.recording-active;
@@ -302,6 +325,8 @@ export component PreferencesDialog inherits Dialog {
                                 checked <=> root.highlight-clicks;
                             }
                         }
+
+                        Rectangle { vertical-stretch: 1; }
                     }
                 }
             }
@@ -313,14 +338,15 @@ export component PreferencesDialog inherits Dialog {
                     background: transparent;
 
                     VerticalLayout {
-                        padding: 20px;
-                        spacing: 2px;
+                        padding: 12px;
+                        spacing: 0px;
+                        alignment: start;
 
                         Text {
                             text: "单独使用 F1–F24，或为普通按键组合 Ctrl、Alt、Shift、Win。";
                             color: #9fa8b5;
                             font-size: 12px;
-                            height: 28px;
+                            height: 24px;
                         }
 
                         ShortcutEditor {
@@ -353,6 +379,8 @@ export component PreferencesDialog inherits Dialog {
                                 root.shortcut-captured(2, text, control, alt, shift, meta);
                             }
                         }
+
+                        Rectangle { vertical-stretch: 1; }
                     }
                 }
             }
@@ -362,7 +390,7 @@ export component PreferencesDialog inherits Dialog {
             text: root.status-text;
             color: root.status-error ? #f4878f : #8fd5a6;
             font-size: 12px;
-            height: 18px;
+            height: 16px;
             overflow: elide;
         }
     }
