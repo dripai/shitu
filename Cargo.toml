@@ -11,7 +11,7 @@ default-members = ["apps/shitu"]
 exclude = ["tools/windows-ai-bindgen"]
 
 [workspace.package]
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 
 [workspace.dependencies]

@@ -4047,7 +4047,7 @@ dependencies = [
 
 [[package]]
 name = "shi-foundation"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "serde",
  "slint",
@@ -4056,11 +4056,11 @@ dependencies = [
 
 [[package]]
 name = "shi-ui"
-version = "0.1.5"
+version = "0.1.6"
 
 [[package]]
 name = "shiping"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "global-hotkey",
@@ -4078,7 +4078,7 @@ dependencies = [
 
 [[package]]
 name = "shitu"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "global-hotkey",
@@ -4099,7 +4099,7 @@ dependencies = [
 
 [[package]]
 name = "shiyin"
-version = "0.1.5"
+version = "0.1.6"
 
 [[package]]
 name = "shlex"
