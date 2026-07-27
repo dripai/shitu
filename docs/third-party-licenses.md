@@ -19,6 +19,14 @@
 
 图标源码许可文本保存在 `apps/shitu/src/icons/LICENSE`。
 
+## Microsoft Fluent System Icons
+
+- 项目：https://github.com/microsoft/fluentui-system-icons
+- 用途：录屏工具的系统声音与麦克风状态图标
+- 许可：MIT License
+
+采用 24px Regular 风格的 Speaker 2、Speaker Off、Mic 与 Mic Off 图标。许可文本保存在 `apps/shiping/ui/icons/FLUENT_SYSTEM_ICONS_LICENSE`。
+
 ## Rust 依赖
 
 Rust 依赖包括 `anyhow`、`global-hotkey`、`image`、`raw-window-handle`、`rfd`、`serde`、`serde_json`、`slint` 和 `windows`。各项目保留其原始版权与许可。

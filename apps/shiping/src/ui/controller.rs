@@ -769,9 +769,19 @@ fn show_shortcut_issue(preferences: &PreferencesDialog, issue: &ShortcutIssue) {
 
 fn restore_main_window(main: &slint::Weak<MainWindow>) {
     let Some(main) = main.upgrade() else { return };
+    if let Err(error) = restore_main_window_handle(&main) {
+        set_status(&main, error.to_string(), true);
+    }
+}
+
+fn restore_main_window_handle(main: &MainWindow) -> Result<()> {
     main.window().set_minimized(false);
-    let _ = main.show();
+    main.show().context(i18n::text(
+        "无法恢复拾屏主窗口",
+        "Could not restore the ShiPing window",
+    ))?;
     main.window().request_redraw();
+    Ok(())
 }
 
 fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
@@ -829,7 +839,9 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
                 if let Some(recorder) = state.borrow().recorder.as_ref() {
                     recorder.send(Command::Stop);
                 }
-                match clear_target_indicator(&state) {
+                let clear_result = clear_target_indicator(&state);
+                let restore_result = restore_main_window_handle(&main);
+                match clear_result.and(restore_result) {
                     Ok(()) => set_status(
                         &main,
                         i18n::text("正在完成录制文件...", "Finalizing the recording file..."),
@@ -845,7 +857,9 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
                 }
                 main.set_recording_state(0);
                 main.set_elapsed_text("00:00:00".into());
-                match clear_target_indicator(&state) {
+                let clear_result = clear_target_indicator(&state);
+                let restore_result = restore_main_window_handle(&main);
+                match clear_result.and(restore_result) {
                     Ok(()) => set_status(
                         &main,
                         i18n::text("已取消开始录制", "Recording start canceled"),
