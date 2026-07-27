@@ -4047,6 +4047,7 @@ name = "shitu"
 version = "0.1.7"
 dependencies = [
  "anyhow",
+ "chrono",
  "global-hotkey",
  "image",
  "raw-window-handle",

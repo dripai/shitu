@@ -24,6 +24,7 @@ windows-core.workspace = true
 windows-future.workspace = true
 
 [build-dependencies]
+chrono = { version = "0.4.45", default-features = false, features = ["now"] }
 shi-ui = { path = "../../crates/shi-ui" }
 slint-build.workspace = true
 winresource.workspace = true

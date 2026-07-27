@@ -1,6 +1,11 @@
 fn main() {
+    println!("cargo:rerun-if-env-changed=SHITU_BUILD_DATE");
     println!("cargo:rerun-if-changed=../../assets/app.ico");
     println!("cargo:rerun-if-changed=../../packaging/ShiTu.exe.manifest");
+    let build_date = std::env::var("SHITU_BUILD_DATE")
+        .unwrap_or_else(|_| chrono::Utc::now().format("%Y-%m-%d").to_string());
+    println!("cargo:rustc-env=SHITU_BUILD_DATE={build_date}");
+
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         let mut resource = winresource::WindowsResource::new();
         resource.set_icon("../../assets/app.ico");

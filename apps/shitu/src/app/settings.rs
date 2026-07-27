@@ -627,13 +627,14 @@ fn report_result(
 
 fn build_information() -> String {
     format!(
-        "Windows {} · Slint 1.17.0 · {}",
+        "Windows {} · Slint 1.17.0 · {} · {}",
         std::env::consts::ARCH,
         if cfg!(debug_assertions) {
             "Debug"
         } else {
             "Release"
-        }
+        },
+        env!("SHITU_BUILD_DATE")
     )
 }
 
