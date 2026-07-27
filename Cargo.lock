@@ -4029,6 +4029,7 @@ name = "shiping"
 version = "0.1.7"
 dependencies = [
  "anyhow",
+ "gif",
  "global-hotkey",
  "raw-window-handle",
  "rfd",

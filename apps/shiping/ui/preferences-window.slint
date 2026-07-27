@@ -32,8 +32,9 @@ component ShortcutEditor {
         }
 
         shortcut-box := Rectangle {
+            width: 180px;
             height: 32px;
-            horizontal-stretch: 1;
+            horizontal-stretch: 0;
             border-radius: 5px;
             border-width: keyboard-focus.has-focus ? 2px : 1px;
             border-color: root.error-text != ""
@@ -120,6 +121,7 @@ export component PreferencesDialog inherits Dialog {
 
     in-out property <int> quality-preset: 2;
     in-out property <int> frame-rate: 0;
+    in-out property <int> output-format: 0;
     in-out property <bool> system-audio: true;
     in-out property <bool> microphone: false;
     in-out property <bool> show-cursor: true;
@@ -139,7 +141,7 @@ export component PreferencesDialog inherits Dialog {
     private property <length> setting-row-spacing: 8px;
     private property <int> current-page: 0;
 
-    callback save-settings(bool);
+    callback save-settings();
     callback cancel-settings();
     callback reset-settings();
     callback preview-language(int);
@@ -148,67 +150,70 @@ export component PreferencesDialog inherits Dialog {
     callback shortcut-captured(int, string, bool, bool, bool, bool);
 
     VerticalLayout {
-        padding: 10px;
-        spacing: 6px;
+        spacing: 0px;
 
-        HorizontalLayout {
-            spacing: 12px;
+        Rectangle {
             horizontal-stretch: 1;
             vertical-stretch: 1;
+            background: root.background;
 
-            // Slint 1.17's vertical TabWidget has no public tab-row-height property.
-            // Keep native button focus, keyboard and accessibility behavior while limiting
-            // this navigation-only replacement to three compact rows.
-            VerticalLayout {
-                width: 80px;
-                spacing: 4px;
-                alignment: start;
+            HorizontalLayout {
+                padding: 10px;
+                spacing: 12px;
 
-                general-page-button := Button {
-                    height: 36px;
-                    text: @tr("常规");
-                    checkable: true;
-                    checked: true;
-                    clicked => {
-                        general-page-button.checked = true;
-                        recording-page-button.checked = false;
-                        shortcuts-page-button.checked = false;
-                        root.current-page = 0;
+                // Slint 1.17's vertical TabWidget has no public tab-row-height property.
+                // Keep native button focus, keyboard and accessibility behavior while limiting
+                // this navigation-only replacement to three compact rows.
+                VerticalLayout {
+                    width: 80px;
+                    spacing: 4px;
+                    alignment: start;
+
+                    general-page-button := Button {
+                        height: 36px;
+                        text: @tr("常规");
+                        checkable: true;
+                        checked: true;
+                        clicked => {
+                            general-page-button.checked = true;
+                            recording-page-button.checked = false;
+                            shortcuts-page-button.checked = false;
+                            root.current-page = 0;
+                        }
+                    }
+                    recording-page-button := Button {
+                        height: 36px;
+                        text: @tr("录制");
+                        checkable: true;
+                        clicked => {
+                            general-page-button.checked = false;
+                            recording-page-button.checked = true;
+                            shortcuts-page-button.checked = false;
+                            root.current-page = 1;
+                        }
+                    }
+                    shortcuts-page-button := Button {
+                        height: 36px;
+                        text: @tr("快捷键");
+                        checkable: true;
+                        clicked => {
+                            general-page-button.checked = false;
+                            recording-page-button.checked = false;
+                            shortcuts-page-button.checked = true;
+                            root.current-page = 2;
+                        }
                     }
                 }
-                recording-page-button := Button {
-                    height: 36px;
-                    text: @tr("录制");
-                    checkable: true;
-                    clicked => {
-                        general-page-button.checked = false;
-                        recording-page-button.checked = true;
-                        shortcuts-page-button.checked = false;
-                        root.current-page = 1;
-                    }
-                }
-                shortcuts-page-button := Button {
-                    height: 36px;
-                    text: @tr("快捷键");
-                    checkable: true;
-                    clicked => {
-                        general-page-button.checked = false;
-                        recording-page-button.checked = false;
-                        shortcuts-page-button.checked = true;
-                        root.current-page = 2;
-                    }
-                }
-            }
 
-            Rectangle {
-                width: 1px;
-                background: #343b47;
-            }
+                Rectangle {
+                    width: 1px;
+                    background: #343b47;
+                }
 
-            Rectangle {
-                horizontal-stretch: 1;
-                vertical-stretch: 1;
-                background: transparent;
+                Rectangle {
+                    horizontal-stretch: 1;
+                    vertical-stretch: 1;
+                    background: transparent;
 
                 if root.current-page == 0: Rectangle {
                     background: transparent;
@@ -311,73 +316,97 @@ export component PreferencesDialog inherits Dialog {
                     }
                 }
 
-                if root.current-page == 1: Rectangle {
-                    background: transparent;
+                    if root.current-page == 1: Rectangle {
+                        background: transparent;
 
-                    VerticalLayout {
-                        padding: 12px;
-                        spacing: root.setting-row-spacing;
-                        alignment: start;
-
-                        HorizontalLayout {
-                            height: root.setting-row-height;
-                            spacing: 8px;
+                        VerticalLayout {
+                            padding: 12px;
+                            spacing: root.setting-row-spacing;
                             alignment: start;
-                            cross-axis-alignment: center;
-                            Text { text: @tr("默认清晰度"); color: #e7eaf0; width: root.setting-label-width; }
-                            ComboBox {
-                                width: 180px;
-                                enabled: !root.recording-active;
-                                model: [@tr("自动"), "720p", "1080p", @tr("原始分辨率")];
-                                current-index <=> root.quality-preset;
-                            }
-                            Rectangle { horizontal-stretch: 1; }
-                        }
-                        HorizontalLayout {
-                            height: root.setting-row-height;
-                            spacing: 8px;
-                            alignment: start;
-                            cross-axis-alignment: center;
-                            Text { text: @tr("默认帧率"); color: #e7eaf0; width: root.setting-label-width; }
-                            ComboBox {
-                                width: 180px;
-                                enabled: !root.recording-active;
-                                model: ["30 FPS", "60 FPS"];
-                                current-index <=> root.frame-rate;
-                            }
-                            Rectangle { horizontal-stretch: 1; }
-                        }
-                        Switch {
-                            height: root.setting-row-height;
-                            text: @tr("默认录制系统声音");
-                            enabled: !root.recording-active;
-                            checked <=> root.system-audio;
-                        }
-                        Switch {
-                            height: root.setting-row-height;
-                            text: @tr("默认录制麦克风");
-                            enabled: !root.recording-active;
-                            checked <=> root.microphone;
-                        }
-                        Switch {
-                            height: root.setting-row-height;
-                            text: @tr("显示鼠标指针");
-                            enabled: !root.recording-active;
-                            checked <=> root.show-cursor;
-                        }
-                        Switch {
-                            height: root.setting-row-height;
-                            text: @tr("突出鼠标点击");
-                            enabled: !root.recording-active;
-                            checked <=> root.highlight-clicks;
-                        }
 
-                        Rectangle { vertical-stretch: 1; }
+                            HorizontalLayout {
+                                height: root.setting-row-height;
+                                spacing: 8px;
+                                alignment: start;
+                                cross-axis-alignment: center;
+                                Text { text: @tr("输出格式"); color: #e7eaf0; width: root.setting-label-width; }
+                                ComboBox {
+                                    width: 180px;
+                                    enabled: !root.recording-active;
+                                    model: ["MP4", "GIF"];
+                                    current-index <=> root.output-format;
+                                    selected(value) => {
+                                        if root.output-format == 1 {
+                                            root.system-audio = false;
+                                            root.microphone = false;
+                                            root.status-text = @tr("GIF 格式不包含声音，已关闭系统声音和麦克风");
+                                            root.status-error = false;
+                                        }
+                                    }
+                                }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                            HorizontalLayout {
+                                height: root.setting-row-height;
+                                spacing: 8px;
+                                alignment: start;
+                                cross-axis-alignment: center;
+                                Text { text: @tr("默认清晰度"); color: #e7eaf0; width: root.setting-label-width; }
+                                ComboBox {
+                                    width: 180px;
+                                    enabled: !root.recording-active;
+                                    model: [@tr("自动"), "720p", "1080p", @tr("原始分辨率")];
+                                    current-index <=> root.quality-preset;
+                                }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                            HorizontalLayout {
+                                height: root.setting-row-height;
+                                spacing: 8px;
+                                alignment: start;
+                                cross-axis-alignment: center;
+                                Text { text: @tr("默认帧率"); color: #e7eaf0; width: root.setting-label-width; }
+                                ComboBox {
+                                    width: 180px;
+                                    enabled: !root.recording-active;
+                                    model: root.output-format == 0
+                                        ? ["30 FPS", "60 FPS"]
+                                        : ["10 FPS", "20 FPS"];
+                                    current-index <=> root.frame-rate;
+                                }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                            Switch {
+                                height: root.setting-row-height;
+                                text: @tr("默认录制系统声音");
+                                enabled: !root.recording-active && root.output-format == 0;
+                                checked <=> root.system-audio;
+                            }
+                            Switch {
+                                height: root.setting-row-height;
+                                text: @tr("默认录制麦克风");
+                                enabled: !root.recording-active && root.output-format == 0;
+                                checked <=> root.microphone;
+                            }
+                            Switch {
+                                height: root.setting-row-height;
+                                text: @tr("显示鼠标指针");
+                                enabled: !root.recording-active;
+                                checked <=> root.show-cursor;
+                            }
+                            Switch {
+                                height: root.setting-row-height;
+                                text: @tr("突出鼠标点击");
+                                enabled: !root.recording-active;
+                                checked <=> root.highlight-clicks;
+                            }
+
+                            Rectangle { vertical-stretch: 1; }
+                        }
                     }
-                }
 
-                if root.current-page == 2: Rectangle {
-                    background: transparent;
+                    if root.current-page == 2: Rectangle {
+                        background: transparent;
 
                     VerticalLayout {
                         padding: 12px;
@@ -427,41 +456,44 @@ export component PreferencesDialog inherits Dialog {
 
                         Rectangle { vertical-stretch: 1; }
                     }
+                    }
                 }
             }
         }
 
+        // Dialog's automatic role-button row is always placed after its content in Slint 1.17.
+        // Keep native Buttons, but place the footer explicitly so the shared StatusBar can be last.
+        HorizontalLayout {
+            height: 42px;
+            padding-left: 10px;
+            padding-right: 10px;
+            padding-top: 5px;
+            padding-bottom: 5px;
+            spacing: 8px;
+
+            Rectangle { horizontal-stretch: 1; }
+            Button {
+                text: @tr("恢复默认");
+                enabled: !root.recording-active;
+                clicked => { root.reset-settings(); }
+            }
+            Button {
+                text: @tr("取消");
+                clicked => { root.cancel-settings(); }
+            }
+            Button {
+                text: @tr("保存");
+                enabled: !root.recording-active;
+                clicked => { root.save-settings(); }
+            }
+        }
+
         StatusBar {
+            visible: root.status-text != "" || root.recording-active;
             status-text: root.status-text != ""
                 ? root.status-text
-                : root.recording-active
-                    ? @tr("录制进行中：停止录制后才能应用修改")
-                    : @tr("修改后请单击“应用”或“确定”保存");
+                : @tr("录制进行中：停止录制后才能保存修改");
             status-level: root.status-error ? 2 : 0;
         }
-    }
-
-    Button {
-        text: @tr("恢复默认");
-        enabled: !root.recording-active;
-        dialog-button-role: reset;
-        clicked => { root.reset-settings(); }
-    }
-    Button {
-        text: @tr("取消");
-        dialog-button-role: reject;
-        clicked => { root.cancel-settings(); }
-    }
-    Button {
-        text: @tr("应用");
-        enabled: !root.recording-active;
-        dialog-button-role: apply;
-        clicked => { root.save-settings(false); }
-    }
-    Button {
-        text: @tr("确定");
-        enabled: !root.recording-active;
-        dialog-button-role: accept;
-        clicked => { root.save-settings(true); }
     }
 }

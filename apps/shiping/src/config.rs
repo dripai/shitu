@@ -6,6 +6,50 @@ pub use shi_foundation::LanguageMode;
 
 use shi_foundation::i18n;
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OutputFormat {
+    #[default]
+    Mp4,
+    Gif,
+}
+
+impl OutputFormat {
+    pub fn from_index(index: i32) -> Self {
+        match index {
+            1 => Self::Gif,
+            _ => Self::Mp4,
+        }
+    }
+
+    pub fn index(self) -> i32 {
+        match self {
+            Self::Mp4 => 0,
+            Self::Gif => 1,
+        }
+    }
+
+    pub fn extension(self) -> &'static str {
+        match self {
+            Self::Mp4 => "mp4",
+            Self::Gif => "gif",
+        }
+    }
+
+    pub fn frames_per_second(self, frame_rate: u8) -> u32 {
+        match (self, frame_rate.min(1)) {
+            (Self::Mp4, 0) => 30,
+            (Self::Mp4, _) => 60,
+            (Self::Gif, 0) => 10,
+            (Self::Gif, _) => 20,
+        }
+    }
+
+    pub fn supports_audio(self) -> bool {
+        matches!(self, Self::Mp4)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -13,6 +57,7 @@ pub struct Config {
     pub source_mode: u8,
     pub quality_preset: u8,
     pub frame_rate: u8,
+    pub output_format: OutputFormat,
     pub system_audio: bool,
     pub microphone: bool,
     pub show_cursor: bool,
@@ -33,6 +78,7 @@ impl Default for Config {
             source_mode: 0,
             quality_preset: 2,
             frame_rate: 0,
+            output_format: OutputFormat::Mp4,
             system_audio: true,
             microphone: false,
             show_cursor: true,
@@ -148,6 +194,10 @@ impl Config {
         self.quality_preset = self.quality_preset.min(3);
         self.frame_rate = self.frame_rate.min(1);
         self.countdown_seconds = self.countdown_seconds.min(10);
+        if !self.output_format.supports_audio() {
+            self.system_audio = false;
+            self.microphone = false;
+        }
         if self.save_directory.as_os_str().is_empty() {
             self.save_directory = default_video_directory();
         }
@@ -180,7 +230,7 @@ fn replace_file(source: &std::path::Path, target: &std::path::Path) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use super::{Config, LanguageMode, default_video_directory};
+    use super::{Config, LanguageMode, OutputFormat, default_video_directory};
 
     #[test]
     fn defaults_match_product_design() {
@@ -189,6 +239,7 @@ mod tests {
         assert_eq!(config.source_mode, 0);
         assert_eq!(config.quality_preset, 2);
         assert_eq!(config.frame_rate, 0);
+        assert_eq!(config.output_format, OutputFormat::Mp4);
         assert!(config.system_audio);
         assert!(!config.microphone);
         assert!(config.show_cursor);
@@ -212,6 +263,7 @@ mod tests {
         assert_eq!(config.source_mode, 2);
         assert_eq!(config.quality_preset, 3);
         assert_eq!(config.frame_rate, 1);
+        assert_eq!(config.output_format, OutputFormat::Mp4);
         assert_eq!(config.countdown_seconds, 10);
         assert_eq!(config.start_hotkey.as_deref(), Some("F10"));
         assert_eq!(config.pause_hotkey.as_deref(), Some("F11"));
@@ -229,5 +281,23 @@ mod tests {
 
         let restored: Config = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.language, LanguageMode::Chinese);
+    }
+
+    #[test]
+    fn gif_settings_disable_audio_and_use_gif_frame_rates() {
+        let mut config = Config {
+            output_format: OutputFormat::Gif,
+            system_audio: true,
+            microphone: true,
+            ..Config::default()
+        };
+        config.validate();
+        assert!(!config.system_audio);
+        assert!(!config.microphone);
+        assert_eq!(config.output_format.frames_per_second(0), 10);
+        assert_eq!(config.output_format.frames_per_second(1), 20);
+
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("\"output_format\":\"gif\""));
     }
 }

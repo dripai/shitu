@@ -14,6 +14,8 @@ component CapsuleAction {
     in property <bool> checkable: false;
     in property <bool> danger: false;
     in property <bool> enabled: true;
+    in property <string> footer-text;
+    in property <color> footer-color: #ff858e;
     out property <bool> has-hover <=> touch-area.has-hover;
 
     callback clicked();
@@ -91,6 +93,16 @@ component CapsuleAction {
                 stroke-line-cap: round;
                 stroke-line-join: round;
             }
+        }
+
+        if root.footer-text != "": Text {
+            height: 14px;
+            text: root.footer-text;
+            color: root.footer-color;
+            font-size: 12px;
+            font-weight: 700;
+            horizontal-alignment: center;
+            vertical-alignment: center;
         }
     }
 
@@ -282,6 +294,7 @@ export component MainWindow inherits Window {
     in-out property <int> source-mode: 0;
     in-out property <int> quality-preset: 2;
     in-out property <int> frame-rate: 0;
+    in-out property <int> output-format: 0;
     in-out property <bool> system-audio: true;
     in-out property <bool> microphone: false;
     in-out property <bool> show-cursor: true;
@@ -310,8 +323,12 @@ export component MainWindow inherits Window {
     private property <string> quality-label: root.quality-preset == 0
         ? @tr("自动")
         : root.quality-preset == 1 ? "720p" : root.quality-preset == 2 ? "1080p" : @tr("原始");
-    private property <string> frame-label: root.frame-rate == 0 ? "30 FPS" : "60 FPS";
-    private property <string> config-summary: root.source-label + "  ·  " + root.quality-label + "  ·  " + root.frame-label;
+    private property <string> format-label: root.output-format == 0 ? "MP4" : "GIF";
+    private property <string> frame-label: root.output-format == 0
+        ? (root.frame-rate == 0 ? "30 FPS" : "60 FPS")
+        : (root.frame-rate == 0 ? "10 FPS" : "20 FPS");
+    private property <string> config-summary: root.source-label + "  ·  " + root.format-label
+        + "  ·  " + root.quality-label + "  ·  " + root.frame-label;
     private property <string> detail-text: root.recording-state == 3
         ? root.status-text
         : root.recording-state == 1
@@ -421,46 +438,7 @@ export component MainWindow inherits Window {
             }
 
             VerticalLayout {
-                width: 43px;
-                height: 57px;
-                spacing: 4px;
-                alignment: center;
-
-                Rectangle {
-                    width: 38px;
-                    height: 38px;
-                    border-radius: 19px;
-                    background: root.recording-state == 2 ? #e69a45 : root.recording-state == 3 ? #5d6d84 : #f14f5d;
-                    drop-shadow-offset-y: 1.5px;
-                    drop-shadow-blur: 6.5px;
-                    drop-shadow-color: root.recording-state == 2 ? #e69a4566 : #f14f5d66;
-
-                    Rectangle {
-                        x: 14.5px;
-                        y: 14.5px;
-                        width: 9px;
-                        height: 9px;
-                        border-radius: root.recording-busy ? 2px : 4.5px;
-                        background: #ffd9dd;
-                    }
-                }
-
-                Text {
-                    text: root.recording-state == 1
-                        ? "REC"
-                        : root.recording-state == 2
-                            ? @tr("暂停")
-                            : root.recording-state == 3 ? @tr("准备") : @tr("就绪");
-                    visible: root.recording-state != 0;
-                    color: root.recording-state == 2 ? #f1b66f : #ff858e;
-                    font-size: 12px;
-                    font-weight: 700;
-                    horizontal-alignment: center;
-                }
-            }
-
-            VerticalLayout {
-                width: 161px;
+                width: 209.5px;
                 height: 57px;
                 spacing: 0px;
 
@@ -569,7 +547,9 @@ export component MainWindow inherits Window {
                     fps-action := CapsuleAction {
                         label: root.frame-label;
                         accessible-name: @tr("帧率：{}", root.frame-label);
-                        icon-text: root.frame-rate == 0 ? "30" : "60";
+                        icon-text: root.output-format == 0
+                            ? (root.frame-rate == 0 ? "30" : "60")
+                            : (root.frame-rate == 0 ? "10" : "20");
                         enabled: !root.recording-busy;
                         clicked => { root.frame-rate = Math.mod(root.frame-rate + 1, 2); }
                     }
@@ -581,6 +561,7 @@ export component MainWindow inherits Window {
                         icon-path: "M4 10 H8 L13 6 V18 L8 14 H4 Z M16 9 C18 11 18 13 16 15 M18 6 C22 10 22 14 18 18";
                         checkable: true;
                         checked: root.system-audio;
+                        enabled: !root.recording-busy && root.output-format == 0;
                         clicked => {
                             root.system-audio = !root.system-audio;
                             root.system-audio-changed(root.system-audio);
@@ -594,6 +575,7 @@ export component MainWindow inherits Window {
                         icon-path: "M9 5 A3 3 0 0 1 15 5 V12 A3 3 0 0 1 9 12 Z M6 11 A6 6 0 0 0 18 11 M12 17 V21 M8 21 H16";
                         checkable: true;
                         checked: root.microphone;
+                        enabled: !root.recording-busy && root.output-format == 0;
                         clicked => {
                             root.microphone = !root.microphone;
                             root.microphone-changed(root.microphone);
@@ -604,6 +586,12 @@ export component MainWindow inherits Window {
 
             record-action := CapsuleAction {
                 label: root.recording-busy ? @tr("停止") : @tr("开始");
+                footer-text: root.recording-state == 1
+                    ? "REC"
+                    : root.recording-state == 2
+                        ? @tr("暂停")
+                        : root.recording-state == 3 ? @tr("准备") : "";
+                footer-color: root.recording-state == 2 ? #f1b66f : #ff858e;
                 accessible-name: root.recording-busy
                     ? @tr("停止录制")
                         + (root.stop-shortcut-label == "" ? "" : " (" + root.stop-shortcut-label + ")")

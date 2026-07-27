@@ -16,7 +16,7 @@ use slint::{
 use crate::{
     MainWindow, PreferencesDialog, RecordingTray, RegionIndicatorWindow, SelectionWindow,
     application::{ApplicationState, Command, Event, RecorderHandle, RecordingOptions},
-    config::{Config, LanguageMode},
+    config::{Config, LanguageMode, OutputFormat},
     platform::{
         activate_window,
         audio::SourceKind,
@@ -219,6 +219,7 @@ fn apply_config(main: &MainWindow, config: &Config) {
     main.set_source_mode(config.source_mode as i32);
     main.set_quality_preset(config.quality_preset as i32);
     main.set_frame_rate(config.frame_rate as i32);
+    main.set_output_format(config.output_format.index());
     main.set_system_audio(config.system_audio);
     main.set_microphone(config.microphone);
     main.set_show_cursor(config.show_cursor);
@@ -375,8 +376,8 @@ fn bind_preferences(
             sync_preferences(&preferences, &defaults, false);
             preferences.set_status_text(
                 i18n::text(
-                    "已恢复默认值；单击应用或确定后保存",
-                    "Defaults restored; click Apply or OK to save",
+                    "已恢复默认值，保存后生效",
+                    "Defaults restored; save to apply them",
                 )
                 .into(),
             );
@@ -400,14 +401,14 @@ fn bind_preferences(
                     } else {
                         set_status(
                             &main,
-                            i18n::text("语言预览已应用", "Language preview applied"),
+                            i18n::text("正在预览语言", "Language preview active"),
                             false,
                         );
                     }
                     preferences.set_status_text(
                         i18n::text(
-                            "语言已预览；单击应用或确定后保存",
-                            "Language preview applied; click Apply or OK to save",
+                            "语言已预览，保存后生效",
+                            "Language previewed; save to apply it",
                         )
                         .into(),
                     );
@@ -444,8 +445,8 @@ fn bind_preferences(
                 preferences.set_save_directory(directory.to_string_lossy().into_owned().into());
                 preferences.set_status_text(
                     i18n::text(
-                        "保存目录将在应用设置后生效",
-                        "The save folder will change after the settings are applied",
+                        "保存目录将在保存后生效",
+                        "The save folder will change after saving",
                     )
                     .into(),
                 );
@@ -495,8 +496,8 @@ fn bind_preferences(
                         set_shortcut_value(&preferences, action, display_shortcut(Some(&shortcut)));
                         preferences.set_status_text(
                             i18n::text(
-                                "快捷键将在应用设置后生效",
-                                "The shortcut will change after the settings are applied",
+                                "快捷键将在保存后生效",
+                                "The shortcut will change after saving",
                             )
                             .into(),
                         );
@@ -515,7 +516,7 @@ fn bind_preferences(
         let tray = tray.as_weak();
         let preferences = preferences.as_weak();
         let state = Rc::clone(&state);
-        preferences.unwrap().on_save_settings(move |close_after| {
+        preferences.unwrap().on_save_settings(move || {
             let (Some(main), Some(tray), Some(preferences)) =
                 (main.upgrade(), tray.upgrade(), preferences.upgrade())
             else {
@@ -524,17 +525,8 @@ fn bind_preferences(
             clear_shortcut_errors(&preferences);
             match apply_preferences(&main, &tray, &preferences, &state, &hotkeys) {
                 Ok(()) => {
-                    preferences
-                        .set_status_text(i18n::text("设置已应用", "Settings applied").into());
-                    preferences.set_status_error(false);
-                    set_status(
-                        &main,
-                        i18n::text("首选项已更新", "Preferences updated"),
-                        false,
-                    );
-                    if close_after {
-                        let _ = preferences.hide();
-                    }
+                    set_status(&main, "", false);
+                    let _ = preferences.hide();
                 }
                 Err(mut issue) => {
                     if let Err(error) = restore_saved_language(&main, &preferences, &state) {
@@ -571,6 +563,7 @@ fn sync_preferences(preferences: &PreferencesDialog, config: &Config, recording_
     preferences.set_save_directory(config.save_directory.to_string_lossy().into_owned().into());
     preferences.set_quality_preset(config.quality_preset as i32);
     preferences.set_frame_rate(config.frame_rate as i32);
+    preferences.set_output_format(config.output_format.index());
     preferences.set_system_audio(config.system_audio);
     preferences.set_microphone(config.microphone);
     preferences.set_show_cursor(config.show_cursor);
@@ -594,8 +587,8 @@ fn apply_preferences(
         return Err(ShortcutIssue {
             action: None,
             message: i18n::text(
-                "录制期间不能应用首选项",
-                "Preferences cannot be applied while recording",
+                "录制期间不能保存首选项",
+                "Preferences cannot be saved while recording",
             )
             .to_owned(),
             is_conflict: false,
@@ -620,8 +613,11 @@ fn apply_preferences(
     new_config.save_directory = save_directory;
     new_config.quality_preset = preferences.get_quality_preset().clamp(0, 3) as u8;
     new_config.frame_rate = preferences.get_frame_rate().clamp(0, 1) as u8;
-    new_config.system_audio = preferences.get_system_audio();
-    new_config.microphone = preferences.get_microphone();
+    new_config.output_format = OutputFormat::from_index(preferences.get_output_format());
+    new_config.system_audio =
+        new_config.output_format.supports_audio() && preferences.get_system_audio();
+    new_config.microphone =
+        new_config.output_format.supports_audio() && preferences.get_microphone();
     new_config.show_cursor = preferences.get_show_cursor();
     new_config.highlight_clicks = preferences.get_highlight_clicks();
 
@@ -1541,6 +1537,7 @@ fn countdown_tick(
 }
 
 fn recording_options(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<RecordingOptions> {
+    let output_format = OutputFormat::from_index(main.get_output_format());
     let source_mode = main.get_source_mode();
     let target = match source_mode {
         0 => RecordingTarget::Screen(
@@ -1578,9 +1575,10 @@ fn recording_options(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<
     Ok(RecordingOptions {
         target,
         quality_preset: main.get_quality_preset().clamp(0, 3) as u8,
-        frames_per_second: if main.get_frame_rate() == 0 { 30 } else { 60 },
-        system_audio: main.get_system_audio(),
-        microphone: main.get_microphone(),
+        frames_per_second: output_format.frames_per_second(main.get_frame_rate().clamp(0, 1) as u8),
+        output_format,
+        system_audio: output_format.supports_audio() && main.get_system_audio(),
+        microphone: output_format.supports_audio() && main.get_microphone(),
         show_cursor: main.get_show_cursor(),
         highlight_clicks: main.get_highlight_clicks(),
         save_directory: state.borrow().config.save_directory.clone(),
@@ -1715,8 +1713,9 @@ fn update_config_from_main(main: &MainWindow, config: &mut Config) {
     config.source_mode = main.get_source_mode().clamp(0, 2) as u8;
     config.quality_preset = main.get_quality_preset().clamp(0, 3) as u8;
     config.frame_rate = main.get_frame_rate().clamp(0, 1) as u8;
-    config.system_audio = main.get_system_audio();
-    config.microphone = main.get_microphone();
+    config.output_format = OutputFormat::from_index(main.get_output_format());
+    config.system_audio = config.output_format.supports_audio() && main.get_system_audio();
+    config.microphone = config.output_format.supports_audio() && main.get_microphone();
     config.show_cursor = main.get_show_cursor();
     config.highlight_clicks = main.get_highlight_clicks();
     config.countdown_seconds = main.get_countdown_seconds().clamp(0, 10) as u8;
