@@ -11,11 +11,13 @@ pub(crate) mod target;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows::{
     Win32::{
+        Foundation::HWND,
         Storage::FileSystem::{
             MOVE_FILE_FLAGS, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
         },
         System::Com::{COINIT_MULTITHREADED, CoInitializeEx, CoUninitialize},
         System::SystemInformation::GetLocalTime,
+        UI::WindowsAndMessaging::SetForegroundWindow,
     },
     core::PCWSTR,
 };
@@ -80,4 +82,12 @@ pub(crate) fn native_window_handle(window: &slint::Window) -> Option<isize> {
         return None;
     };
     Some(handle.hwnd.get())
+}
+
+pub(crate) fn activate_window(window: &slint::Window) {
+    if let Some(hwnd) = native_window_handle(window) {
+        unsafe {
+            let _ = SetForegroundWindow(HWND(hwnd as *mut _));
+        }
+    }
 }

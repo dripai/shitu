@@ -127,6 +127,7 @@ fn open_overlay(
         state.borrow_mut().session = None;
         return Err(error.into());
     }
+    crate::platform::windows::window::activate(overlay.window());
     Ok(())
 }
 

@@ -18,6 +18,7 @@ use crate::{
     application::{ApplicationState, Command, Event, RecorderHandle, RecordingOptions},
     config::{Config, LanguageMode},
     platform::{
+        activate_window,
         audio::SourceKind,
         begin_window_drag, configure_visual_overlay, native_window_handle, shell,
         target::{self, Bounds, MonitorCandidates, RecordingTarget, WindowCandidates},
@@ -1265,6 +1266,7 @@ fn open_target_selector(main: &MainWindow, state: &Rc<RefCell<UiState>>, mode: i
             let _ = selector.hide();
             return Err(error.into());
         }
+        activate_window(selector.window());
         selector.invoke_take_keyboard_focus();
         Ok(())
     })();

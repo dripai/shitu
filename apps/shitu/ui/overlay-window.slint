@@ -275,7 +275,18 @@ export component OverlayWindow inherits Window {
         background: transparent;
         clip: true;
 
-        if root.completed: Image {
+        if root.completed && root.adjusting-selection: Image {
+            width: parent.width;
+            height: parent.height;
+            source: root.desktop-image;
+            source-clip-x: root.source-left;
+            source-clip-y: root.source-top;
+            source-clip-width: root.source-width;
+            source-clip-height: root.source-height;
+            image-fit: fill;
+        }
+
+        if root.completed && !root.adjusting-selection: Image {
             width: parent.width;
             height: parent.height;
             source: root.selected-image;

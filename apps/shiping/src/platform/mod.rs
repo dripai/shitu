@@ -7,6 +7,6 @@ mod windows;
 
 #[cfg(target_os = "windows")]
 pub(crate) use windows::{
-    ComRuntime, audio, capture, encoder, local_timestamp, native_window_handle, replace_file,
-    shell, target,
+    ComRuntime, activate_window, audio, capture, encoder, local_timestamp, native_window_handle,
+    replace_file, shell, target,
 };
