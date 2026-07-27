@@ -182,8 +182,6 @@ export component SettingsPanel inherits Rectangle {
     callback preview-language(int);
 
     changed current-tab => { root.config-hint(false); }
-    changed language-mode => { root.preview-language(root.language-mode); }
-
     VerticalLayout {
         padding-left: 10px;
         padding-right: 10px;
@@ -232,6 +230,9 @@ export component SettingsPanel inherits Rectangle {
                     ComboBox {
                         model: [@tr("跟随系统"), @tr("简体中文"), "English"];
                         current-index <=> root.language-mode;
+                        selected(value) => {
+                            root.preview-language(root.language-mode);
+                        }
                     }
                 }
                 Rectangle { height: 1px; background: Palette.foreground.with-alpha(0.16); }

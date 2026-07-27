@@ -17,3 +17,7 @@ Desktop.ini
 .env
 .env.*
 !.env.example
+
+# Codex local diagnostics and generated media
+/.codex-tmp/
+/.codex-tmpblack-metadata.txt

@@ -78,7 +78,7 @@ pub fn run(start_minimized: bool) -> Result<(), slint::PlatformError> {
                 "Ready. Right-click the tray icon to open the menu.",
             )
             .to_owned(),
-            StatusLevel::Info,
+            StatusLevel::Success,
         ),
         Err(error) => {
             logging::error(error.to_string());
