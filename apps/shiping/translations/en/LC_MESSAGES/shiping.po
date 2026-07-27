@@ -81,6 +81,9 @@ msgstr "Recording"
 msgid "录制区域"
 msgstr "Recording area"
 
+msgid "录制窗口"
+msgstr "Recording window"
+
 msgid "录制范围：{}"
 msgstr "Recording source: {}"
 

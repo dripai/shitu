@@ -21,29 +21,22 @@ pub(crate) fn begin_window_drag(window: &slint::Window) -> Result<()> {
 /// Makes a visual-only overlay ignore cursor input while keeping it above other windows.
 /// Winit owns the platform-specific hit-test implementation; Windows-only taskbar and
 /// undecorated-shadow flags stay isolated in this adapter.
-pub(crate) fn configure_visual_overlay(window: &slint::Window) -> Result<()> {
-    window
-        .with_winit_window(|window| {
-            window.set_cursor_hittest(false).context(i18n::text(
-                "无法让选区边框穿透鼠标",
-                "Could not make the region indicator ignore pointer input",
-            ))?;
+pub(crate) async fn configure_visual_overlay(window: &slint::Window) -> Result<()> {
+    let window = window.winit_window().await.context(i18n::text(
+        "无法获取选区边框的 Winit 窗口",
+        "Could not obtain the Winit window for the target indicator",
+    ))?;
+    window.set_cursor_hittest(false).context(i18n::text(
+        "无法让选区边框穿透鼠标",
+        "Could not make the target indicator ignore pointer input",
+    ))?;
 
-            #[cfg(target_os = "windows")]
-            {
-                use slint::winit_030::winit::platform::windows::WindowExtWindows;
+    #[cfg(target_os = "windows")]
+    {
+        use slint::winit_030::winit::platform::windows::WindowExtWindows;
 
-                window.set_skip_taskbar(true);
-                window.set_undecorated_shadow(false);
-            }
-
-            Ok::<(), anyhow::Error>(())
-        })
-        .ok_or_else(|| {
-            anyhow!(i18n::text(
-                "当前选区边框没有可用的 Winit 后端",
-                "The region indicator has no available Winit backend"
-            ))
-        })??;
+        window.set_skip_taskbar(true);
+        window.set_undecorated_shadow(false);
+    }
     Ok(())
 }

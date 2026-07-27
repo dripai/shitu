@@ -44,10 +44,10 @@
 5. 停止和保存结果继续显示在计时器下方，不打开完成弹窗。
 6. 鼠标细项、倒计时、保存目录和快捷键不常驻占用工具条空间；右键菜单只保留录制控制、首选项、打开保存目录和退出。
 7. 无标题栏窗口的所有非交互空白区域均可拖动；空闲状态不重复显示“就绪”，只保留参数摘要和“开始”动作。
-8. 窗口和区域选择器将操作提示固定在左下角；窗口模式不显示桌面蒙版，随光标移动只显示候选窗口的蓝色边框、标题与像素尺寸，单击当前位置直接确认。区域模式始终保持桌面透明；拖选及确认后的蓝色边框都绘制在录制坐标外侧，“录制区域”标签位于上边框外侧。确认后的指示窗保持显示直到切换录制目标，整窗鼠标穿透，不提供会与“停止录制”混淆的关闭按钮。
+8. 窗口和区域选择器将操作提示固定在左下角；窗口模式不显示桌面蒙版，随光标移动只显示候选窗口的蓝色边框、标题与像素尺寸，单击当前位置直接确认。区域模式始终保持桌面透明。确认后，蓝色边框和“录制窗口”或“录制区域”标签都绘制在录制坐标外侧；指示窗在等待开始、倒计时、录制和暂停期间持续显示，停止或取消录制时移除，切换目标时替换或清除。整窗鼠标穿透，不提供会与“停止录制”混淆的关闭按钮。
 9. 首选项采用 600×450px 紧凑对话框，左侧“常规、录制、快捷键”固定为三个 36px 单行导航项，不再均分整列高度；右侧各页统一左侧内容起点、96px 标签列、32px 设置行和 8px 行间距。快捷键页为三项操作各提供一个 180px 可点击按键输入框和清除按钮，输入框获得焦点后直接捕获按键组合。操作按钮统一靠右排列为“恢复默认、取消、保存”。空闲时不显示教学式提示；发生恢复默认、预览、错误或录制中不可修改等有效状态时，状态栏显示在所有按钮下方。常规页提供界面语言切换，切换时即时预览，只有“保存”才写入配置。
 
-界面基于 Slint 1.17，并统一使用 `fluent-dark` 样式。已核对原生 `Dialog`、`Button`、`TabWidget`、`LineEdit`、`Switch`、`ComboBox`、`Palette`、`TouchArea`、`FocusScope`、`Tooltip`、`PopupWindow`、`ContextMenuArea`、`Menu`、`MenuItem`、`MenuSeparator` 和 Slint 捆绑翻译 API，并检查了 `shi-ui` 现有的 `StatusBar`。原生 `Button` 的公开结构固定为横向图标与文字，不能表达参考设计所需的“圆形图标 + 可选状态值 + 紧凑选中态”；原生 `ComboBox` 的 Fluent 实现最小宽度为 160px，也不能放入 46×57px 的快捷操作位；原生纵向 `TabWidget` 的标签栏会占满内容高度，公开 API 没有单项行高属性；Slint 1.17 的 `Dialog` 会把带 `dialog-button-role` 的直接子按钮固定排在内容之后，不能再把状态栏放到按钮下方；Slint `Window` 没有公开的鼠标穿透属性；公共 `StatusBar` 的固定高度和状态结构不能容纳录制状态、计时与参数摘要。因此只为六个快捷操作、录制状态区和原始快捷键捕获框自定义必要视觉或事件结构。悬浮提示直接使用原生 `Tooltip`，不自定义弹窗；首选项保留原生 `Dialog`、`ComboBox` 和标准 `Button`，仅显式排列底部按钮与状态栏，并用三个原生可选 `Button` 替换纵向标签导航；范围、清晰度和应用右键菜单使用原生 `ContextMenuArea`、`Menu` 与 `MenuItem`，由 Slint 后端处理键盘、失焦关闭、屏幕边缘与缩放；区域指示窗仅绘制录制矩形外侧的四条边和标签，并通过 Slint 的 Winit 访问器调用 Winit `Window::set_cursor_hittest(false)` 实现鼠标穿透；中英文文案使用 Slint `@tr`、构建期捆绑 PO 翻译和运行期 `select_bundled_translation`；无标题栏拖动通过同一访问器调用 Winit `Window::drag_window()`，不再直接发送 Win32 窗口消息。
+界面基于 Slint 1.17，并统一使用 `fluent-dark` 样式。已核对原生 `Dialog`、`Button`、`TabWidget`、`LineEdit`、`Switch`、`ComboBox`、`Palette`、`TouchArea`、`FocusScope`、`Tooltip`、`PopupWindow`、`ContextMenuArea`、`Menu`、`MenuItem`、`MenuSeparator` 和 Slint 捆绑翻译 API，并检查了 `shi-ui` 现有的 `StatusBar`。原生 `Button` 的公开结构固定为横向图标与文字，不能表达参考设计所需的“圆形图标 + 可选状态值 + 紧凑选中态”；原生 `ComboBox` 的 Fluent 实现最小宽度为 160px，也不能放入 46×57px 的快捷操作位；原生纵向 `TabWidget` 的标签栏会占满内容高度，公开 API 没有单项行高属性；Slint 1.17 的 `Dialog` 会把带 `dialog-button-role` 的直接子按钮固定排在内容之后，不能再把状态栏放到按钮下方；Slint `Window` 没有公开的鼠标穿透属性；公共 `StatusBar` 的固定高度和状态结构不能容纳录制状态、计时与参数摘要。因此只为六个快捷操作、录制状态区和原始快捷键捕获框自定义必要视觉或事件结构。悬浮提示直接使用原生 `Tooltip`，不自定义弹窗；首选项保留原生 `Dialog`、`ComboBox` 和标准 `Button`，仅显式排列底部按钮与状态栏，并用三个原生可选 `Button` 替换纵向标签导航；范围、清晰度和应用右键菜单使用原生 `ContextMenuArea`、`Menu` 与 `MenuItem`，由 Slint 后端处理键盘、失焦关闭、屏幕边缘与缩放；目标指示窗仅绘制录制矩形外侧的四条边和标签，显示后通过 Slint 1.17 的异步 `WinitWindowAccessor::winit_window()` 等待原生窗口创建，再调用 Winit `Window::set_cursor_hittest(false)` 实现鼠标穿透；中英文文案使用 Slint `@tr`、构建期捆绑 PO 翻译和运行期 `select_bundled_translation`；无标题栏拖动通过同一访问器调用 Winit `Window::drag_window()`，不再直接发送 Win32 窗口消息。
 
 ## 4. 默认值
 
@@ -79,7 +79,7 @@
 
 ## 6. 源码分层
 
-- `ui/main-window.slint`、`ui/preferences-window.slint`、`ui/selection-window.slint` 与 `ui/region-indicator-window.slint` 只负责视觉、命中测试、焦点和原始鼠标键盘输入，并通过语义回调表达“开始录制”“保存设置”“捕获快捷键”等用户意图；持久区域指示窗自身不处理输入。
+- `ui/main-window.slint`、`ui/preferences-window.slint`、`ui/selection-window.slint` 与 `ui/target-indicator-window.slint` 只负责视觉、命中测试、焦点和原始鼠标键盘输入，并通过语义回调表达“开始录制”“保存设置”“捕获快捷键”等用户意图；持久目标指示窗自身不处理输入。
 - `src/ui/controller.rs` 绑定主窗口与托盘回调，将用户意图转换为业务状态变更，并把录制事件渲染回界面；`src/ui/hotkeys.rs` 负责全局快捷键的整组注册、事件转发和失败回滚。
 - `src/application/state.rs` 保存录制业务唯一可变状态，包括配置、录制目标、录制器、倒计时任务和最近输出，不持有 Slint 组件或平台窗口对象。
 - `src/application/recording_service.rs` 编排录制生命周期；`src/output.rs` 根据输出格式适配 MP4 或 GIF 写入器并统一临时文件提交；`src/platform/windowing.rs` 封装基于 Winit 的桌面窗口交互；`src/platform/windows/` 集中实现窗口句柄、目标枚举、GDI 画面采集、WASAPI 音频、Media Foundation MP4 编码和系统 Shell 调用。
@@ -90,7 +90,7 @@
 ## 7. 当前实现边界
 
 - 当前仅实现 Windows 路径。屏幕列表通过 `EnumDisplayMonitors` 和 `GetMonitorInfoW` 实时获取，每次展开范围菜单都会刷新，不支持合并多屏录制。画面通过 GDI 读取选定屏幕的当前可见像素，因此窗口录制不是独立的窗口表面捕获：遮挡、屏幕外区域和窗口移动都会反映到录制结果中。
-- 持久区域指示窗的透明中心与 GDI 录制坐标完全一致，四条 3px 蓝边和上方标签均位于录制矩形之外，因此不进入当前区域的 `StretchBlt` 源矩形。指示窗整窗鼠标穿透；开始、暂停、停止不会清除它，只有确认其他录制目标时才移除。选区紧贴虚拟桌面边缘时，位于桌面之外的部分会被系统裁掉；不同 DPI 显示器之间的视觉对齐仍需设备验证。
+- 持久目标指示窗的透明中心与 GDI 录制坐标完全一致，四条 3px 蓝边和上方标签均位于录制矩形之外，因此不进入当前目标的 `StretchBlt` 源矩形。区域使用固定边界；窗口边界每 50ms 按当前 DWM 扩展框架坐标更新，以跟随移动或缩放。指示窗整窗鼠标穿透，在等待开始、倒计时、录制和暂停期间保留，停止或取消录制时移除；切换目标时替换或清除。目标紧贴虚拟桌面边缘时，位于桌面之外的部分会被系统裁掉；不同 DPI 显示器之间的视觉对齐仍需设备验证。
 - 窗口选择覆盖整个 Windows 虚拟桌面，通过 Slint `TouchArea.pointer-event` 的移动事件实时命中 `EnumWindows` 按 Z 序枚举的候选窗口，并使用 `GetWindowTextW` 显示窗口标题。`TouchArea.moved` 只用于按下后的区域拖选，不再承担普通鼠标悬停。按下和释放时都会重新探测当前坐标，因此单击选择不依赖此前是否发生过鼠标移动。
 - 工具条的鼠标、键盘、菜单和窗口拖动已经不直接依赖 Win32；Winit 桌面拖动覆盖 Windows、macOS、X11 和 Wayland，但完整应用仍需对应系统的录屏后端才能运行。
 - “自动”与“1080p”当前都以 1080p 为上限；720p 和 1080p 均保持原始宽高比、不主动放大，并将编码尺寸调整为偶数。
@@ -123,4 +123,4 @@
 
 - 已通过：`cargo test --release --locked -p shiping`（24 项通过、1 项真实录制测试按环境要求忽略，其中 GIF 测试实际写入并重新解码动画及跳帧时序）、`cargo clippy --release --locked -p shiping --all-targets -- -D warnings`、`./start.sh build shiping`、格式检查、英译 PO 覆盖检查和修改文件严格 UTF-8 校验。此前也已完成短时真实 MP4 录制测试。
 - 当前设备已验证：主界面与右键菜单、3 秒倒计时、MP4 录制/暂停/继续/停止、结果文件生成、Escape 与右键取消目标选择、可见窗口选择和区域拖选；GIF 当前只完成编解码单元验证。
-- 尚未覆盖：真实桌面 GIF 录制、GIF 长时间录制的文件体积与内存占用、首选项新增格式设置与底部状态栏的人工交互、持久区域边框的实际鼠标穿透及录制成片检查、中英文运行期切换与重启后恢复的人工交互、真实第三方快捷键冲突、多显示器含负坐标、不同 DPI/缩放组合、60 FPS 持续负载、不同音频端点格式、无 AAC/H.264 编码器设备、长时间 MP4 录制和发布构建安装包。编译通过不能替代这些设备矩阵验证。
+- 尚未覆盖：真实桌面 GIF 录制、GIF 长时间录制的文件体积与内存占用、首选项新增格式设置与底部状态栏的人工交互、窗口与区域持久边框的实际鼠标穿透、窗口移动跟随及录制成片检查、中英文运行期切换与重启后恢复的人工交互、真实第三方快捷键冲突、多显示器含负坐标、不同 DPI/缩放组合、60 FPS 持续负载、不同音频端点格式、无 AAC/H.264 编码器设备、长时间 MP4 录制和发布构建安装包。编译通过不能替代这些设备矩阵验证。

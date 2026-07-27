@@ -1,7 +1,7 @@
-// The region indicator is a separate click-through window. Its transparent center maps
+// The target indicator is a separate click-through window. Its transparent center maps
 // exactly to the captured rectangle; every visible pixel is placed outside that rectangle.
-export component RegionIndicatorWindow inherits Window {
-    title: @tr("录制区域");
+export component TargetIndicatorWindow inherits Window {
+    title: root.indicator-label;
     background: transparent;
     no-frame: true;
     always-on-top: true;
@@ -13,6 +13,7 @@ export component RegionIndicatorWindow inherits Window {
     in property <int> border-pixels: 3;
     in property <int> label-height-pixels: 28;
     in property <int> label-gap-pixels: 4;
+    in property <string> indicator-label: @tr("录制区域");
 
     private property <float> pixel-width: root.width / 1px > 0
         ? (root.region-width + root.border-pixels * 2) / (root.width / 1px)
@@ -72,7 +73,7 @@ export component RegionIndicatorWindow inherits Window {
         Text {
             width: parent.width;
             height: parent.height;
-            text: @tr("录制区域");
+            text: root.indicator-label;
             color: white;
             font-size: 13px;
             horizontal-alignment: center;

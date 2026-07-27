@@ -14,7 +14,7 @@ use slint::{
 };
 
 use crate::{
-    MainWindow, PreferencesDialog, RecordingTray, RegionIndicatorWindow, SelectionWindow,
+    MainWindow, PreferencesDialog, RecordingTray, SelectionWindow, TargetIndicatorWindow,
     application::{ApplicationState, Command, Event, RecorderHandle, RecordingOptions},
     config::{Config, LanguageMode, OutputFormat},
     platform::{
@@ -33,7 +33,9 @@ use super::hotkeys::{
 struct UiState {
     application: ApplicationState,
     selector: Option<SelectionWindow>,
-    region_indicator: Option<RegionIndicatorWindow>,
+    target_indicator: Option<TargetIndicatorWindow>,
+    target_indicator_bounds: Option<Bounds>,
+    target_indicator_generation: u64,
     candidates: Option<WindowCandidates>,
     monitors: Option<MonitorCandidates>,
     selected_screen: Option<Bounds>,
@@ -98,7 +100,9 @@ pub(crate) fn run() -> Result<(), slint::PlatformError> {
     let state = Rc::new(RefCell::new(UiState {
         application: ApplicationState::new(config),
         selector: None,
-        region_indicator: None,
+        target_indicator: None,
+        target_indicator_bounds: None,
+        target_indicator_generation: 0,
         candidates: None,
         monitors: None,
         selected_screen: None,
@@ -199,6 +203,10 @@ pub(crate) fn run() -> Result<(), slint::PlatformError> {
         event_timer.start(TimerMode::Repeated, Duration::from_millis(50), move || {
             if let Some(main) = main.upgrade() {
                 handle_recorder_events(&main, &state);
+                if let Err(error) = refresh_target_indicator(&state) {
+                    let _ = clear_target_indicator(&state);
+                    set_status(&main, error.to_string(), true);
+                }
                 if let Some(preferences) = preferences.upgrade() {
                     preferences.set_recording_active(
                         state.borrow().recorder.is_some() || main.get_recording_state() != 0,
@@ -817,24 +825,34 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
         let state = Rc::clone(&state);
         main.unwrap().on_stop_recording(move || {
             let Some(main) = main.upgrade() else { return };
-            if let Some(recorder) = state.borrow().recorder.as_ref() {
-                recorder.send(Command::Stop);
-                set_status(
-                    &main,
-                    i18n::text("正在完成 MP4 文件...", "Finalizing the MP4 file..."),
-                    false,
-                );
+            if state.borrow().recorder.is_some() {
+                if let Some(recorder) = state.borrow().recorder.as_ref() {
+                    recorder.send(Command::Stop);
+                }
+                match clear_target_indicator(&state) {
+                    Ok(()) => set_status(
+                        &main,
+                        i18n::text("正在完成录制文件...", "Finalizing the recording file..."),
+                        false,
+                    ),
+                    Err(error) => set_status(&main, error.to_string(), true),
+                }
             } else if main.get_recording_state() == 3 {
-                let mut state = state.borrow_mut();
-                state.countdown_token = state.countdown_token.wrapping_add(1);
-                state.pending_options = None;
+                {
+                    let mut state = state.borrow_mut();
+                    state.countdown_token = state.countdown_token.wrapping_add(1);
+                    state.pending_options = None;
+                }
                 main.set_recording_state(0);
                 main.set_elapsed_text("00:00:00".into());
-                set_status(
-                    &main,
-                    i18n::text("已取消开始录制", "Recording start canceled"),
-                    false,
-                );
+                match clear_target_indicator(&state) {
+                    Ok(()) => set_status(
+                        &main,
+                        i18n::text("已取消开始录制", "Recording start canceled"),
+                        false,
+                    ),
+                    Err(error) => set_status(&main, error.to_string(), true),
+                }
             }
         });
     }
@@ -1014,7 +1032,7 @@ fn select_screen(main: &MainWindow, state: &Rc<RefCell<UiState>>, index: i32) ->
             ))
         })?;
 
-    clear_region_indicator(state)?;
+    clear_target_indicator(state)?;
     {
         let mut state = state.borrow_mut();
         state.selected_screen = Some(monitor.bounds);
@@ -1091,49 +1109,64 @@ fn bind_live_option_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
     }
 }
 
-const REGION_INDICATOR_BORDER_PIXELS: i32 = 3;
-const REGION_INDICATOR_LABEL_HEIGHT_PIXELS: i32 = 28;
-const REGION_INDICATOR_LABEL_GAP_PIXELS: i32 = 4;
+const TARGET_INDICATOR_BORDER_PIXELS: i32 = 3;
+const TARGET_INDICATOR_LABEL_HEIGHT_PIXELS: i32 = 28;
+const TARGET_INDICATOR_LABEL_GAP_PIXELS: i32 = 4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct RegionIndicatorGeometry {
+struct TargetIndicatorGeometry {
     left: i32,
     top: i32,
     width: u32,
     height: u32,
 }
 
-fn region_indicator_geometry(bounds: Bounds) -> Result<RegionIndicatorGeometry> {
-    let horizontal_margin = REGION_INDICATOR_BORDER_PIXELS
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TargetIndicatorKind {
+    Window,
+    Region,
+}
+
+impl TargetIndicatorKind {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Window => i18n::text("录制窗口", "Recording window"),
+            Self::Region => i18n::text("录制区域", "Recording region"),
+        }
+    }
+}
+
+fn target_indicator_geometry(bounds: Bounds) -> Result<TargetIndicatorGeometry> {
+    let horizontal_margin = TARGET_INDICATOR_BORDER_PIXELS
         .checked_mul(2)
-        .ok_or_else(|| anyhow!("region indicator horizontal margin overflow"))?;
-    let vertical_margin = REGION_INDICATOR_LABEL_HEIGHT_PIXELS
-        .checked_add(REGION_INDICATOR_LABEL_GAP_PIXELS)
-        .and_then(|value| value.checked_add(REGION_INDICATOR_BORDER_PIXELS * 2))
-        .ok_or_else(|| anyhow!("region indicator vertical margin overflow"))?;
+        .ok_or_else(|| anyhow!("target indicator horizontal margin overflow"))?;
+    let vertical_margin = TARGET_INDICATOR_LABEL_HEIGHT_PIXELS
+        .checked_add(TARGET_INDICATOR_LABEL_GAP_PIXELS)
+        .and_then(|value| value.checked_add(TARGET_INDICATOR_BORDER_PIXELS * 2))
+        .ok_or_else(|| anyhow!("target indicator vertical margin overflow"))?;
     let width = bounds
         .width
         .checked_add(horizontal_margin)
         .and_then(|value| u32::try_from(value).ok())
-        .ok_or_else(|| anyhow!("region indicator width is invalid"))?;
+        .ok_or_else(|| anyhow!("target indicator width is invalid"))?;
     let height = bounds
         .height
         .checked_add(vertical_margin)
         .and_then(|value| u32::try_from(value).ok())
-        .ok_or_else(|| anyhow!("region indicator height is invalid"))?;
+        .ok_or_else(|| anyhow!("target indicator height is invalid"))?;
     let left = bounds
         .left
-        .checked_sub(REGION_INDICATOR_BORDER_PIXELS)
-        .ok_or_else(|| anyhow!("region indicator left coordinate overflow"))?;
-    let top_margin = REGION_INDICATOR_LABEL_HEIGHT_PIXELS
-        + REGION_INDICATOR_LABEL_GAP_PIXELS
-        + REGION_INDICATOR_BORDER_PIXELS;
+        .checked_sub(TARGET_INDICATOR_BORDER_PIXELS)
+        .ok_or_else(|| anyhow!("target indicator left coordinate overflow"))?;
+    let top_margin = TARGET_INDICATOR_LABEL_HEIGHT_PIXELS
+        + TARGET_INDICATOR_LABEL_GAP_PIXELS
+        + TARGET_INDICATOR_BORDER_PIXELS;
     let top = bounds
         .top
         .checked_sub(top_margin)
-        .ok_or_else(|| anyhow!("region indicator top coordinate overflow"))?;
+        .ok_or_else(|| anyhow!("target indicator top coordinate overflow"))?;
 
-    Ok(RegionIndicatorGeometry {
+    Ok(TargetIndicatorGeometry {
         left,
         top,
         width,
@@ -1141,71 +1174,191 @@ fn region_indicator_geometry(bounds: Bounds) -> Result<RegionIndicatorGeometry> 
     })
 }
 
-fn set_region_indicator_visible(state: &Rc<RefCell<UiState>>, visible: bool) -> Result<()> {
-    let indicator = state
-        .borrow()
-        .region_indicator
-        .as_ref()
-        .map(ComponentHandle::clone_strong);
-    let Some(indicator) = indicator else {
-        return Ok(());
-    };
-    if visible {
-        indicator.show().context(i18n::text(
-            "无法显示录制区域边框",
-            "Could not show the recording region indicator",
-        ))?;
-        if let Err(error) = configure_visual_overlay(indicator.window()) {
-            let _ = indicator.hide();
-            return Err(error);
-        }
-    } else {
-        indicator.hide().context(i18n::text(
-            "无法隐藏录制区域边框",
-            "Could not hide the recording region indicator",
-        ))?;
-    }
-    Ok(())
-}
-
-fn clear_region_indicator(state: &Rc<RefCell<UiState>>) -> Result<()> {
-    let indicator = state.borrow_mut().region_indicator.take();
-    if let Some(indicator) = indicator {
-        indicator.hide().context(i18n::text(
-            "无法移除录制区域边框",
-            "Could not remove the recording region indicator",
-        ))?;
-    }
-    Ok(())
-}
-
-fn replace_region_indicator(state: &Rc<RefCell<UiState>>, bounds: Bounds) -> Result<()> {
-    clear_region_indicator(state)?;
-    let geometry = region_indicator_geometry(bounds)?;
-    let indicator = RegionIndicatorWindow::new().context(i18n::text(
-        "无法创建录制区域边框",
-        "Could not create the recording region indicator",
-    ))?;
+fn apply_target_indicator_geometry(
+    indicator: &TargetIndicatorWindow,
+    bounds: Bounds,
+) -> Result<()> {
+    let geometry = target_indicator_geometry(bounds)?;
     indicator.set_region_width(bounds.width);
     indicator.set_region_height(bounds.height);
-    indicator.set_border_pixels(REGION_INDICATOR_BORDER_PIXELS);
-    indicator.set_label_height_pixels(REGION_INDICATOR_LABEL_HEIGHT_PIXELS);
-    indicator.set_label_gap_pixels(REGION_INDICATOR_LABEL_GAP_PIXELS);
+    indicator.set_border_pixels(TARGET_INDICATOR_BORDER_PIXELS);
+    indicator.set_label_height_pixels(TARGET_INDICATOR_LABEL_HEIGHT_PIXELS);
+    indicator.set_label_gap_pixels(TARGET_INDICATOR_LABEL_GAP_PIXELS);
     indicator
         .window()
         .set_position(PhysicalPosition::new(geometry.left, geometry.top));
     indicator
         .window()
         .set_size(PhysicalSize::new(geometry.width, geometry.height));
-    indicator.show().context(i18n::text(
-        "无法显示录制区域边框",
-        "Could not show the recording region indicator",
+    Ok(())
+}
+
+fn schedule_target_indicator_configuration(
+    main: slint::Weak<MainWindow>,
+    state: Rc<RefCell<UiState>>,
+    indicator: slint::Weak<TargetIndicatorWindow>,
+    generation: u64,
+) -> Result<()> {
+    slint::spawn_local(async move {
+        let Some(indicator) = indicator.upgrade() else {
+            return;
+        };
+        if let Err(error) = configure_visual_overlay(indicator.window()).await {
+            let should_report = {
+                let mut state = state.borrow_mut();
+                if state.target_indicator_generation == generation {
+                    state.target_indicator.take();
+                    state.target_indicator_bounds = None;
+                    state.target_indicator_generation =
+                        state.target_indicator_generation.wrapping_add(1);
+                    true
+                } else {
+                    false
+                }
+            };
+            if should_report {
+                let _ = indicator.hide();
+                if let Some(main) = main.upgrade() {
+                    set_status(&main, error.to_string(), true);
+                }
+            }
+        }
+    })
+    .context(i18n::text(
+        "无法安排录制目标边框初始化",
+        "Could not schedule target indicator initialization",
     ))?;
-    if let Err(error) = configure_visual_overlay(indicator.window()) {
-        let _ = indicator.hide();
+    Ok(())
+}
+
+fn set_target_indicator_visible(
+    main: &MainWindow,
+    state: &Rc<RefCell<UiState>>,
+    visible: bool,
+) -> Result<()> {
+    let (indicator, generation) = {
+        let mut state = state.borrow_mut();
+        state.target_indicator_generation = state.target_indicator_generation.wrapping_add(1);
+        (
+            state
+                .target_indicator
+                .as_ref()
+                .map(ComponentHandle::clone_strong),
+            state.target_indicator_generation,
+        )
+    };
+    let Some(indicator) = indicator else {
+        return Ok(());
+    };
+    if visible {
+        indicator.show().context(i18n::text(
+            "无法显示录制目标边框",
+            "Could not show the target indicator",
+        ))?;
+        schedule_target_indicator_configuration(
+            main.as_weak(),
+            Rc::clone(state),
+            indicator.as_weak(),
+            generation,
+        )?;
+    } else {
+        indicator.hide().context(i18n::text(
+            "无法隐藏录制目标边框",
+            "Could not hide the target indicator",
+        ))?;
+    }
+    Ok(())
+}
+
+fn clear_target_indicator(state: &Rc<RefCell<UiState>>) -> Result<()> {
+    let indicator = {
+        let mut state = state.borrow_mut();
+        state.target_indicator_generation = state.target_indicator_generation.wrapping_add(1);
+        state.target_indicator_bounds = None;
+        state.target_indicator.take()
+    };
+    if let Some(indicator) = indicator {
+        indicator.hide().context(i18n::text(
+            "无法移除录制目标边框",
+            "Could not remove the target indicator",
+        ))?;
+    }
+    Ok(())
+}
+
+fn replace_target_indicator(
+    main: &MainWindow,
+    state: &Rc<RefCell<UiState>>,
+    bounds: Bounds,
+    kind: TargetIndicatorKind,
+) -> Result<()> {
+    clear_target_indicator(state)?;
+    let indicator = TargetIndicatorWindow::new().context(i18n::text(
+        "无法创建录制目标边框",
+        "Could not create the target indicator",
+    ))?;
+    indicator.set_indicator_label(kind.label().into());
+    apply_target_indicator_geometry(&indicator, bounds)?;
+    indicator.show().context(i18n::text(
+        "无法显示录制目标边框",
+        "Could not show the target indicator",
+    ))?;
+    let generation = {
+        let mut state = state.borrow_mut();
+        state.target_indicator_generation = state.target_indicator_generation.wrapping_add(1);
+        state.target_indicator_bounds = Some(bounds);
+        state.target_indicator = Some(indicator.clone_strong());
+        state.target_indicator_generation
+    };
+    if let Err(error) = schedule_target_indicator_configuration(
+        main.as_weak(),
+        Rc::clone(state),
+        indicator.as_weak(),
+        generation,
+    ) {
+        let _ = clear_target_indicator(state);
         return Err(error);
     }
-    state.borrow_mut().region_indicator = Some(indicator);
+    Ok(())
+}
+
+fn ensure_target_indicator(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<()> {
+    if state.borrow().target_indicator.is_some() {
+        return Ok(());
+    }
+    let Some(target) = state.borrow().target else {
+        return Ok(());
+    };
+    let kind = match target {
+        RecordingTarget::Window { .. } => TargetIndicatorKind::Window,
+        RecordingTarget::Region(_) => TargetIndicatorKind::Region,
+        RecordingTarget::Screen(_) => return Ok(()),
+    };
+    replace_target_indicator(main, state, target.current_bounds()?, kind)
+}
+
+fn refresh_target_indicator(state: &Rc<RefCell<UiState>>) -> Result<()> {
+    let (indicator, previous_bounds, target) = {
+        let state = state.borrow();
+        (
+            state
+                .target_indicator
+                .as_ref()
+                .map(ComponentHandle::clone_strong),
+            state.target_indicator_bounds,
+            state.target,
+        )
+    };
+    let (Some(indicator), Some(target @ RecordingTarget::Window { .. })) = (indicator, target)
+    else {
+        return Ok(());
+    };
+    let bounds = target.current_bounds()?;
+    if previous_bounds == Some(bounds) {
+        return Ok(());
+    }
+    apply_target_indicator_geometry(&indicator, bounds)?;
+    state.borrow_mut().target_indicator_bounds = Some(bounds);
     Ok(())
 }
 
@@ -1215,7 +1368,7 @@ fn open_target_selector(main: &MainWindow, state: &Rc<RefCell<UiState>>, mode: i
             .borrow()
             .selected_screen
             .unwrap_or(target::primary_screen_bounds()?);
-        clear_region_indicator(state)?;
+        clear_target_indicator(state)?;
         state.borrow_mut().target = Some(RecordingTarget::Screen(bounds));
         state.borrow_mut().config.source_mode = 0;
         set_status(
@@ -1231,7 +1384,7 @@ fn open_target_selector(main: &MainWindow, state: &Rc<RefCell<UiState>>, mode: i
             "The recording target cannot be changed while recording"
         )));
     }
-    set_region_indicator_visible(state, false)?;
+    set_target_indicator_visible(main, state, false)?;
     let result = (|| -> Result<()> {
         let desktop = target::virtual_desktop_bounds()?;
         let mut candidates = WindowCandidates::snapshot(desktop)?;
@@ -1272,7 +1425,7 @@ fn open_target_selector(main: &MainWindow, state: &Rc<RefCell<UiState>>, mode: i
         }
         state.borrow_mut().candidates = None;
         state.borrow_mut().selection_desktop = None;
-        if let Err(restore_error) = set_region_indicator_visible(state, true) {
+        if let Err(restore_error) = set_target_indicator_visible(main, state, true) {
             return Err(result
                 .expect_err("selection setup failed")
                 .context(restore_error.to_string()));
@@ -1413,16 +1566,19 @@ fn finish_selector(
     let main = main
         .upgrade()
         .ok_or_else(|| anyhow!("main window was destroyed during target selection"))?;
-    let (selector, restored_mode, message, indicator_bounds) = {
+    let (selector, restored_mode, message, indicator_target) = {
         let mut state = state.borrow_mut();
         let selector = state.selector.take();
         state.candidates = None;
         state.selection_desktop = None;
         if let Some(target) = target {
             let bounds = target.initial_bounds();
-            let indicator_bounds = match target {
-                RecordingTarget::Region(bounds) => Some(Some(bounds)),
-                RecordingTarget::Screen(_) | RecordingTarget::Window { .. } => Some(None),
+            let indicator_target = match target {
+                RecordingTarget::Window { .. } => Some(Some((bounds, TargetIndicatorKind::Window))),
+                RecordingTarget::Region(bounds) => {
+                    Some(Some((bounds, TargetIndicatorKind::Region)))
+                }
+                RecordingTarget::Screen(_) => Some(None),
             };
             state.target = Some(target);
             state.config.source_mode = mode as u8;
@@ -1435,7 +1591,7 @@ fn finish_selector(
                     bounds.width,
                     bounds.height
                 ),
-                indicator_bounds,
+                indicator_target,
             )
         } else {
             (
@@ -1453,10 +1609,10 @@ fn finish_selector(
             "Could not close the target selection window",
         ))?;
     }
-    let indicator_result = match indicator_bounds {
-        Some(Some(bounds)) => replace_region_indicator(state, bounds),
-        Some(None) => clear_region_indicator(state),
-        None => set_region_indicator_visible(state, true),
+    let indicator_result = match indicator_target {
+        Some(Some((bounds, kind))) => replace_target_indicator(&main, state, bounds, kind),
+        Some(None) => clear_target_indicator(state),
+        None => set_target_indicator_visible(&main, state, true),
     };
     main.show().context(i18n::text(
         "无法恢复拾屏主窗口",
@@ -1475,6 +1631,7 @@ fn begin_countdown(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<()
         )));
     }
     let options = recording_options(main, state)?;
+    ensure_target_indicator(main, state)?;
     {
         let mut state = state.borrow_mut();
         update_config_from_main(main, &mut state.config);
@@ -1517,7 +1674,14 @@ fn countdown_tick(
             }
             Err(error) => {
                 main_window.set_recording_state(0);
-                set_status(&main_window, error.to_string(), true);
+                let indicator_error = clear_target_indicator(&state).err();
+                set_status(
+                    &main_window,
+                    indicator_error
+                        .map(|indicator_error| format!("{error}; {indicator_error}"))
+                        .unwrap_or_else(|| error.to_string()),
+                    true,
+                );
             }
         }
         return;
@@ -1647,6 +1811,7 @@ fn handle_recorder_events(main: &MainWindow, state: &Rc<RefCell<UiState>>) {
                 output_path,
                 duration,
             } => {
+                let indicator_error = clear_target_indicator(state).err();
                 state.borrow_mut().last_output = Some(output_path.clone());
                 state.borrow_mut().recorder.take();
                 main.set_recording_state(0);
@@ -1673,8 +1838,17 @@ fn handle_recorder_events(main: &MainWindow, state: &Rc<RefCell<UiState>>) {
                             .and_then(shell::open_path)
                     })
                     .and_then(Result::err);
-                if let Some(error) = open_error {
-                    set_status(
+                match (open_error, indicator_error) {
+                    (Some(open_error), Some(indicator_error)) => set_status(
+                        main,
+                        format!(
+                            "{}: {file_name}; {}: {open_error}; {indicator_error}",
+                            i18n::text("已保存", "Saved"),
+                            i18n::text("打开目录失败", "Failed to open the save folder")
+                        ),
+                        true,
+                    ),
+                    (Some(error), None) => set_status(
                         main,
                         format!(
                             "{}: {file_name}; {}: {error}",
@@ -1682,9 +1856,13 @@ fn handle_recorder_events(main: &MainWindow, state: &Rc<RefCell<UiState>>) {
                             i18n::text("打开目录失败", "Failed to open the save folder")
                         ),
                         true,
-                    );
-                } else {
-                    set_status(
+                    ),
+                    (None, Some(error)) => set_status(
+                        main,
+                        format!("{}: {file_name}; {error}", i18n::text("已保存", "Saved")),
+                        true,
+                    ),
+                    (None, None) => set_status(
                         main,
                         format!(
                             "{}: {file_name} {}",
@@ -1692,16 +1870,26 @@ fn handle_recorder_events(main: &MainWindow, state: &Rc<RefCell<UiState>>) {
                             i18n::text("（单击打开）", "(click to open)")
                         ),
                         false,
-                    );
+                    ),
                 }
             }
             Event::Failed(message) => {
+                let indicator_error = clear_target_indicator(state).err();
                 state.borrow_mut().recorder.take();
                 main.set_recording_state(0);
                 main.set_output_file_name("".into());
                 set_status(
                     main,
-                    format!("{}: {message}", i18n::text("录制失败", "Recording failed")),
+                    indicator_error
+                        .map(|error| {
+                            format!(
+                                "{}: {message}; {error}",
+                                i18n::text("录制失败", "Recording failed")
+                            )
+                        })
+                        .unwrap_or_else(|| {
+                            format!("{}: {message}", i18n::text("录制失败", "Recording failed"))
+                        }),
                     true,
                 );
             }
@@ -1740,9 +1928,9 @@ fn format_duration(duration: Duration) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        REGION_INDICATOR_BORDER_PIXELS, REGION_INDICATOR_LABEL_GAP_PIXELS,
-        REGION_INDICATOR_LABEL_HEIGHT_PIXELS, language_from_index, language_index,
-        region_indicator_geometry,
+        TARGET_INDICATOR_BORDER_PIXELS, TARGET_INDICATOR_LABEL_GAP_PIXELS,
+        TARGET_INDICATOR_LABEL_HEIGHT_PIXELS, language_from_index, language_index,
+        target_indicator_geometry,
     };
     use crate::config::LanguageMode;
     use crate::platform::target::Bounds;
@@ -1757,34 +1945,34 @@ mod tests {
     }
 
     #[test]
-    fn region_indicator_window_keeps_visible_pixels_outside_capture_bounds() {
+    fn target_indicator_window_keeps_visible_pixels_outside_capture_bounds() {
         let capture = Bounds {
             left: -640,
             top: 120,
             width: 1280,
             height: 720,
         };
-        let indicator = region_indicator_geometry(capture).unwrap();
+        let indicator = target_indicator_geometry(capture).unwrap();
         let capture_left_in_indicator = capture.left - indicator.left;
         let capture_top_in_indicator = capture.top - indicator.top;
 
-        assert_eq!(capture_left_in_indicator, REGION_INDICATOR_BORDER_PIXELS);
+        assert_eq!(capture_left_in_indicator, TARGET_INDICATOR_BORDER_PIXELS);
         assert_eq!(
             capture_top_in_indicator,
-            REGION_INDICATOR_LABEL_HEIGHT_PIXELS
-                + REGION_INDICATOR_LABEL_GAP_PIXELS
-                + REGION_INDICATOR_BORDER_PIXELS
+            TARGET_INDICATOR_LABEL_HEIGHT_PIXELS
+                + TARGET_INDICATOR_LABEL_GAP_PIXELS
+                + TARGET_INDICATOR_BORDER_PIXELS
         );
         assert_eq!(
             indicator.width as i32,
-            capture.width + REGION_INDICATOR_BORDER_PIXELS * 2
+            capture.width + TARGET_INDICATOR_BORDER_PIXELS * 2
         );
         assert_eq!(
             indicator.height as i32,
             capture.height
-                + REGION_INDICATOR_LABEL_HEIGHT_PIXELS
-                + REGION_INDICATOR_LABEL_GAP_PIXELS
-                + REGION_INDICATOR_BORDER_PIXELS * 2
+                + TARGET_INDICATOR_LABEL_HEIGHT_PIXELS
+                + TARGET_INDICATOR_LABEL_GAP_PIXELS
+                + TARGET_INDICATOR_BORDER_PIXELS * 2
         );
     }
 }
