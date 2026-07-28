@@ -9,11 +9,20 @@ msgstr ""
 msgid "3 秒"
 msgstr "3 seconds"
 
+msgid "一款轻量、直接的屏幕、窗口与区域录制工具。"
+msgstr "A lightweight, direct tool for recording a screen, window, or region."
+
 msgid "5 秒"
 msgstr "5 seconds"
 
+msgid "作者："
+msgstr "Author:"
+
 msgid "保存目录"
 msgstr "Save folder"
+
+msgid "关于"
+msgstr "About"
 
 msgid "常规"
 msgstr "General"
@@ -23,6 +32,9 @@ msgstr "Window"
 
 msgid "打开"
 msgstr "Open"
+
+msgid "关闭窗口"
+msgstr "Close"
 
 msgid "打开保存目录"
 msgstr "Open save folder"
@@ -150,8 +162,11 @@ msgstr "Open the save folder after recording stops and is saved"
 msgid "突出鼠标点击"
 msgstr "Highlight mouse clicks"
 
-msgid "退出拾屏"
-msgstr "Quit ShiPing"
+msgid "退出"
+msgstr "Quit"
+
+msgid "使用 Rust 与 Slint 构建 · © 2026"
+msgstr "Built with Rust and Slint · © 2026"
 
 msgid "拖动选择固定录制区域，Esc 取消"
 msgstr "Drag to select a fixed recording region; press Esc to cancel"

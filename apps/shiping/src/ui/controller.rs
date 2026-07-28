@@ -74,6 +74,8 @@ pub(crate) fn run() -> Result<(), slint::PlatformError> {
     let language_error = shi_foundation::i18n::apply(config.language).err();
     let tray = RecordingTray::new()?;
     let preferences = PreferencesDialog::new()?;
+    preferences.set_version_text(format!("v{}", env!("CARGO_PKG_VERSION")).into());
+    preferences.set_build_text(build_information().into());
     apply_config(&main, &config);
     apply_shortcut_labels(&main, &tray, &config);
     let initial_hotkeys = config.hotkeys();
@@ -1927,6 +1929,18 @@ fn update_config_from_main(main: &MainWindow, config: &mut Config) {
 fn set_status(main: &MainWindow, message: impl Into<String>, error: bool) {
     main.set_status_text(message.into().into());
     main.set_status_level(if error { 2 } else { 0 });
+}
+
+fn build_information() -> String {
+    format!(
+        "Windows {} · Slint 1.17.0 · {}",
+        std::env::consts::ARCH,
+        if cfg!(debug_assertions) {
+            "Debug"
+        } else {
+            "Release"
+        }
+    )
 }
 
 fn format_duration(duration: Duration) -> String {

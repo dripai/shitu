@@ -103,12 +103,65 @@ component ShortcutEditor {
     }
 }
 
+component AboutInfoRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+
+    height: 28px;
+    spacing: 8px;
+
+    Text {
+        width: 72px;
+        text: root.label;
+        color: #9fa8b5;
+        vertical-alignment: center;
+    }
+    Text {
+        text: root.value;
+        color: #e7eaf0;
+        vertical-alignment: center;
+    }
+    Rectangle { }
+}
+
+// Slint 1.17 provides Platform.open-url(), but no standard hyperlink widget.
+// This component only supplies link presentation and pointer/accessibility behavior.
+component AboutLinkRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <string> url;
+
+    height: 28px;
+    spacing: 8px;
+
+    Text {
+        width: 72px;
+        text: root.label;
+        color: #9fa8b5;
+        vertical-alignment: center;
+    }
+    link := Text {
+        text: root.value;
+        color: touch.has-hover ? #8ab4f8 : #e7eaf0;
+        vertical-alignment: center;
+        accessible-role: button;
+        accessible-label: root.label + " " + root.value;
+        accessible-action-default => { Platform.open-url(root.url); }
+
+        touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => { Platform.open-url(root.url); }
+        }
+    }
+    Rectangle { }
+}
+
 export component PreferencesDialog inherits Dialog {
     title: @tr("拾屏首选项");
     icon: @image-url("icons/tray.svg");
     default-font-family: "Microsoft YaHei UI";
     default-font-size: 13px;
-    width: 600px;
+    width: 620px;
     height: 450px;
     background: #1f242c;
 
@@ -135,6 +188,8 @@ export component PreferencesDialog inherits Dialog {
     in-out property <string> stop-shortcut-error;
     in-out property <string> status-text;
     in-out property <bool> status-error: false;
+    in property <string> version-text;
+    in property <string> build-text;
 
     private property <length> setting-label-width: 96px;
     private property <length> setting-row-height: 32px;
@@ -163,9 +218,9 @@ export component PreferencesDialog inherits Dialog {
 
                 // Slint 1.17's vertical TabWidget has no public tab-row-height property.
                 // Keep native button focus, keyboard and accessibility behavior while limiting
-                // this navigation-only replacement to three compact rows.
+                // this navigation-only replacement to compact rows.
                 VerticalLayout {
-                    width: 80px;
+                    width: 100px;
                     spacing: 4px;
                     alignment: start;
 
@@ -178,6 +233,7 @@ export component PreferencesDialog inherits Dialog {
                             general-page-button.checked = true;
                             recording-page-button.checked = false;
                             shortcuts-page-button.checked = false;
+                            about-page-button.checked = false;
                             root.current-page = 0;
                         }
                     }
@@ -189,6 +245,7 @@ export component PreferencesDialog inherits Dialog {
                             general-page-button.checked = false;
                             recording-page-button.checked = true;
                             shortcuts-page-button.checked = false;
+                            about-page-button.checked = false;
                             root.current-page = 1;
                         }
                     }
@@ -200,7 +257,20 @@ export component PreferencesDialog inherits Dialog {
                             general-page-button.checked = false;
                             recording-page-button.checked = false;
                             shortcuts-page-button.checked = true;
+                            about-page-button.checked = false;
                             root.current-page = 2;
+                        }
+                    }
+                    about-page-button := Button {
+                        height: 36px;
+                        text: @tr("关于");
+                        checkable: true;
+                        clicked => {
+                            general-page-button.checked = false;
+                            recording-page-button.checked = false;
+                            shortcuts-page-button.checked = false;
+                            about-page-button.checked = true;
+                            root.current-page = 3;
                         }
                     }
                 }
@@ -457,6 +527,88 @@ export component PreferencesDialog inherits Dialog {
                         Rectangle { vertical-stretch: 1; }
                     }
                     }
+
+                    if root.current-page == 3: Rectangle {
+                        background: transparent;
+
+                        VerticalLayout {
+                            padding: 12px;
+                            spacing: 6px;
+                            alignment: start;
+
+                            HorizontalLayout {
+                                height: 58px;
+                                spacing: 12px;
+
+                                Image {
+                                    width: 48px;
+                                    height: 48px;
+                                    source: @image-url("icons/tray.svg");
+                                    image-fit: contain;
+                                }
+                                VerticalLayout {
+                                    width: 78px;
+                                    height: 48px;
+                                    spacing: 2px;
+
+                                    Text {
+                                        height: 26px;
+                                        text: @tr("拾屏");
+                                        color: #e7eaf0;
+                                        font-size: 19px;
+                                        font-weight: 700;
+                                        vertical-alignment: center;
+                                    }
+                                    Text {
+                                        height: 20px;
+                                        text: root.version-text;
+                                        color: #9fa8b5;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                                Text {
+                                    horizontal-stretch: 1;
+                                    text: @tr("一款轻量、直接的屏幕、窗口与区域录制工具。");
+                                    color: #9fa8b5;
+                                    vertical-alignment: center;
+                                    wrap: word-wrap;
+                                }
+                            }
+
+                            Rectangle {
+                                height: 1px;
+                                background: #343b47;
+                            }
+                            Text {
+                                height: 24px;
+                                text: root.build-text;
+                                color: #9fa8b5;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+                            AboutInfoRow {
+                                label: @tr("作者：");
+                                value: "logic";
+                            }
+                            AboutLinkRow {
+                                label: "Twitter:";
+                                value: "@wz220321";
+                                url: "https://x.com/wz220321";
+                            }
+                            AboutLinkRow {
+                                label: "GitHub:";
+                                value: "dripai/shitu";
+                                url: "https://github.com/dripai/shitu";
+                            }
+                            Text {
+                                height: 22px;
+                                text: @tr("使用 Rust 与 Slint 构建 · © 2026");
+                                color: #9fa8b5;
+                                vertical-alignment: center;
+                            }
+                            Rectangle { vertical-stretch: 1; }
+                        }
+                    }
                 }
             }
         }
@@ -472,16 +624,16 @@ export component PreferencesDialog inherits Dialog {
             spacing: 8px;
 
             Rectangle { horizontal-stretch: 1; }
-            Button {
+            if root.current-page != 3: Button {
                 text: @tr("恢复默认");
                 enabled: !root.recording-active;
                 clicked => { root.reset-settings(); }
             }
             Button {
-                text: @tr("取消");
+                text: root.current-page == 3 ? @tr("关闭窗口") : @tr("取消");
                 clicked => { root.cancel-settings(); }
             }
-            Button {
+            if root.current-page != 3: Button {
                 text: @tr("保存");
                 enabled: !root.recording-active;
                 clicked => { root.save-settings(); }
