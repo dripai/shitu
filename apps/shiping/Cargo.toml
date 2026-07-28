@@ -4,6 +4,11 @@ version.workspace = true
 edition.workspace = true
 description = "ShiPing screen recorder UI prototype"
 publish = false
+autobins = false
+
+[[bin]]
+name = "ShiPing"
+path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true

@@ -17,25 +17,35 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Verify tag matches package version
+      - name: Verify tag matches package versions
         shell: pwsh
         run: |
-          $package = (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages |
-            Where-Object name -eq 'shitu' |
-            Select-Object -First 1
-          if ($null -eq $package) {
-            throw 'Cargo workspace package shitu was not found.'
+          $packageNames = @('shitu', 'shiping')
+          $packages = @(
+            (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages |
+              Where-Object { $_.name -in $packageNames }
+          )
+          if ($packages.Count -ne $packageNames.Count) {
+            $foundNames = @($packages | ForEach-Object name)
+            $missingNames = @($packageNames | Where-Object { $_ -notin $foundNames })
+            throw "Cargo workspace packages were not found: $($missingNames -join ', ')"
           }
-          $expectedTag = "v$($package.version)"
-          if ($env:GITHUB_REF_NAME -ne $expectedTag) {
-            throw "Release tag $env:GITHUB_REF_NAME must match Cargo.toml version $expectedTag"
+
+          foreach ($package in $packages) {
+            $expectedTag = "v$($package.version)"
+            if ($env:GITHUB_REF_NAME -ne $expectedTag) {
+              throw "Release tag $env:GITHUB_REF_NAME must match $($package.name) version $expectedTag"
+            }
           }
 
       - name: Test
         run: cargo test --workspace --locked
 
-      - name: Build release binary
+      - name: Build ShiTu release binary
         run: cargo build --release --locked --package shitu --bin ShiTu
+
+      - name: Build ShiPing release binary
+        run: cargo build --release --locked --package shiping --bin ShiPing
 
       - name: Build Microsoft Store upload asset
         shell: pwsh
@@ -55,22 +65,35 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $executable = 'target\release\ShiTu.exe'
-          if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
-            throw "Expected release executable was not produced: $executable"
-          }
-
           New-Item -ItemType Directory -Force -Path release-assets | Out-Null
-          $archiveName = "ShiTu-$env:GITHUB_REF_NAME-windows-x86_64.zip"
-          $archivePath = Join-Path 'release-assets' $archiveName
-          Compress-Archive -LiteralPath $executable -DestinationPath $archivePath -Force
 
-          $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash *$archiveName" | Set-Content -LiteralPath "$archivePath.sha256" -Encoding ascii -NoNewline
+          $products = @(
+            @{
+              Name = 'ShiTu'
+              Executable = 'target\release\ShiTu.exe'
+            },
+            @{
+              Name = 'ShiPing'
+              Executable = 'target\release\ShiPing.exe'
+            }
+          )
+
+          foreach ($product in $products) {
+            if (-not (Test-Path -LiteralPath $product.Executable -PathType Leaf)) {
+              throw "Expected release executable was not produced: $($product.Executable)"
+            }
+
+            $archiveName = "$($product.Name)-$env:GITHUB_REF_NAME-windows-x86_64.zip"
+            $archivePath = Join-Path 'release-assets' $archiveName
+            Compress-Archive -LiteralPath $product.Executable -DestinationPath $archivePath -Force
+
+            $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash *$archiveName" | Set-Content -LiteralPath "$archivePath.sha256" -Encoding ascii -NoNewline
+          }
 
       - uses: actions/upload-artifact@v4
         with:
-          name: shitu-windows-x86_64
+          name: windows-x86_64
           path: release-assets/*
           if-no-files-found: error
 

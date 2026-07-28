@@ -18,8 +18,11 @@ case "$app" in
     shitu)
         bin="ShiTu"
         ;;
-    shiping | shiyin)
-        bin="$app"
+    shiping)
+        bin="ShiPing"
+        ;;
+    shiyin)
+        bin="shiyin"
         ;;
     *)
         echo "Unknown application: $app" >&2
