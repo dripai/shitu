@@ -1,23 +1,29 @@
-# Microsoft Store MSIX package
+# Microsoft Store MSIX packages
 
-ShiTu is published to Microsoft Store as a complete x64 MSIX package. The package contains `ShiTu.exe` and its app icon, and uses the Store identity reserved for this product.
+ShiTu is published to Microsoft Store as a complete x64 MSIX package. ShiPing is prepared for a separate x64 MSIX submission. Each package contains one product executable and its app icon, and uses the Microsoft Store identity reserved for that product.
 
-`AppxManifest.xml` is a template: `tools/package-store-msix.ps1` replaces `__PACKAGE_VERSION__` with the `shitu` workspace package version in MSIX format (`X.Y.Z.0`) while preparing the staging directory. The Store submission version therefore follows the Git tag, which the release workflow requires to match the workspace version inherited by `apps/shitu`.
+The manifests are intentionally isolated by product:
 
-The package declares `systemAIModels` for Windows AI OCR. It also declares `runFullTrust` because ShiTu is a packaged Win32 desktop application.
+- `packaging/shitu/AppxManifest.xml`
+- `packaging/shiping/AppxManifest.xml`
 
-Build a Store upload asset after compiling the release executable:
+`tools/package-store-msix.ps1` requires an explicit `-Product` argument and replaces `__PACKAGE_VERSION__` with the selected Cargo package version in MSIX format (`X.Y.Z.0`) while preparing the staging directory. It rejects an executable whose file name does not match the selected product.
+
+ShiTu declares `systemAIModels` and the Windows App Runtime dependency for enhanced Windows AI OCR. ShiPing does not declare either dependency. Both packages declare `runFullTrust` because they are packaged Win32 desktop applications.
+
+Build Store upload assets after compiling the release executables:
 
 ```powershell
-.\tools\package-store-msix.ps1 -ExecutablePath .\target\release\ShiTu.exe -Version 0.1.1 -OutputDirectory .\release-assets
+.\tools\package-store-msix.ps1 -Product ShiTu -ExecutablePath .\target\release\ShiTu.exe -Version 0.1.9 -OutputDirectory .\release-assets
+.\tools\package-store-msix.ps1 -Product ShiPing -ExecutablePath .\target\release\ShiPing.exe -Version 0.1.9 -OutputDirectory .\release-assets
 ```
 
-The script produces:
+For each selected product, the script produces:
 
-- `ShiTu-<version>-windows-x64.msix`: the unsigned MSIX package.
-- `ShiTu-<version>-store.msixupload`: the MSIX wrapped in the Store upload format.
+- `<product>-<version>-windows-x64.msix`: the unsigned MSIX package.
+- `<product>-<version>-store.msixupload`: the MSIX wrapped in the Store upload format.
 
-The `.msixupload` file is for Partner Center. Microsoft Store re-signs accepted MSIX submissions, so no private signing certificate is stored in this repository or used by the release workflow. The unsigned package must not be distributed for sideloading.
+The `.msixupload` file is for Partner Center. Microsoft Store signs accepted MSIX submissions, so no private signing certificate is stored in this repository or used by the release workflow. The unsigned package must not be distributed for sideloading.
 
 Official references:
 

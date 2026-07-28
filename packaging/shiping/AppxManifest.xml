@@ -4,46 +4,41 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  xmlns:systemai="http://schemas.microsoft.com/appx/manifest/systemai/windows10"
-  IgnorableNamespaces="uap uap10 rescap systemai">
-  <!-- Values are reserved by Microsoft Store for ShiTu. -->
+  IgnorableNamespaces="uap uap10 rescap">
+  <!-- Microsoft Store identity reserved for ShiPing. -->
   <Identity
-    Name="wangzhen.55436AAF2FD6E"
+    Name="wangzhen.ShiPing"
     Publisher="CN=15C8697D-431F-4F15-B827-0E00360E3FE4"
     Version="__PACKAGE_VERSION__"
     ProcessorArchitecture="x64" />
   <Properties>
-    <DisplayName>拾图</DisplayName>
+    <DisplayName>拾屏</DisplayName>
     <PublisherDisplayName>wang zhen</PublisherDisplayName>
     <Logo>Assets\app.png</Logo>
   </Properties>
   <Resources>
     <Resource Language="zh-cn" />
+    <Resource Language="en-us" />
   </Resources>
   <Dependencies>
     <TargetDeviceFamily
       Name="Windows.Desktop"
-      MinVersion="10.0.26100.0"
-      MaxVersionTested="10.0.26226.0" />
-    <PackageDependency
-      Name="Microsoft.WindowsAppRuntime.1.8"
-      Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
-      MinVersion="8000.642.119.0" />
+      MinVersion="10.0.19041.0"
+      MaxVersionTested="10.0.26200.0" />
   </Dependencies>
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
-    <systemai:Capability Name="systemAIModels" />
   </Capabilities>
   <Applications>
     <Application
-      Id="ShiTu"
-      Executable="ShiTu.exe"
+      Id="ShiPing"
+      Executable="ShiPing.exe"
       uap10:TrustLevel="mediumIL"
       uap10:RuntimeBehavior="win32App">
       <uap:VisualElements
         AppListEntry="default"
-        DisplayName="拾图"
-        Description="轻量级截图与钉图工具"
+        DisplayName="拾屏"
+        Description="轻量级屏幕、窗口与区域录制工具"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\app.png"
         Square44x44Logo="Assets\app.png" />

@@ -61,7 +61,7 @@ ShiPing is designed for product walkthroughs, tutorials, meeting demonstrations,
 
 - [Download the latest release](https://github.com/dripai/shitu/releases)
 - [Report a problem or request a feature](https://github.com/dripai/shitu/issues)
-- [Read the privacy policy](PRIVACY.md)
+- [Read the privacy policy](PRIVACY.en.md)
 
 ## Privacy by design
 

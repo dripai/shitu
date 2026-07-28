@@ -47,19 +47,36 @@ jobs:
       - name: Build ShiPing release binary
         run: cargo build --release --locked --package shiping --bin ShiPing
 
-      - name: Build Microsoft Store upload asset
+      - name: Build Microsoft Store upload assets
         shell: pwsh
         run: |
-          $package = (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages |
-            Where-Object name -eq 'shitu' |
-            Select-Object -First 1
-          if ($null -eq $package) {
-            throw 'Cargo workspace package shitu was not found.'
+          $packages = (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages
+          $storeProducts = @(
+            @{
+              Product = 'ShiTu'
+              PackageName = 'shitu'
+              Executable = '.\target\release\ShiTu.exe'
+            },
+            @{
+              Product = 'ShiPing'
+              PackageName = 'shiping'
+              Executable = '.\target\release\ShiPing.exe'
+            }
+          )
+
+          foreach ($storeProduct in $storeProducts) {
+            $package = $packages |
+              Where-Object name -eq $storeProduct.PackageName |
+              Select-Object -First 1
+            if ($null -eq $package) {
+              throw "Cargo workspace package $($storeProduct.PackageName) was not found."
+            }
+            .\tools\package-store-msix.ps1 `
+              -Product $storeProduct.Product `
+              -ExecutablePath $storeProduct.Executable `
+              -Version $package.version `
+              -OutputDirectory .\release-assets
           }
-          .\tools\package-store-msix.ps1 `
-            -ExecutablePath .\target\release\ShiTu.exe `
-            -Version $package.version `
-            -OutputDirectory .\release-assets
 
       - name: Package release assets
         shell: pwsh
