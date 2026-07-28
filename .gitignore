@@ -2,6 +2,9 @@
 /release-assets/
 /download/
 
+# Local product and commercial documentation
+/docs/
+
 # Local runtime data
 *.log
 *.tmp
