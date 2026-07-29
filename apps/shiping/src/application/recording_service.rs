@@ -18,6 +18,40 @@ use crate::{
 
 const AUDIO_CHUNK_FRAMES: u64 = 1024;
 
+trait RecordingClock {
+    fn now(&self) -> Duration;
+    fn sleep(&self, duration: Duration);
+}
+
+struct SystemClock {
+    epoch: Instant,
+}
+
+impl SystemClock {
+    fn new() -> Self {
+        Self {
+            epoch: Instant::now(),
+        }
+    }
+}
+
+impl RecordingClock for SystemClock {
+    fn now(&self) -> Duration {
+        self.epoch.elapsed()
+    }
+
+    fn sleep(&self, duration: Duration) {
+        thread::sleep(duration);
+    }
+}
+
+#[derive(Clone, Copy)]
+struct RecordingServices<'a> {
+    backend: &'a dyn RecordingBackend,
+    targets: &'a dyn TargetSelection,
+    clock: &'a dyn RecordingClock,
+}
+
 #[derive(Clone)]
 pub struct RecordingOptions {
     pub target: RecordingTarget,
@@ -111,15 +145,31 @@ fn run_recording(
     commands: Receiver<Command>,
     events: &Sender<Event>,
 ) -> Result<()> {
-    let backend = recording_backend();
-    let targets = target_selection();
-    let _runtime = backend.initialize_thread()?;
-    let initial_bounds = targets.current_bounds(options.target)?;
+    let clock = SystemClock::new();
+    run_recording_with_services(
+        RecordingServices {
+            backend: recording_backend(),
+            targets: target_selection(),
+            clock: &clock,
+        },
+        options,
+        commands,
+        events,
+    )
+}
+
+fn run_recording_with_services(
+    services: RecordingServices<'_>,
+    options: RecordingOptions,
+    commands: Receiver<Command>,
+    events: &Sender<Event>,
+) -> Result<()> {
+    let _runtime = services.backend.initialize_thread()?;
+    let initial_bounds = services.targets.current_bounds(options.target)?;
     let (width, height) = output_size(initial_bounds, options.quality_preset);
     let paths = output::prepare(&options.save_directory, options.output_format)?;
     let result = run_with_output(
-        backend,
-        targets,
+        services,
         &options,
         &paths,
         (width, height),
@@ -133,8 +183,7 @@ fn run_recording(
 }
 
 fn run_with_output(
-    backend: &dyn RecordingBackend,
-    targets: &dyn TargetSelection,
+    services: RecordingServices<'_>,
     options: &RecordingOptions,
     paths: &output::OutputPaths,
     output_size: (u32, u32),
@@ -145,7 +194,7 @@ fn run_with_output(
     let mut audio = options
         .output_format
         .supports_audio()
-        .then(|| backend.create_audio_capture());
+        .then(|| services.backend.create_audio_capture());
     let mut warnings = Vec::new();
     if let Some(audio) = audio.as_ref() {
         if options.system_audio && !audio.system_available() {
@@ -197,7 +246,7 @@ fn run_with_output(
         .as_ref()
         .is_some_and(|audio| audio.microphone_available());
     let include_audio = audio.as_ref().is_some_and(|audio| audio.has_any_source());
-    let mut writer = backend.create_writer(
+    let mut writer = services.backend.create_writer(
         options.output_format,
         &paths.partial,
         width,
@@ -205,8 +254,8 @@ fn run_with_output(
         options.frames_per_second,
         include_audio,
     )?;
-    let mut grabber = backend.create_video_capture(width, height)?;
-    let audio_sample_rate = backend.audio_sample_rate();
+    let mut grabber = services.backend.create_video_capture(width, height)?;
+    let audio_sample_rate = services.backend.audio_sample_rate();
     events
         .send(Event::Started {
             output_path: paths.final_path.clone(),
@@ -217,7 +266,7 @@ fn run_with_output(
         .ok();
 
     let mut active_duration = Duration::ZERO;
-    let mut active_segment_started = Some(Instant::now());
+    let mut active_segment_started = Some(services.clock.now());
     let mut next_video_index = 0_u64;
     let mut audio_frame_index = 0_u64;
     let mut system_audio = options.system_audio;
@@ -226,7 +275,7 @@ fn run_with_output(
     let mut highlight_clicks = options.highlight_clicks;
     let mut paused = false;
     let mut stopping = false;
-    let mut last_progress = Instant::now();
+    let mut last_progress = services.clock.now();
 
     while !stopping {
         loop {
@@ -235,10 +284,10 @@ fn run_with_output(
                     paused = !paused;
                     if paused {
                         if let Some(started) = active_segment_started.take() {
-                            active_duration += started.elapsed();
+                            active_duration += services.clock.now().saturating_sub(started);
                         }
                     } else {
-                        active_segment_started = Some(Instant::now());
+                        active_segment_started = Some(services.clock.now());
                     }
                     if let Some(audio) = audio.as_mut() {
                         audio.discard();
@@ -339,13 +388,13 @@ fn run_with_output(
             if let Some(audio) = audio.as_mut() {
                 audio.discard();
             }
-            thread::sleep(Duration::from_millis(8));
+            services.clock.sleep(Duration::from_millis(8));
             continue;
         }
 
         let elapsed = active_duration
             + active_segment_started
-                .map(|started| started.elapsed())
+                .map(|started| services.clock.now().saturating_sub(started))
                 .unwrap_or_default();
         let expected_video_index =
             (elapsed.as_secs_f64() * options.frames_per_second as f64).floor() as u64;
@@ -353,7 +402,7 @@ fn run_with_output(
             if expected_video_index > next_video_index + 2 {
                 next_video_index = expected_video_index;
             }
-            let bounds = targets.current_bounds(options.target)?;
+            let bounds = services.targets.current_bounds(options.target)?;
             let pixels = grabber.capture(bounds, show_cursor, highlight_clicks)?;
             writer.write_video(next_video_index, pixels)?;
             next_video_index += 1;
@@ -369,15 +418,16 @@ fn run_with_output(
             }
         }
 
-        if last_progress.elapsed() >= Duration::from_millis(200) {
+        let now = services.clock.now();
+        if now.saturating_sub(last_progress) >= Duration::from_millis(200) {
             events.send(Event::Progress(elapsed)).ok();
-            last_progress = Instant::now();
+            last_progress = now;
         }
-        thread::sleep(Duration::from_millis(2));
+        services.clock.sleep(Duration::from_millis(2));
     }
 
     if let Some(started) = active_segment_started.take() {
-        active_duration += started.elapsed();
+        active_duration += services.clock.now().saturating_sub(started);
     }
     if let Some(mut audio) = audio.take() {
         let expected_audio_frames =
@@ -402,20 +452,24 @@ fn run_with_output(
 #[cfg(test)]
 mod tests {
     use std::{
+        cell::{Cell, RefCell},
+        collections::VecDeque,
         fs,
         path::Path,
-        sync::mpsc,
+        sync::{Arc, Mutex, mpsc},
         thread,
         time::{Duration, Instant},
     };
 
-    use anyhow::Result;
+    use anyhow::{Result, anyhow};
 
-    use super::{Command, Event, RecorderHandle, RecordingOptions, run_with_output};
+    use super::{
+        Command, Event, RecorderHandle, RecordingClock, RecordingOptions, RecordingServices,
+        run_recording_with_services,
+    };
     use crate::{
         config::OutputFormat,
         domain::{AudioSourceKind, Bounds, MonitorCandidates, RecordingTarget, WindowCandidates},
-        output,
         platform::target_selection,
         ports::{
             AudioCapture, MediaWriter, RecordingBackend, RecordingThreadRuntime, TargetSelection,
@@ -423,16 +477,61 @@ mod tests {
         },
     };
 
-    struct FakeBackend;
+    #[derive(Default)]
+    struct FakeTrace {
+        video_indices: Vec<u64>,
+        capture_options: Vec<(bool, bool)>,
+        audio_writes: Vec<(u64, usize, i16)>,
+        audio_discards: usize,
+        finalized: bool,
+    }
+
+    struct FakeBackend {
+        trace: Arc<Mutex<FakeTrace>>,
+        fail_video_write: bool,
+    }
+
     struct FakeTargetSelection;
     struct FakeRuntime;
     struct FakeVideoCapture {
         pixels: Vec<u8>,
+        trace: Arc<Mutex<FakeTrace>>,
     }
-    struct FakeAudioCapture;
-    struct FakeWriter;
+    struct FakeAudioCapture {
+        trace: Arc<Mutex<FakeTrace>>,
+    }
+    struct FakeWriter {
+        trace: Arc<Mutex<FakeTrace>>,
+        fail_video_write: bool,
+    }
+    struct ScriptedClock {
+        now: Cell<Duration>,
+        commands: mpsc::Sender<Command>,
+        schedule: RefCell<VecDeque<(Duration, Command)>>,
+    }
 
     impl RecordingThreadRuntime for FakeRuntime {}
+
+    impl RecordingClock for ScriptedClock {
+        fn now(&self) -> Duration {
+            self.now.get()
+        }
+
+        fn sleep(&self, duration: Duration) {
+            let now = self.now.get() + duration;
+            self.now.set(now);
+            let mut schedule = self.schedule.borrow_mut();
+            while schedule
+                .front()
+                .is_some_and(|(scheduled, _)| *scheduled <= now)
+            {
+                let (_, command) = schedule.pop_front().expect("scheduled command exists");
+                self.commands
+                    .send(command)
+                    .expect("command receiver is open");
+            }
+        }
+    }
 
     impl TargetSelection for FakeTargetSelection {
         fn monitors(&self) -> Result<MonitorCandidates> {
@@ -460,56 +559,74 @@ mod tests {
         fn capture(
             &mut self,
             _source: Bounds,
-            _show_cursor: bool,
-            _highlight_clicks: bool,
+            show_cursor: bool,
+            highlight_clicks: bool,
         ) -> Result<&[u8]> {
+            self.trace
+                .lock()
+                .unwrap()
+                .capture_options
+                .push((show_cursor, highlight_clicks));
             Ok(&self.pixels)
         }
     }
 
     impl AudioCapture for FakeAudioCapture {
         fn system_available(&self) -> bool {
-            false
+            true
         }
 
         fn microphone_available(&self) -> bool {
-            false
+            true
         }
 
         fn error(&self, _kind: AudioSourceKind) -> Option<&str> {
-            Some("fake audio is unavailable")
+            None
         }
 
         fn has_any_source(&self) -> bool {
-            false
+            true
         }
 
         fn pump(&mut self) -> Result<()> {
             Ok(())
         }
 
-        fn discard(&mut self) {}
+        fn discard(&mut self) {
+            self.trace.lock().unwrap().audio_discards += 1;
+        }
 
         fn mix(
             &mut self,
             frames: usize,
-            _system_enabled: bool,
-            _microphone_enabled: bool,
+            system_enabled: bool,
+            microphone_enabled: bool,
         ) -> Vec<i16> {
-            vec![0; frames * 2]
+            let marker = i16::from(system_enabled) + i16::from(microphone_enabled) * 2;
+            vec![marker; frames * 2]
         }
     }
 
     impl MediaWriter for FakeWriter {
-        fn write_video(&mut self, _frame_index: u64, _bgra: &[u8]) -> Result<()> {
+        fn write_video(&mut self, frame_index: u64, _bgra: &[u8]) -> Result<()> {
+            if self.fail_video_write {
+                return Err(anyhow!("fake video write failure"));
+            }
+            self.trace.lock().unwrap().video_indices.push(frame_index);
             Ok(())
         }
 
-        fn write_audio(&mut self, _start_frame: u64, _pcm: &[i16]) -> Result<()> {
+        fn write_audio(&mut self, start_frame: u64, pcm: &[i16]) -> Result<()> {
+            self.trace.lock().unwrap().audio_writes.push((
+                start_frame,
+                pcm.len() / 2,
+                pcm.first().copied().unwrap_or_default(),
+            ));
             Ok(())
         }
 
         fn finalize(self: Box<Self>) -> Result<()> {
+            self.trace.lock().unwrap().finalized = true;
             Ok(())
         }
     }
@@ -522,11 +639,14 @@ mod tests {
         fn create_video_capture(&self, width: u32, height: u32) -> Result<Box<dyn VideoCapture>> {
             Ok(Box::new(FakeVideoCapture {
                 pixels: vec![0; width as usize * height as usize * 4],
+                trace: Arc::clone(&self.trace),
             }))
         }
 
         fn create_audio_capture(&self) -> Box<dyn AudioCapture> {
-            Box::new(FakeAudioCapture)
+            Box::new(FakeAudioCapture {
+                trace: Arc::clone(&self.trace),
+            })
         }
 
         fn create_writer(
@@ -539,7 +659,10 @@ mod tests {
             _include_audio: bool,
         ) -> Result<Box<dyn MediaWriter>> {
             fs::write(path, b"fake recording")?;
-            Ok(Box::new(FakeWriter))
+            Ok(Box::new(FakeWriter {
+                trace: Arc::clone(&self.trace),
+                fail_video_write: self.fail_video_write,
+            }))
         }
 
         fn audio_sample_rate(&self) -> u32 {
@@ -548,36 +671,36 @@ mod tests {
     }
 
     #[test]
-    fn recording_core_can_run_with_a_fake_backend() {
+    fn fake_backend_covers_pause_resume_stop_and_media_timeline() {
         let directory =
-            std::env::temp_dir().join(format!("shiping-core-test-{}", std::process::id()));
-        let paths = output::prepare(&directory, OutputFormat::Gif).unwrap();
-        let options = RecordingOptions {
-            target: RecordingTarget::Screen(Bounds {
-                left: 0,
-                top: 0,
-                width: 16,
-                height: 16,
-            }),
-            quality_preset: 3,
-            frames_per_second: 10,
-            output_format: OutputFormat::Gif,
-            system_audio: false,
-            microphone: false,
-            show_cursor: false,
-            highlight_clicks: false,
-            save_directory: directory.clone(),
+            std::env::temp_dir().join(format!("shiping-timeline-test-{}", std::process::id()));
+        let trace = Arc::new(Mutex::new(FakeTrace::default()));
+        let backend = FakeBackend {
+            trace: Arc::clone(&trace),
+            fail_video_write: false,
         };
-        let (commands, command_receiver) = mpsc::channel();
+        let (command_sender, command_receiver) = mpsc::channel();
+        let clock = ScriptedClock {
+            now: Cell::new(Duration::ZERO),
+            commands: command_sender,
+            schedule: RefCell::new(VecDeque::from([
+                (Duration::from_millis(50), Command::SystemAudio(false)),
+                (Duration::from_millis(50), Command::ShowCursor(true)),
+                (Duration::from_millis(50), Command::HighlightClicks(true)),
+                (Duration::from_millis(120), Command::TogglePause),
+                (Duration::from_millis(320), Command::TogglePause),
+                (Duration::from_millis(500), Command::Stop),
+            ])),
+        };
         let (event_sender, events) = mpsc::channel();
-        commands.send(Command::Stop).unwrap();
 
-        run_with_output(
-            &FakeBackend,
-            &FakeTargetSelection,
-            &options,
-            &paths,
-            (16, 16),
+        run_recording_with_services(
+            RecordingServices {
+                backend: &backend,
+                targets: &FakeTargetSelection,
+                clock: &clock,
+            },
+            fake_options(directory.clone()),
             command_receiver,
             &event_sender,
         )
@@ -585,9 +708,93 @@ mod tests {
 
         let events: Vec<_> = events.try_iter().collect();
         assert!(matches!(events.first(), Some(Event::Started { .. })));
-        assert!(matches!(events.last(), Some(Event::Completed { .. })));
-        assert_eq!(fs::read(&paths.final_path).unwrap(), b"fake recording");
+        assert_eq!(
+            events
+                .iter()
+                .filter_map(|event| match event {
+                    Event::Paused(paused) => Some(*paused),
+                    _ => None,
+                })
+                .collect::<Vec<_>>(),
+            [true, false]
+        );
+        assert!(matches!(
+            events.last(),
+            Some(Event::Completed { duration, .. }) if *duration == Duration::from_millis(300)
+        ));
+
+        let trace = trace.lock().unwrap();
+        assert_eq!(trace.video_indices, [0, 1, 2]);
+        assert_eq!(
+            trace.capture_options,
+            [(false, false), (true, true), (true, true)]
+        );
+        assert!(trace.audio_discards > 0);
+        assert!(trace.finalized);
+        assert_contiguous_audio_timeline(&trace.audio_writes, 14_400);
+        assert!(trace.audio_writes.iter().any(|(_, _, marker)| *marker == 3));
+        assert!(trace.audio_writes.iter().any(|(_, _, marker)| *marker == 2));
+        drop(trace);
+
+        let files = fs::read_dir(&directory)
+            .unwrap()
+            .collect::<std::io::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(fs::read(files[0].path()).unwrap(), b"fake recording");
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn fake_backend_failure_removes_partial_output() {
+        let directory =
+            std::env::temp_dir().join(format!("shiping-rollback-test-{}", std::process::id()));
+        let trace = Arc::new(Mutex::new(FakeTrace::default()));
+        let backend = FakeBackend {
+            trace: Arc::clone(&trace),
+            fail_video_write: true,
+        };
+        let (command_sender, command_receiver) = mpsc::channel();
+        let clock = ScriptedClock {
+            now: Cell::new(Duration::ZERO),
+            commands: command_sender,
+            schedule: RefCell::new(VecDeque::new()),
+        };
+        let (event_sender, _events) = mpsc::channel();
+
+        let error = run_recording_with_services(
+            RecordingServices {
+                backend: &backend,
+                targets: &FakeTargetSelection,
+                clock: &clock,
+            },
+            fake_options(directory.clone()),
+            command_receiver,
+            &event_sender,
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("fake video write failure"));
+        assert!(!trace.lock().unwrap().finalized);
+        assert!(
+            fs::read_dir(&directory).unwrap().next().is_none(),
+            "failed recording left a partial or final file"
+        );
+        fs::remove_dir(directory).unwrap();
+    }
+
+    fn fake_options(save_directory: std::path::PathBuf) -> RecordingOptions {
+        RecordingOptions {
+            target: RecordingTarget::Screen(fake_bounds()),
+            quality_preset: 3,
+            frames_per_second: 10,
+            output_format: OutputFormat::Mp4,
+            system_audio: true,
+            microphone: true,
+            show_cursor: false,
+            highlight_clicks: false,
+            save_directory,
+        }
     }
 
     fn fake_bounds() -> Bounds {
@@ -597,6 +804,15 @@ mod tests {
             width: 16,
             height: 16,
         }
+    }
+
+    fn assert_contiguous_audio_timeline(writes: &[(u64, usize, i16)], expected_frames: u64) {
+        let mut next_frame = 0_u64;
+        for (start_frame, frames, _) in writes {
+            assert_eq!(*start_frame, next_frame);
+            next_frame += *frames as u64;
+        }
+        assert_eq!(next_frame, expected_frames);
     }
 
     #[test]
