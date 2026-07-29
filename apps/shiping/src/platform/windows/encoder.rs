@@ -20,6 +20,8 @@ use windows::{
     core::PCWSTR,
 };
 
+use crate::ports::MediaWriter;
+
 const HUNDRED_NS_PER_SECOND: i64 = 10_000_000;
 pub const AUDIO_SAMPLE_RATE: u32 = 48_000;
 pub const AUDIO_CHANNELS: u32 = 2;
@@ -159,6 +161,48 @@ impl Mp4Writer {
         ))?;
         self.finalized = true;
         Ok(())
+    }
+}
+
+pub(crate) struct MediaFoundationWriter {
+    writer: Mp4Writer,
+    _runtime: MediaFoundationRuntime,
+}
+
+impl MediaFoundationWriter {
+    pub(crate) fn create(
+        path: &Path,
+        width: u32,
+        height: u32,
+        frames_per_second: u32,
+        include_audio: bool,
+    ) -> Result<Self> {
+        let runtime = MediaFoundationRuntime::start()?;
+        let writer = Mp4Writer::create(path, width, height, frames_per_second, include_audio)?;
+        Ok(Self {
+            writer,
+            _runtime: runtime,
+        })
+    }
+}
+
+impl MediaWriter for MediaFoundationWriter {
+    fn write_video(&mut self, frame_index: u64, bgra: &[u8]) -> Result<()> {
+        self.writer.write_video(frame_index, bgra)
+    }
+
+    fn write_audio(&mut self, start_frame: u64, pcm: &[i16]) -> Result<()> {
+        self.writer.write_audio(start_frame, pcm)
+    }
+
+    fn finalize(self: Box<Self>) -> Result<()> {
+        let Self {
+            writer,
+            _runtime: runtime,
+        } = *self;
+        let result = writer.finalize();
+        drop(runtime);
+        result
     }
 }
 

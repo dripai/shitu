@@ -1,31 +1,7 @@
 use anyhow::{Context, Result, anyhow};
 use shi_foundation::i18n;
 
-use super::target::Bounds;
-
-pub fn output_size(source: Bounds, quality_preset: u8) -> (u32, u32) {
-    let maximum = match quality_preset {
-        1 => Some((1280_u32, 720_u32)),
-        2 | 0 => Some((1920_u32, 1080_u32)),
-        _ => None,
-    };
-    let source_width = source.width.max(16) as u32;
-    let source_height = source.height.max(16) as u32;
-    let (mut width, mut height) = if let Some((max_width, max_height)) = maximum {
-        let scale = (max_width as f64 / source_width as f64)
-            .min(max_height as f64 / source_height as f64)
-            .min(1.0);
-        (
-            (source_width as f64 * scale).round() as u32,
-            (source_height as f64 * scale).round() as u32,
-        )
-    } else {
-        (source_width, source_height)
-    };
-    width = width.max(16) & !1;
-    height = height.max(16) & !1;
-    (width, height)
-}
+use crate::{domain::Bounds, ports::VideoCapture};
 
 #[cfg(windows)]
 pub struct FrameGrabber {
@@ -250,6 +226,17 @@ impl FrameGrabber {
     }
 }
 
+impl VideoCapture for FrameGrabber {
+    fn capture(
+        &mut self,
+        source: Bounds,
+        show_cursor: bool,
+        highlight_clicks: bool,
+    ) -> Result<&[u8]> {
+        Self::capture(self, source, show_cursor, highlight_clicks)
+    }
+}
+
 #[cfg(windows)]
 impl Drop for FrameGrabber {
     fn drop(&mut self) {
@@ -285,31 +272,8 @@ fn bitmap_info(width: i32, height: i32) -> windows::Win32::Graphics::Gdi::BITMAP
 
 #[cfg(test)]
 mod tests {
-    use super::Bounds;
     #[cfg(windows)]
     use super::bitmap_info;
-    use super::output_size;
-
-    #[test]
-    fn output_size_preserves_ratio_and_even_dimensions() {
-        let source = Bounds {
-            left: 0,
-            top: 0,
-            width: 2560,
-            height: 1440,
-        };
-        assert_eq!(output_size(source, 1), (1280, 720));
-        assert_eq!(output_size(source, 2), (1920, 1080));
-        assert_eq!(output_size(source, 3), (2560, 1440));
-        let odd = Bounds {
-            width: 801,
-            height: 601,
-            ..source
-        };
-        let size = output_size(odd, 3);
-        assert_eq!(size.0 % 2, 0);
-        assert_eq!(size.1 % 2, 0);
-    }
 
     #[cfg(windows)]
     #[test]

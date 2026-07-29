@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::{config::Config, platform::target::RecordingTarget};
+use crate::{config::Config, domain::RecordingTarget};
 
 use super::{RecorderHandle, RecordingOptions};
 

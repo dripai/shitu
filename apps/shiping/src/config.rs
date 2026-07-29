@@ -225,7 +225,7 @@ pub fn default_video_directory() -> PathBuf {
 }
 
 fn replace_file(source: &std::path::Path, target: &std::path::Path) -> Result<()> {
-    crate::platform::replace_file(source, target)
+    crate::platform::desktop_integration().replace_file(source, target)
 }
 
 #[cfg(test)]

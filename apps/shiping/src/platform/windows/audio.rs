@@ -15,15 +15,11 @@ use windows::Win32::{
     System::Com::{CLSCTX_ALL, CoCreateInstance, CoTaskMemFree},
 };
 
+use crate::{domain::AudioSourceKind as SourceKind, ports::AudioCapture as AudioCapturePort};
+
 use super::encoder::{AUDIO_CHANNELS, AUDIO_SAMPLE_RATE};
 
 const MAX_QUEUED_FRAMES: usize = AUDIO_SAMPLE_RATE as usize * 2;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SourceKind {
-    System,
-    Microphone,
-}
 
 pub struct AudioSources {
     system: Option<AudioCapture>,
@@ -119,6 +115,36 @@ impl AudioSources {
             }
         }
         output
+    }
+}
+
+impl AudioCapturePort for AudioSources {
+    fn system_available(&self) -> bool {
+        Self::system_available(self)
+    }
+
+    fn microphone_available(&self) -> bool {
+        Self::microphone_available(self)
+    }
+
+    fn error(&self, kind: SourceKind) -> Option<&str> {
+        Self::error(self, kind)
+    }
+
+    fn has_any_source(&self) -> bool {
+        Self::has_any_source(self)
+    }
+
+    fn pump(&mut self) -> Result<()> {
+        Self::pump(self)
+    }
+
+    fn discard(&mut self) {
+        Self::discard(self);
+    }
+
+    fn mix(&mut self, frames: usize, system_enabled: bool, microphone_enabled: bool) -> Vec<i16> {
+        Self::mix(self, frames, system_enabled, microphone_enabled)
     }
 }
 

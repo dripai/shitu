@@ -7,87 +7,14 @@ use anyhow::{Context, Result, anyhow};
 use gif::{Encoder, Frame, Repeat};
 use shi_foundation::i18n;
 
-use crate::{
-    config::OutputFormat,
-    platform::encoder::{MediaFoundationRuntime, Mp4Writer},
-};
+use crate::{config::OutputFormat, ports::MediaWriter};
 
 pub struct OutputPaths {
     pub partial: PathBuf,
     pub final_path: PathBuf,
 }
 
-pub enum OutputWriter {
-    Mp4 {
-        writer: Mp4Writer,
-        runtime: MediaFoundationRuntime,
-    },
-    Gif(GifWriter),
-}
-
-impl OutputWriter {
-    pub fn create(
-        format: OutputFormat,
-        path: &Path,
-        width: u32,
-        height: u32,
-        frames_per_second: u32,
-        include_audio: bool,
-    ) -> Result<Self> {
-        match format {
-            OutputFormat::Mp4 => {
-                let runtime = MediaFoundationRuntime::start()?;
-                let writer =
-                    Mp4Writer::create(path, width, height, frames_per_second, include_audio)?;
-                Ok(Self::Mp4 { writer, runtime })
-            }
-            OutputFormat::Gif => {
-                if include_audio {
-                    return Err(anyhow!(i18n::text(
-                        "GIF 格式不支持音频",
-                        "GIF output does not support audio"
-                    )));
-                }
-                Ok(Self::Gif(GifWriter::create(
-                    path,
-                    width,
-                    height,
-                    frames_per_second,
-                )?))
-            }
-        }
-    }
-
-    pub fn write_video(&mut self, frame_index: u64, bgra: &[u8]) -> Result<()> {
-        match self {
-            Self::Mp4 { writer, .. } => writer.write_video(frame_index, bgra),
-            Self::Gif(writer) => writer.write_video(frame_index, bgra),
-        }
-    }
-
-    pub fn write_audio(&mut self, start_frame: u64, pcm: &[i16]) -> Result<()> {
-        match self {
-            Self::Mp4 { writer, .. } => writer.write_audio(start_frame, pcm),
-            Self::Gif(_) => Err(anyhow!(i18n::text(
-                "不能向 GIF 文件写入音频",
-                "Audio cannot be written to a GIF file"
-            ))),
-        }
-    }
-
-    pub fn finalize(self) -> Result<()> {
-        match self {
-            Self::Mp4 { writer, runtime } => {
-                let result = writer.finalize();
-                drop(runtime);
-                result
-            }
-            Self::Gif(writer) => writer.finalize(),
-        }
-    }
-}
-
-pub struct GifWriter {
+pub(crate) struct GifWriter {
     encoder: Encoder<File>,
     frame_delay: u16,
     width: u16,
@@ -96,7 +23,12 @@ pub struct GifWriter {
 }
 
 impl GifWriter {
-    fn create(path: &Path, width: u32, height: u32, frames_per_second: u32) -> Result<Self> {
+    pub(crate) fn create(
+        path: &Path,
+        width: u32,
+        height: u32,
+        frames_per_second: u32,
+    ) -> Result<Self> {
         let width = u16::try_from(width).context(i18n::text(
             "GIF 宽度超过格式限制",
             "The GIF width exceeds the format limit",
@@ -197,6 +129,23 @@ impl GifWriter {
     }
 }
 
+impl MediaWriter for GifWriter {
+    fn write_video(&mut self, frame_index: u64, bgra: &[u8]) -> Result<()> {
+        Self::write_video(self, frame_index, bgra)
+    }
+
+    fn write_audio(&mut self, _start_frame: u64, _pcm: &[i16]) -> Result<()> {
+        Err(anyhow!(i18n::text(
+            "不能向 GIF 文件写入音频",
+            "Audio cannot be written to a GIF file"
+        )))
+    }
+
+    fn finalize(self: Box<Self>) -> Result<()> {
+        GifWriter::finalize(*self)
+    }
+}
+
 pub fn prepare(directory: &Path, format: OutputFormat) -> Result<OutputPaths> {
     fs::create_dir_all(directory).with_context(|| {
         format!(
@@ -229,7 +178,7 @@ pub fn prepare(directory: &Path, format: OutputFormat) -> Result<OutputPaths> {
 }
 
 fn timestamp() -> String {
-    crate::platform::local_timestamp()
+    crate::platform::desktop_integration().local_timestamp()
 }
 
 pub fn commit(paths: &OutputPaths) -> Result<()> {
@@ -253,7 +202,9 @@ mod tests {
 
     use gif::{ColorOutput, DecodeOptions};
 
-    use super::{OutputWriter, commit, prepare};
+    use crate::ports::MediaWriter;
+
+    use super::{GifWriter, commit, prepare};
     use crate::config::OutputFormat;
 
     #[test]
@@ -298,8 +249,7 @@ mod tests {
         let directory =
             std::env::temp_dir().join(format!("shiping-gif-test-{}", std::process::id()));
         let paths = prepare(&directory, OutputFormat::Gif).unwrap();
-        let mut writer =
-            OutputWriter::create(OutputFormat::Gif, &paths.partial, 2, 2, 10, false).unwrap();
+        let mut writer = GifWriter::create(&paths.partial, 2, 2, 10).unwrap();
         let first = [
             0_u8, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 0, 255, 255, 255, 0,
         ];
@@ -308,7 +258,7 @@ mod tests {
         ];
         writer.write_video(0, &first).unwrap();
         writer.write_video(1, &second).unwrap();
-        writer.finalize().unwrap();
+        Box::new(writer).finalize().unwrap();
         commit(&paths).unwrap();
 
         let mut options = DecodeOptions::new();
@@ -330,12 +280,11 @@ mod tests {
         let directory =
             std::env::temp_dir().join(format!("shiping-gif-delay-test-{}", std::process::id()));
         let paths = prepare(&directory, OutputFormat::Gif).unwrap();
-        let mut writer =
-            OutputWriter::create(OutputFormat::Gif, &paths.partial, 1, 1, 10, false).unwrap();
+        let mut writer = GifWriter::create(&paths.partial, 1, 1, 10).unwrap();
         let pixel = [0_u8, 0, 255, 0];
         writer.write_video(0, &pixel).unwrap();
         writer.write_video(3, &pixel).unwrap();
-        writer.finalize().unwrap();
+        Box::new(writer).finalize().unwrap();
         commit(&paths).unwrap();
 
         let mut decoder = DecodeOptions::new()

@@ -10,14 +10,10 @@ use shi_foundation::i18n;
 
 use crate::{
     config::OutputFormat,
+    domain::{AudioSourceKind as SourceKind, RecordingTarget, output_size},
     output,
-    platform::{
-        ComRuntime,
-        audio::{AudioSources, SourceKind},
-        capture::{FrameGrabber, output_size},
-        encoder::AUDIO_SAMPLE_RATE,
-        target::RecordingTarget,
-    },
+    platform::{recording_backend, target_selection},
+    ports::{RecordingBackend, TargetSelection},
 };
 
 const AUDIO_CHUNK_FRAMES: u64 = 1024;
@@ -115,11 +111,21 @@ fn run_recording(
     commands: Receiver<Command>,
     events: &Sender<Event>,
 ) -> Result<()> {
-    let _com = ComRuntime::initialize()?;
-    let initial_bounds = options.target.current_bounds()?;
+    let backend = recording_backend();
+    let targets = target_selection();
+    let _runtime = backend.initialize_thread()?;
+    let initial_bounds = targets.current_bounds(options.target)?;
     let (width, height) = output_size(initial_bounds, options.quality_preset);
     let paths = output::prepare(&options.save_directory, options.output_format)?;
-    let result = run_with_output(&options, &paths, width, height, commands, events);
+    let result = run_with_output(
+        backend,
+        targets,
+        &options,
+        &paths,
+        (width, height),
+        commands,
+        events,
+    );
     if result.is_err() {
         output::discard_partial(&paths);
     }
@@ -127,17 +133,19 @@ fn run_recording(
 }
 
 fn run_with_output(
+    backend: &dyn RecordingBackend,
+    targets: &dyn TargetSelection,
     options: &RecordingOptions,
     paths: &output::OutputPaths,
-    width: u32,
-    height: u32,
+    output_size: (u32, u32),
     commands: Receiver<Command>,
     events: &Sender<Event>,
 ) -> Result<()> {
+    let (width, height) = output_size;
     let mut audio = options
         .output_format
         .supports_audio()
-        .then(AudioSources::initialize);
+        .then(|| backend.create_audio_capture());
     let mut warnings = Vec::new();
     if let Some(audio) = audio.as_ref() {
         if options.system_audio && !audio.system_available() {
@@ -184,12 +192,12 @@ fn run_with_output(
         }
     }
 
-    let system_available = audio.as_ref().is_some_and(AudioSources::system_available);
+    let system_available = audio.as_ref().is_some_and(|audio| audio.system_available());
     let microphone_available = audio
         .as_ref()
-        .is_some_and(AudioSources::microphone_available);
-    let include_audio = audio.as_ref().is_some_and(AudioSources::has_any_source);
-    let mut writer = output::OutputWriter::create(
+        .is_some_and(|audio| audio.microphone_available());
+    let include_audio = audio.as_ref().is_some_and(|audio| audio.has_any_source());
+    let mut writer = backend.create_writer(
         options.output_format,
         &paths.partial,
         width,
@@ -197,7 +205,8 @@ fn run_with_output(
         options.frames_per_second,
         include_audio,
     )?;
-    let mut grabber = FrameGrabber::new(width, height)?;
+    let mut grabber = backend.create_video_capture(width, height)?;
+    let audio_sample_rate = backend.audio_sample_rate();
     events
         .send(Event::Started {
             output_path: paths.final_path.clone(),
@@ -344,7 +353,7 @@ fn run_with_output(
             if expected_video_index > next_video_index + 2 {
                 next_video_index = expected_video_index;
             }
-            let bounds = options.target.current_bounds()?;
+            let bounds = targets.current_bounds(options.target)?;
             let pixels = grabber.capture(bounds, show_cursor, highlight_clicks)?;
             writer.write_video(next_video_index, pixels)?;
             next_video_index += 1;
@@ -352,7 +361,7 @@ fn run_with_output(
 
         if let Some(audio) = audio.as_mut() {
             let expected_audio_frames =
-                (elapsed.as_secs_f64() * AUDIO_SAMPLE_RATE as f64).floor() as u64;
+                (elapsed.as_secs_f64() * audio_sample_rate as f64).floor() as u64;
             while audio_frame_index + AUDIO_CHUNK_FRAMES <= expected_audio_frames {
                 let pcm = audio.mix(AUDIO_CHUNK_FRAMES as usize, system_audio, microphone);
                 writer.write_audio(audio_frame_index, &pcm)?;
@@ -372,7 +381,7 @@ fn run_with_output(
     }
     if let Some(mut audio) = audio.take() {
         let expected_audio_frames =
-            (active_duration.as_secs_f64() * AUDIO_SAMPLE_RATE as f64).floor() as u64;
+            (active_duration.as_secs_f64() * audio_sample_rate as f64).floor() as u64;
         if audio_frame_index < expected_audio_frames {
             let remaining = (expected_audio_frames - audio_frame_index) as usize;
             let pcm = audio.mix(remaining, system_audio, microphone);
@@ -393,12 +402,202 @@ fn run_with_output(
 #[cfg(test)]
 mod tests {
     use std::{
-        fs, thread,
+        fs,
+        path::Path,
+        sync::mpsc,
+        thread,
         time::{Duration, Instant},
     };
 
-    use super::{Command, Event, RecorderHandle, RecordingOptions};
-    use crate::platform::target::{RecordingTarget, primary_screen_bounds};
+    use anyhow::Result;
+
+    use super::{Command, Event, RecorderHandle, RecordingOptions, run_with_output};
+    use crate::{
+        config::OutputFormat,
+        domain::{AudioSourceKind, Bounds, MonitorCandidates, RecordingTarget, WindowCandidates},
+        output,
+        platform::target_selection,
+        ports::{
+            AudioCapture, MediaWriter, RecordingBackend, RecordingThreadRuntime, TargetSelection,
+            VideoCapture,
+        },
+    };
+
+    struct FakeBackend;
+    struct FakeTargetSelection;
+    struct FakeRuntime;
+    struct FakeVideoCapture {
+        pixels: Vec<u8>,
+    }
+    struct FakeAudioCapture;
+    struct FakeWriter;
+
+    impl RecordingThreadRuntime for FakeRuntime {}
+
+    impl TargetSelection for FakeTargetSelection {
+        fn monitors(&self) -> Result<MonitorCandidates> {
+            Ok(MonitorCandidates::new(Vec::new()))
+        }
+
+        fn windows(&self, _desktop: Bounds) -> Result<WindowCandidates> {
+            Ok(WindowCandidates::new(Vec::new()))
+        }
+
+        fn primary_screen_bounds(&self) -> Result<Bounds> {
+            Ok(fake_bounds())
+        }
+
+        fn virtual_desktop_bounds(&self) -> Result<Bounds> {
+            Ok(fake_bounds())
+        }
+
+        fn current_bounds(&self, target: RecordingTarget) -> Result<Bounds> {
+            Ok(target.initial_bounds())
+        }
+    }
+
+    impl VideoCapture for FakeVideoCapture {
+        fn capture(
+            &mut self,
+            _source: Bounds,
+            _show_cursor: bool,
+            _highlight_clicks: bool,
+        ) -> Result<&[u8]> {
+            Ok(&self.pixels)
+        }
+    }
+
+    impl AudioCapture for FakeAudioCapture {
+        fn system_available(&self) -> bool {
+            false
+        }
+
+        fn microphone_available(&self) -> bool {
+            false
+        }
+
+        fn error(&self, _kind: AudioSourceKind) -> Option<&str> {
+            Some("fake audio is unavailable")
+        }
+
+        fn has_any_source(&self) -> bool {
+            false
+        }
+
+        fn pump(&mut self) -> Result<()> {
+            Ok(())
+        }
+
+        fn discard(&mut self) {}
+
+        fn mix(
+            &mut self,
+            frames: usize,
+            _system_enabled: bool,
+            _microphone_enabled: bool,
+        ) -> Vec<i16> {
+            vec![0; frames * 2]
+        }
+    }
+
+    impl MediaWriter for FakeWriter {
+        fn write_video(&mut self, _frame_index: u64, _bgra: &[u8]) -> Result<()> {
+            Ok(())
+        }
+
+        fn write_audio(&mut self, _start_frame: u64, _pcm: &[i16]) -> Result<()> {
+            Ok(())
+        }
+
+        fn finalize(self: Box<Self>) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    impl RecordingBackend for FakeBackend {
+        fn initialize_thread(&self) -> Result<Box<dyn RecordingThreadRuntime>> {
+            Ok(Box::new(FakeRuntime))
+        }
+
+        fn create_video_capture(&self, width: u32, height: u32) -> Result<Box<dyn VideoCapture>> {
+            Ok(Box::new(FakeVideoCapture {
+                pixels: vec![0; width as usize * height as usize * 4],
+            }))
+        }
+
+        fn create_audio_capture(&self) -> Box<dyn AudioCapture> {
+            Box::new(FakeAudioCapture)
+        }
+
+        fn create_writer(
+            &self,
+            _format: OutputFormat,
+            path: &Path,
+            _width: u32,
+            _height: u32,
+            _frames_per_second: u32,
+            _include_audio: bool,
+        ) -> Result<Box<dyn MediaWriter>> {
+            fs::write(path, b"fake recording")?;
+            Ok(Box::new(FakeWriter))
+        }
+
+        fn audio_sample_rate(&self) -> u32 {
+            48_000
+        }
+    }
+
+    #[test]
+    fn recording_core_can_run_with_a_fake_backend() {
+        let directory =
+            std::env::temp_dir().join(format!("shiping-core-test-{}", std::process::id()));
+        let paths = output::prepare(&directory, OutputFormat::Gif).unwrap();
+        let options = RecordingOptions {
+            target: RecordingTarget::Screen(Bounds {
+                left: 0,
+                top: 0,
+                width: 16,
+                height: 16,
+            }),
+            quality_preset: 3,
+            frames_per_second: 10,
+            output_format: OutputFormat::Gif,
+            system_audio: false,
+            microphone: false,
+            show_cursor: false,
+            highlight_clicks: false,
+            save_directory: directory.clone(),
+        };
+        let (commands, command_receiver) = mpsc::channel();
+        let (event_sender, events) = mpsc::channel();
+        commands.send(Command::Stop).unwrap();
+
+        run_with_output(
+            &FakeBackend,
+            &FakeTargetSelection,
+            &options,
+            &paths,
+            (16, 16),
+            command_receiver,
+            &event_sender,
+        )
+        .unwrap();
+
+        let events: Vec<_> = events.try_iter().collect();
+        assert!(matches!(events.first(), Some(Event::Started { .. })));
+        assert!(matches!(events.last(), Some(Event::Completed { .. })));
+        assert_eq!(fs::read(&paths.final_path).unwrap(), b"fake recording");
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    fn fake_bounds() -> Bounds {
+        Bounds {
+            left: 0,
+            top: 0,
+            width: 16,
+            height: 16,
+        }
+    }
 
     #[test]
     #[ignore = "需要 Windows 桌面、Media Foundation 编码器和实际屏幕采集"]
@@ -407,7 +606,7 @@ mod tests {
             std::env::temp_dir().join(format!("shiping-recorder-smoke-{}", std::process::id()));
         fs::create_dir_all(&directory).unwrap();
         let recorder = RecorderHandle::start(RecordingOptions {
-            target: RecordingTarget::Screen(primary_screen_bounds().unwrap()),
+            target: RecordingTarget::Screen(target_selection().primary_screen_bounds().unwrap()),
             quality_preset: 1,
             frames_per_second: 30,
             output_format: crate::config::OutputFormat::Mp4,

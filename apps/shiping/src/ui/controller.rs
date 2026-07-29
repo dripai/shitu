@@ -17,11 +17,11 @@ use crate::{
     MainWindow, PreferencesDialog, RecordingTray, SelectionWindow, TargetIndicatorWindow,
     application::{ApplicationState, Command, Event, RecorderHandle, RecordingOptions},
     config::{Config, LanguageMode, OutputFormat},
+    domain::{
+        AudioSourceKind as SourceKind, Bounds, MonitorCandidates, RecordingTarget, WindowCandidates,
+    },
     platform::{
-        activate_window,
-        audio::SourceKind,
-        begin_window_drag, configure_visual_overlay, native_window_handle, shell,
-        target::{self, Bounds, MonitorCandidates, RecordingTarget, WindowCandidates},
+        begin_window_drag, configure_visual_overlay, desktop_integration, target_selection,
     },
 };
 
@@ -485,7 +485,7 @@ fn bind_preferences(
                             directory.display()
                         )
                     })
-                    .and_then(|_| shell::open_path(&directory))
+                    .and_then(|_| desktop_integration().open_path(&directory))
             };
             if let Err(error) = result {
                 preferences.set_status_text(error.to_string().into());
@@ -955,7 +955,7 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
                         directory.display()
                     )
                 })
-                .and_then(|_| shell::open_path(&directory));
+                .and_then(|_| desktop_integration().open_path(&directory));
             if let Err(error) = result {
                 set_status(&main, error.to_string(), true);
             }
@@ -977,7 +977,7 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
                 );
                 return;
             };
-            if let Err(error) = shell::open_path(&path) {
+            if let Err(error) = desktop_integration().open_path(&path) {
                 set_status(&main, error.to_string(), true);
             }
         });
@@ -1000,7 +1000,7 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
 }
 
 fn refresh_screens(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<()> {
-    let monitors = MonitorCandidates::snapshot()?;
+    let monitors = target_selection().monitors()?;
     let labels = monitors.labels();
     let previous = state.borrow().selected_screen;
     let selected_index = previous
@@ -1350,7 +1350,12 @@ fn ensure_target_indicator(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> R
         RecordingTarget::Region(_) => TargetIndicatorKind::Region,
         RecordingTarget::Screen(_) => return Ok(()),
     };
-    replace_target_indicator(main, state, target.current_bounds()?, kind)
+    replace_target_indicator(
+        main,
+        state,
+        target_selection().current_bounds(target)?,
+        kind,
+    )
 }
 
 fn refresh_target_indicator(state: &Rc<RefCell<UiState>>) -> Result<()> {
@@ -1369,7 +1374,7 @@ fn refresh_target_indicator(state: &Rc<RefCell<UiState>>) -> Result<()> {
     else {
         return Ok(());
     };
-    let bounds = target.current_bounds()?;
+    let bounds = target_selection().current_bounds(target)?;
     if previous_bounds == Some(bounds) {
         return Ok(());
     }
@@ -1383,7 +1388,7 @@ fn open_target_selector(main: &MainWindow, state: &Rc<RefCell<UiState>>, mode: i
         let bounds = state
             .borrow()
             .selected_screen
-            .unwrap_or(target::primary_screen_bounds()?);
+            .unwrap_or(target_selection().primary_screen_bounds()?);
         clear_target_indicator(state)?;
         state.borrow_mut().target = Some(RecordingTarget::Screen(bounds));
         state.borrow_mut().config.source_mode = 0;
@@ -1402,10 +1407,10 @@ fn open_target_selector(main: &MainWindow, state: &Rc<RefCell<UiState>>, mode: i
     }
     set_target_indicator_visible(main, state, false)?;
     let result = (|| -> Result<()> {
-        let desktop = target::virtual_desktop_bounds()?;
-        let mut candidates = WindowCandidates::snapshot(desktop)?;
-        if let Some(hwnd) = native_window_handle(main.window()) {
-            candidates.exclude(hwnd);
+        let desktop = target_selection().virtual_desktop_bounds()?;
+        let mut candidates = target_selection().windows(desktop)?;
+        if let Some(id) = desktop_integration().native_window_id(main.window()) {
+            candidates.exclude(id);
         }
         let selector = SelectionWindow::new()?;
         selector.set_mode(mode);
@@ -1431,7 +1436,7 @@ fn open_target_selector(main: &MainWindow, state: &Rc<RefCell<UiState>>, mode: i
             let _ = selector.hide();
             return Err(error.into());
         }
-        activate_window(selector.window());
+        desktop_integration().activate_window(selector.window());
         selector.invoke_take_keyboard_focus();
         Ok(())
     })();
@@ -1558,7 +1563,7 @@ fn selected_target(
                 ))
             })?;
         Ok(RecordingTarget::Window {
-            hwnd: candidate.hwnd,
+            id: candidate.id,
             initial_bounds: candidate.bounds,
         })
     } else {
@@ -1724,7 +1729,7 @@ fn recording_options(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<
             state
                 .borrow()
                 .selected_screen
-                .unwrap_or(target::primary_screen_bounds()?),
+                .unwrap_or(target_selection().primary_screen_bounds()?),
         ),
         1 => match state.borrow().target {
             Some(target @ RecordingTarget::Window { .. }) => target,
@@ -1751,7 +1756,7 @@ fn recording_options(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<
             )));
         }
     };
-    target.current_bounds()?;
+    target_selection().current_bounds(target)?;
     Ok(RecordingOptions {
         target,
         quality_preset: main.get_quality_preset().clamp(0, 3) as u8,
@@ -1851,7 +1856,7 @@ fn handle_recorder_events(main: &MainWindow, state: &Rc<RefCell<UiState>>) {
                                     "The recorded file has no parent directory"
                                 ))
                             })
-                            .and_then(shell::open_path)
+                            .and_then(|path| desktop_integration().open_path(path))
                     })
                     .and_then(Result::err);
                 match (open_error, indicator_error) {
@@ -1961,7 +1966,7 @@ mod tests {
         target_indicator_geometry,
     };
     use crate::config::LanguageMode;
-    use crate::platform::target::Bounds;
+    use crate::domain::Bounds;
 
     #[test]
     fn preferences_map_only_english_and_chinese() {

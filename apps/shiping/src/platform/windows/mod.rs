@@ -1,13 +1,23 @@
 use std::{os::windows::ffi::OsStrExt, path::Path};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use shi_foundation::i18n;
 
-pub(crate) mod audio;
-pub(crate) mod capture;
-pub(crate) mod encoder;
-pub(crate) mod shell;
-pub(crate) mod target;
+use crate::{
+    config::OutputFormat,
+    domain::WindowId,
+    output::GifWriter,
+    ports::{
+        AudioCapture, DesktopIntegration, MediaWriter, RecordingBackend, RecordingThreadRuntime,
+        TargetSelection, VideoCapture,
+    },
+};
+
+mod audio;
+mod capture;
+mod encoder;
+mod shell;
+mod target;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows::{
     Win32::{
@@ -22,7 +32,17 @@ use windows::{
     core::PCWSTR,
 };
 
-pub(crate) struct ComRuntime;
+pub(super) static DESKTOP_INTEGRATION: WindowsDesktopIntegration = WindowsDesktopIntegration;
+pub(super) static RECORDING_BACKEND: WindowsRecordingBackend = WindowsRecordingBackend;
+
+pub(super) fn target_selection() -> &'static dyn TargetSelection {
+    &target::WINDOWS_TARGET_SELECTION
+}
+
+pub(super) struct WindowsDesktopIntegration;
+pub(super) struct WindowsRecordingBackend;
+
+struct ComRuntime;
 
 impl ComRuntime {
     pub(crate) fn initialize() -> Result<Self> {
@@ -39,7 +59,83 @@ impl Drop for ComRuntime {
     }
 }
 
-pub(crate) fn replace_file(source: &Path, target: &Path) -> Result<()> {
+impl RecordingThreadRuntime for ComRuntime {}
+
+impl RecordingBackend for WindowsRecordingBackend {
+    fn initialize_thread(&self) -> Result<Box<dyn RecordingThreadRuntime>> {
+        Ok(Box::new(ComRuntime::initialize()?))
+    }
+
+    fn create_video_capture(&self, width: u32, height: u32) -> Result<Box<dyn VideoCapture>> {
+        Ok(Box::new(capture::FrameGrabber::new(width, height)?))
+    }
+
+    fn create_audio_capture(&self) -> Box<dyn AudioCapture> {
+        Box::new(audio::AudioSources::initialize())
+    }
+
+    fn create_writer(
+        &self,
+        format: OutputFormat,
+        path: &Path,
+        width: u32,
+        height: u32,
+        frames_per_second: u32,
+        include_audio: bool,
+    ) -> Result<Box<dyn MediaWriter>> {
+        match format {
+            OutputFormat::Mp4 => Ok(Box::new(encoder::MediaFoundationWriter::create(
+                path,
+                width,
+                height,
+                frames_per_second,
+                include_audio,
+            )?)),
+            OutputFormat::Gif => {
+                if include_audio {
+                    return Err(anyhow!(i18n::text(
+                        "GIF 格式不支持音频",
+                        "GIF output does not support audio"
+                    )));
+                }
+                Ok(Box::new(GifWriter::create(
+                    path,
+                    width,
+                    height,
+                    frames_per_second,
+                )?))
+            }
+        }
+    }
+
+    fn audio_sample_rate(&self) -> u32 {
+        encoder::AUDIO_SAMPLE_RATE
+    }
+}
+
+impl DesktopIntegration for WindowsDesktopIntegration {
+    fn replace_file(&self, source: &Path, target: &Path) -> Result<()> {
+        replace_file(source, target)
+    }
+
+    fn local_timestamp(&self) -> String {
+        local_timestamp()
+    }
+
+    fn open_path(&self, path: &Path) -> Result<()> {
+        shell::open_path(path)
+    }
+
+    fn native_window_id(&self, window: &slint::Window) -> Option<WindowId> {
+        native_window_handle(window).map(|handle| target::window_id(HWND(handle as *mut _)))
+    }
+
+    fn activate_window(&self, window: &slint::Window) {
+        activate_window(window);
+    }
+}
+
+fn replace_file(source: &Path, target: &Path) -> Result<()> {
     let source_wide: Vec<u16> = source
         .as_os_str()
         .encode_wide()
@@ -67,7 +163,7 @@ pub(crate) fn replace_file(source: &Path, target: &Path) -> Result<()> {
     })
 }
 
-pub(crate) fn local_timestamp() -> String {
+fn local_timestamp() -> String {
     let value = unsafe { GetLocalTime() };
     format!(
         "{:04}{:02}{:02}_{:02}{:02}{:02}",
@@ -75,7 +171,7 @@ pub(crate) fn local_timestamp() -> String {
     )
 }
 
-pub(crate) fn native_window_handle(window: &slint::Window) -> Option<isize> {
+fn native_window_handle(window: &slint::Window) -> Option<isize> {
     let handle = window.window_handle();
     let handle = handle.window_handle().ok()?;
     let RawWindowHandle::Win32(handle) = handle.as_raw() else {
@@ -84,7 +180,7 @@ pub(crate) fn native_window_handle(window: &slint::Window) -> Option<isize> {
     Some(handle.hwnd.get())
 }
 
-pub(crate) fn activate_window(window: &slint::Window) {
+fn activate_window(window: &slint::Window) {
     if let Some(hwnd) = native_window_handle(window) {
         unsafe {
             let _ = SetForegroundWindow(HWND(hwnd as *mut _));
