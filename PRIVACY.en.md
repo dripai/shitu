@@ -1,5 +1,7 @@
 # ShiTu and ShiPing Privacy Policy
 
+[简体中文](PRIVACY.md)
+
 Effective date: July 29, 2026
 
 ShiTu and ShiPing are local Windows screenshot and screen-recording tools. This policy explains how the applications process screenshots, recordings, audio, OCR results, and configuration data.
