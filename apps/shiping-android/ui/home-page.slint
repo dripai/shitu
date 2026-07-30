@@ -1,0 +1,134 @@
+import { Button, ComboBox, Switch } from "std-widgets.slint";
+
+export component MobileWindow inherits Window {
+    title: "ShiPing";
+    width: 390px;
+    height: 720px;
+    background: #171b23;
+
+    in property <string> permission-status: "尚未申请系统录屏权限";
+    in property <bool> permission-granted: false;
+    in-out property <bool> system-audio: true;
+    in-out property <bool> microphone: false;
+    in-out property <int> quality-index: 1;
+    in-out property <int> frame-rate-index: 1;
+
+    callback request-screen-capture();
+
+    VerticalLayout {
+        padding: 24px;
+        spacing: 16px;
+
+        Text {
+            text: "ShiPing";
+            color: #f4f6fb;
+            font-size: 28px;
+            font-weight: 700;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: "00:00:00";
+            color: #f4f6fb;
+            font-size: 40px;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: root.permission-status;
+            color: root.permission-granted ? #6dd58c : #aeb7c7;
+            font-size: 14px;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+
+        Button {
+            text: root.permission-granted ? "权限已就绪" : "申请录屏权限";
+            enabled: !root.permission-granted;
+            height: 52px;
+            clicked => {
+                root.request-screen-capture();
+            }
+        }
+
+        Rectangle {
+            background: #202631;
+            border-radius: 12px;
+            vertical-stretch: 1;
+
+            VerticalLayout {
+                padding: 18px;
+                spacing: 14px;
+
+                Switch {
+                    text: "系统声音";
+                    checked <=> root.system-audio;
+                }
+
+                Switch {
+                    text: "麦克风";
+                    checked <=> root.microphone;
+                }
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    Text {
+                        text: "画质";
+                        color: #f4f6fb;
+                        vertical-alignment: center;
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    ComboBox {
+                        width: 170px;
+                        model: ["720p", "1080p", "原始分辨率"];
+                        current-index <=> root.quality-index;
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    Text {
+                        text: "帧率";
+                        color: #f4f6fb;
+                        vertical-alignment: center;
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    ComboBox {
+                        width: 170px;
+                        model: ["15 FPS", "30 FPS", "60 FPS"];
+                        current-index <=> root.frame-rate-index;
+                    }
+                }
+
+                Rectangle { vertical-stretch: 1; }
+
+                Text {
+                    text: "Android 编码和录制后端尚未接入";
+                    color: #8993a4;
+                    font-size: 13px;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 8px;
+
+            Button {
+                text: "录制";
+                enabled: false;
+                horizontal-stretch: 1;
+            }
+
+            Button {
+                text: "记录";
+                horizontal-stretch: 1;
+            }
+
+            Button {
+                text: "设置";
+                horizontal-stretch: 1;
+            }
+        }
+    }
+}

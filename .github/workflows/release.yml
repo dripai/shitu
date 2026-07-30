@@ -22,7 +22,7 @@ jobs:
       - name: Verify tag matches package versions
         shell: pwsh
         run: |
-          $packageNames = @('shitu', 'shiping')
+          $packageNames = @('shitu', 'shiping', 'shiping-android')
           $packages = @(
             (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages |
               Where-Object { $_.name -in $packageNames }
@@ -199,9 +199,77 @@ jobs:
           path: release-assets/*
           if-no-files-found: error
 
+  android-release-build:
+    name: Build ShiPing Android ARM64 test APK
+    needs: release-metadata
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          targets: aarch64-linux-android
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '7.5.1'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK and NDK
+        shell: bash
+        run: |
+          sdkmanager \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;27.2.12479018"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-shiping-android-arm64
+
+      - name: Test ShiPing Android shared code
+        run: cargo test --locked --package shiping-android
+
+      - name: Install pinned xbuild
+        run: cargo install --git https://github.com/rust-mobile/xbuild.git --rev e67b501cbe0e9ca5436c223aa7ec0fe5e27544d1
+
+      - name: Build debug-signed Android test APK
+        run: x build --package shiping-android --platform android --arch arm64 --format apk --release
+
+      - name: Package Android test APK
+        shell: bash
+        run: |
+          mapfile -t apks < <(find target/x/release/android -maxdepth 1 -type f -name '*.apk')
+          if [ "${#apks[@]}" -ne 1 ]; then
+            printf 'Expected exactly one Android APK, found %s\n' "${#apks[@]}" >&2
+            exit 1
+          fi
+
+          mkdir -p release-assets
+          asset="ShiPing-${GITHUB_REF_NAME}-android-arm64-test.apk"
+          cp "${apks[0]}" "release-assets/$asset"
+          sha256sum "release-assets/$asset" > "release-assets/$asset.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shiping-android-arm64-test
+          path: release-assets/*
+          if-no-files-found: error
+
   github-release:
     name: Publish GitHub Release
-    needs: release-build
+    needs:
+      - release-build
+      - android-release-build
     runs-on: ubuntu-latest
     permissions:
       contents: write

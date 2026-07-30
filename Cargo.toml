@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "apps/shitu",
     "apps/shiping",
+    "apps/shiping-android",
     "apps/shiyin",
     "crates/shi-foundation",
     "crates/shi-ui",
@@ -11,7 +12,7 @@ default-members = ["apps/shitu"]
 exclude = ["tools/windows-ai-bindgen"]
 
 [workspace.package]
-version = "0.1.12"
+version = "0.1.13"
 edition = "2024"
 
 [workspace.dependencies]
