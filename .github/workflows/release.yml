@@ -231,8 +231,12 @@ jobs:
             "$sdkmanager_path" --sdk_root="$ANDROID_HOME" "platforms;android-33"
           test -d "$ANDROID_HOME/build-tools/35.0.0"
           test -d "$ANDROID_NDK_ROOT"
+          build_tools="$ANDROID_HOME/build-tools/35.0.0"
           llvm_bin="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          test -x "$build_tools/apksigner"
+          test -x "$build_tools/zipalign"
           test -x "$llvm_bin/llvm-readobj"
+          echo "$build_tools" >> "$GITHUB_PATH"
           echo "$llvm_bin" >> "$GITHUB_PATH"
           "$llvm_bin/llvm-readobj" --version
           gradle --version
@@ -292,6 +296,48 @@ jobs:
 
           exit "$status"
 
+      - name: Sign Android test APK
+        shell: bash
+        run: |
+          mapfile -t apks < <(find target/x/release/android -maxdepth 1 -type f -name '*.apk')
+          if [ "${#apks[@]}" -ne 1 ]; then
+            printf 'Expected exactly one unsigned Android APK, found %s\n' "${#apks[@]}" >&2
+            exit 1
+          fi
+
+          unsigned_apk="${apks[0]}"
+          aligned_apk="$RUNNER_TEMP/shiping-android-aligned.apk"
+          signed_apk="$RUNNER_TEMP/shiping-android-signed.apk"
+          keystore="$RUNNER_TEMP/shiping-android-test.jks"
+          password="$(openssl rand -hex 24)"
+
+          cleanup() {
+            rm -f "$aligned_apk" "$signed_apk" "$keystore"
+          }
+          trap cleanup EXIT
+
+          keytool -genkeypair -noprompt \
+            -keystore "$keystore" \
+            -storepass "$password" \
+            -keypass "$password" \
+            -alias shiping-test \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 3650 \
+            -dname "CN=ShiPing Test,O=dripai,C=CN"
+
+          zipalign -P 16 -f 4 "$unsigned_apk" "$aligned_apk"
+          apksigner sign \
+            --ks "$keystore" \
+            --ks-key-alias shiping-test \
+            --ks-pass "pass:$password" \
+            --key-pass "pass:$password" \
+            --out "$signed_apk" \
+            "$aligned_apk"
+          apksigner verify --verbose --print-certs "$signed_apk"
+          zipalign -P 16 -c 4 "$signed_apk"
+          mv "$signed_apk" "$unsigned_apk"
+
       - name: Upload Android build diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
@@ -305,7 +351,7 @@ jobs:
         run: |
           mapfile -t apks < <(find target/x/release/android -maxdepth 1 -type f -name '*.apk')
           if [ "${#apks[@]}" -ne 1 ]; then
-            printf 'Expected exactly one Android APK, found %s\n' "${#apks[@]}" >&2
+            printf 'Expected exactly one signed Android APK, found %s\n' "${#apks[@]}" >&2
             exit 1
           fi
 

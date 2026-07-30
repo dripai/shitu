@@ -25,5 +25,9 @@ x build --package shiping-android --platform android --arch arm64 --format apk -
 
 APK 预期输出到 `target/x/release/android/`。真机运行仍需验证触控、系统录屏授权和 Activity 生命周期。
 
-标签发布时，GitHub Actions 会生成文件名带 `-test.apk` 的测试包。该包使用
-`xbuild` 内置调试证书签名，只用于安装验证，不是应用商店正式发布包。
+标签发布时，GitHub Actions 会生成文件名带 `-test.apk` 的测试包。`xbuild`
+产生的 release APK 本身未签名，流水线随后使用临时测试证书完成对齐、签名和
+签名验证。临时证书只存在于当前 GitHub Actions runner，任务结束后销毁。
+
+该测试证书每次构建都会变化，因此安装新标签的测试包前需要先卸载旧测试版。
+测试包只用于安装和真机功能验证，不是应用商店正式发布包。
