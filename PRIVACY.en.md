@@ -2,9 +2,9 @@
 
 [简体中文](PRIVACY.md)
 
-Effective date: July 29, 2026
+Effective date: July 30, 2026
 
-ShiTu and ShiPing are local Windows screenshot and screen-recording tools. This policy explains how the applications process screenshots, recordings, audio, OCR results, and configuration data.
+ShiTu is a local Windows screenshot tool. ShiPing is a local screen-recording tool for Windows, macOS, and Linux. This policy explains how the applications process screenshots, recordings, audio, OCR results, and configuration data.
 
 ## Data we process
 
@@ -24,8 +24,8 @@ ShiTu and ShiPing are local Windows screenshot and screen-recording tools. This 
 ## Storage and sharing
 
 - Screenshots and recordings you save are managed at the local location you select.
-- Application settings are stored in your local Windows application-data directory.
-- Unless you actively use Windows sharing, copying, saving, or submit content in a GitHub issue, ShiTu and ShiPing do not send screenshots, recordings, audio, OCR results, or settings to the developer or other third parties.
+- Application settings are stored in your local operating system's application-data directory.
+- Unless you actively share, copy, save, or submit content in a GitHub issue, ShiTu and ShiPing do not send screenshots, recordings, audio, OCR results, or settings to the developer or other third parties.
 
 ## Your choices
 

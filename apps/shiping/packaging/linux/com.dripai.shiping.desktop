@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=ShiPing
+Name[zh_CN]=拾屏
+GenericName=Screen Recorder
+GenericName[zh_CN]=录屏工具
+Comment=Record a display, window, or selected region
+Comment[zh_CN]=录制显示器、窗口或选定区域
+TryExec=ShiPing
+Exec=ShiPing
+Icon=com.dripai.shiping
+Terminal=false
+Categories=AudioVideo;Video;
+Keywords=screen;recording;video;capture;
+Keywords[zh_CN]=屏幕;录屏;视频;采集;

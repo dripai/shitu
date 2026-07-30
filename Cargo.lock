@@ -4220,7 +4220,7 @@ dependencies = [
 
 [[package]]
 name = "shi-foundation"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "serde",
  "slint",
@@ -4229,11 +4229,11 @@ dependencies = [
 
 [[package]]
 name = "shi-ui"
-version = "0.1.11"
+version = "0.1.12"
 
 [[package]]
 name = "shiping"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "anyhow",
  "apple-metal",
@@ -4257,7 +4257,7 @@ dependencies = [
 
 [[package]]
 name = "shitu"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4279,7 +4279,7 @@ dependencies = [
 
 [[package]]
 name = "shiyin"
-version = "0.1.11"
+version = "0.1.12"
 
 [[package]]
 name = "shlex"

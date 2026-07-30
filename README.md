@@ -40,7 +40,7 @@ ShiPing is designed for product walkthroughs, tutorials, meeting demonstrations,
 - Configure the countdown, save folder, tray behavior, and global shortcuts.
 - Keep a visible recording boundary around the selected window or region until recording stops.
 
-> **Current status:** ShiPing's first Windows recording workflow is implemented. It is ready for broader testing across multi-monitor, DPI scaling, audio-device, encoder, and long-duration recording combinations.
+> **Current status:** ShiPing has Windows, macOS, and Linux recording backends. Windows has been exercised on the current development device; macOS and Linux currently have CI compilation and unit-test coverage but still require real-device validation.
 
 ## What's new in v0.1.8
 
@@ -69,7 +69,7 @@ ShiTu and ShiPing do not require an account or upload your work to a service ope
 
 ## Build locally
 
-Windows 10/11, Git Bash, and a stable Rust toolchain are required. The project script selects the application binary and prepares the pinned Skia binary package for the current supported platform.
+Windows 10/11, Git Bash, and a stable Rust toolchain are required for the project script below. ShiPing can also be built natively on macOS 15 or Linux after installing the platform dependencies documented in [its architecture notes](apps/shiping/ARCHITECTURE.md).
 
 ```bash
 # Run in development mode
@@ -81,11 +81,12 @@ Windows 10/11, Git Bash, and a stable Rust toolchain are required. The project s
 ./start.sh build shiping
 ```
 
-The release executables are named `ShiTu.exe` and `ShiPing.exe`.
+Tagged releases provide Windows packages for ShiTu and ShiPing, plus ShiPing Linux x64 and macOS ARM64/x64 test packages.
 
 ## Current platform boundaries
 
-- Windows 10/11 is the current supported platform.
+- ShiTu currently supports Windows 10/11 only.
+- ShiPing builds for Windows 10/11, macOS 15 or later, and Linux Wayland desktops with XDG Desktop Portal and PipeWire. macOS and Linux real-device recording behavior is not yet verified.
 - ShiPing records the pixels currently visible in the selected window area. Covered or off-screen window content is not captured as an independent window surface.
 - ShiPing supports one selected display at a time; it does not combine multiple displays into one recording.
 - Enhanced Windows AI OCR exists as an experimental path, but it has not been verified on a supported NPU device and is not presented as a verified product feature.
@@ -93,7 +94,7 @@ The release executables are named `ShiTu.exe` and `ShiPing.exe`.
 ## For contributors
 
 - `apps/shitu`: ShiTu screenshot, annotation, OCR, and pinning application.
-- `apps/shiping`: ShiPing Windows screen recorder.
+- `apps/shiping`: ShiPing cross-platform screen recorder.
 - `apps/shiyin`: planned ShiYin audio recorder; recording is not implemented.
 - `crates/shi-foundation`: shared language, internationalization, configuration, and logging infrastructure.
 - `crates/shi-ui`: shared Slint components.

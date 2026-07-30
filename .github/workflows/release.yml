@@ -40,19 +40,33 @@ jobs:
             }
           }
 
-  platform-validation:
-    name: Validate ShiPing (${{ matrix.platform }})
+  release-build:
+    name: Build ${{ matrix.name }}
     needs: release-metadata
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: Windows
+          - name: Windows x64
             os: windows-latest
-          - platform: macOS
-            os: macos-15
-          - platform: Linux
+            kind: windows
+            architecture: x86_64
+            artifact_name: windows-x86_64
+          - name: Linux x64
             os: ubuntu-24.04
+            kind: linux
+            architecture: x86_64
+            artifact_name: shiping-linux-x86_64
+          - name: ShiPing macOS ARM64
+            os: macos-15
+            kind: macos
+            architecture: arm64
+            artifact_name: shiping-macos-arm64
+          - name: ShiPing macOS x64
+            os: macos-15-intel
+            kind: macos
+            architecture: x86_64
+            artifact_name: shiping-macos-x86_64
     runs-on: ${{ matrix.os }}
     env:
       MACOSX_DEPLOYMENT_TARGET: '15.0'
@@ -65,10 +79,10 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: release-shiping-${{ runner.os }}
+          shared-key: release-shiping-${{ matrix.artifact_name }}
 
       - name: Install Linux build dependencies
-        if: runner.os == 'Linux'
+        if: matrix.kind == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install --yes \
@@ -83,33 +97,23 @@ jobs:
             libxrandr-dev \
             pkg-config
 
-      - name: Compile ShiPing
-        run: cargo check --locked --package shiping
-
       - name: Test ShiPing
+        if: matrix.kind != 'windows'
         run: cargo test --locked --package shiping
 
-  release-build:
-    name: Build Windows x64
-    needs: platform-validation
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.96.0
-
-      - name: Test
+      - name: Test Windows workspace
+        if: matrix.kind == 'windows'
         run: cargo test --workspace --locked
-
-      - name: Build ShiTu release binary
-        run: cargo build --release --locked --package shitu --bin ShiTu
 
       - name: Build ShiPing release binary
         run: cargo build --release --locked --package shiping --bin ShiPing
 
+      - name: Build ShiTu release binary
+        if: matrix.kind == 'windows'
+        run: cargo build --release --locked --package shitu --bin ShiTu
+
       - name: Build Microsoft Store upload assets
+        if: matrix.kind == 'windows'
         shell: pwsh
         run: |
           $packages = (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages
@@ -140,7 +144,8 @@ jobs:
               -OutputDirectory .\release-assets
           }
 
-      - name: Package release assets
+      - name: Package Windows release assets
+        if: matrix.kind == 'windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -170,9 +175,27 @@ jobs:
             "$hash *$archiveName" | Set-Content -LiteralPath "$archivePath.sha256" -Encoding ascii -NoNewline
           }
 
+      - name: Package ShiPing Linux release
+        if: matrix.kind == 'linux'
+        shell: bash
+        run: |
+          bash ./tools/package-shiping-linux.sh \
+            ./target/release/ShiPing \
+            "$GITHUB_REF_NAME" \
+            "${{ matrix.architecture }}"
+
+      - name: Package ShiPing macOS release
+        if: matrix.kind == 'macos'
+        shell: bash
+        run: |
+          bash ./tools/package-shiping-macos.sh \
+            ./target/release/ShiPing \
+            "$GITHUB_REF_NAME" \
+            "${{ matrix.architecture }}"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-x86_64
+          name: ${{ matrix.artifact_name }}
           path: release-assets/*
           if-no-files-found: error
 

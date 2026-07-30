@@ -48,15 +48,19 @@ Slint UI
    - 麦克风通过 PipeWire 官方工具 `pw-record` 输出 48 kHz 双声道 S16 PCM。
    - PipeWire 没有可移植的“默认系统声音监听源”，当前能力协商明确关闭 Linux 系统声音；没有隐式选择节点。
    - 当前只实现 Portal 路径，不另设 X11 捕获回退。
-5. **已完成配置：三平台 CI**
+5. **已完成配置：三平台 CI 与发布打包**
    - Windows、macOS 15 和 Ubuntu 24.04 分别执行 `cargo check --locked --package shiping` 与 `cargo test --locked --package shiping`。
    - 独立任务执行 `cargo fmt --all -- --check`。
+   - 版本标签发布时，Windows 继续同时打包 ShiTu 与 ShiPing；Linux x64、macOS ARM64 和 macOS x64 只打包 ShiPing。
+   - Linux 产物为带桌面入口和图标的 `.tar.gz`；macOS 产物为带 `Info.plist`、权限用途说明和图标的 `.app.zip`。
 
 ## 已确认限制
 
 - macOS 最低系统版本为 15.0；录屏和麦克风仍受系统权限控制。
 - macOS/Linux 的 MP4 输出要求 `ffmpeg` 可从 `PATH` 启动。
 - Linux 需要 XDG Desktop Portal、PipeWire 及 `pw-record`。Portal 会话开始后不能动态切换光标捕获；系统声音和鼠标点击高亮在 UI 中禁用。
+- GitHub Release 中的 macOS `.app.zip` 使用 ad-hoc 签名，没有 Developer ID 签名或 Apple 公证；它是测试产物，不是已完成正式分发认证的安装包。
+- Linux `.tar.gz` 是便携归档，不是 Flatpak；桌面集成文件随包提供，但运行时依赖由目标系统提供。
 - Windows 的系统声音、麦克风和点击高亮继续可用；Windows 仍使用 GDI 采集。
 - 全局快捷键仍使用 `global-hotkey`。Wayland 合成器是否允许注册由运行环境决定；本阶段没有增加另一套 Portal GlobalShortcuts 实现。
 - CI 只证明对应平台能够编译且单元测试通过，不证明屏幕权限、音频设备、多显示器、缩放和长时间录制在真实设备上可用。
