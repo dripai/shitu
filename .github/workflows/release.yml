@@ -223,7 +223,11 @@ jobs:
       - name: Prepare Android SDK 33 toolchain
         shell: bash
         run: |
-          sdkmanager "platforms;android-33"
+          sdkmanager_path="$(
+            find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit
+          )"
+          test -n "$sdkmanager_path"
+          "$sdkmanager_path" "platforms;android-33"
           test -d "$ANDROID_HOME/build-tools/35.0.0"
           test -d "$ANDROID_NDK_ROOT"
           gradle --version
