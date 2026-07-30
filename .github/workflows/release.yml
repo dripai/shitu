@@ -216,21 +216,17 @@ jobs:
           distribution: temurin
           java-version: '11'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '7.5.1'
 
-      - uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK and NDK
+      - name: Verify preinstalled Android toolchain
         shell: bash
         run: |
-          sdkmanager \
-            "platforms;android-35" \
-            "build-tools;35.0.0" \
-            "ndk;27.2.12479018"
-          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
-          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          test -d "$ANDROID_HOME/platforms/android-35"
+          test -d "$ANDROID_HOME/build-tools/35.0.0"
+          test -d "$ANDROID_NDK_ROOT"
+          gradle --version
 
       - uses: Swatinem/rust-cache@v2
         with:
