@@ -148,11 +148,10 @@ dependencies = [
 
 [[package]]
 name = "apple-metal"
-version = "0.8.8"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b1c24b280fad9eadf6f2bf560d826392020ac6258b4c88c6dd356ae7a24f4e3"
+checksum = "c18fb446e23d198c984f319fe2a60c6db36141096c286765b9cbab283b4e218b"
 dependencies = [
- "doom-fish-utils",
  "libc",
 ]
 
@@ -4221,7 +4220,7 @@ dependencies = [
 
 [[package]]
 name = "shi-foundation"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "serde",
  "slint",
@@ -4230,13 +4229,14 @@ dependencies = [
 
 [[package]]
 name = "shi-ui"
-version = "0.1.10"
+version = "0.1.11"
 
 [[package]]
 name = "shiping"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "anyhow",
+ "apple-metal",
  "ashpd 0.13.13",
  "gif",
  "global-hotkey",
@@ -4257,7 +4257,7 @@ dependencies = [
 
 [[package]]
 name = "shitu"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4279,7 +4279,7 @@ dependencies = [
 
 [[package]]
 name = "shiyin"
-version = "0.1.10"
+version = "0.1.11"
 
 [[package]]
 name = "shlex"

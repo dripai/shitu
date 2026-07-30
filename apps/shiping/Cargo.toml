@@ -25,6 +25,8 @@ rfd.workspace = true
 windows.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# apple-metal 0.8.x uses macOS 26 Metal symbols even when targeting macOS 15.
+apple-metal = { version = "=0.6.0", default-features = false }
 rfd.workspace = true
 screencapturekit = { version = "8.0.1", features = ["macos_15_0"] }
 

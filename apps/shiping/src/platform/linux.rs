@@ -362,7 +362,7 @@ fn open_portal(target: RecordingTarget, show_cursor: bool) -> Result<(PortalStre
                     } else {
                         CursorMode::Hidden
                     })
-                    .set_sources(source)
+                    .set_sources(Some(source.into()))
                     .set_multiple(false)
                     .set_restore_token(None)
                     .set_persist_mode(PersistMode::DoNot),
@@ -405,9 +405,9 @@ fn run_pipewire_video(
     pw::init();
     let mainloop = pw::main_loop::MainLoopRc::new(None)?;
     let context = pw::context::ContextRc::new(&mainloop, None)?;
-    let core = context.connect_fd(fd, None)?;
-    let stream = pw::stream::StreamBox::new(
-        &core,
+    let core = context.connect_fd_rc(fd, None)?;
+    let stream = pw::stream::StreamRc::new(
+        core,
         "ShiPing ScreenCast",
         properties! {
             *pw::keys::MEDIA_TYPE => "Video",
@@ -532,7 +532,6 @@ fn run_pipewire_video(
         &mut params,
     )?;
     mainloop.run();
-    drop((listener, stop_listener, stream, core, context));
     Ok(())
 }
 
