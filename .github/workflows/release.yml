@@ -237,7 +237,45 @@ jobs:
 
       - name: Build debug-signed Android test APK
         working-directory: apps/shiping-android
-        run: x build --platform android --arch arm64 --format apk --release
+        shell: bash
+        env:
+          RUST_BACKTRACE: '1'
+          XBUILD_LOG: trace
+        run: |
+          log_file="$RUNNER_TEMP/shiping-android-build.log"
+          set +e
+          x build --verbose --platform android --arch arm64 --format apk --release 2>&1 |
+            tee "$log_file"
+          status="${PIPESTATUS[0]}"
+          set -e
+
+          if [ "$status" -ne 0 ]; then
+            python - "$log_file" <<'PY'
+          import pathlib
+          import sys
+
+          lines = pathlib.Path(sys.argv[1]).read_text(
+              encoding="utf-8", errors="replace"
+          ).splitlines()
+          message = "\n".join(lines[-60:])
+          message = (
+              message.replace("%", "%25")
+              .replace("\r", "%0D")
+              .replace("\n", "%0A")
+          )
+          print(f"::error title=Android xbuild failed::{message}")
+          PY
+          fi
+
+          exit "$status"
+
+      - name: Upload Android build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shiping-android-build-diagnostics
+          path: ${{ runner.temp }}/shiping-android-build.log
+          if-no-files-found: warn
 
       - name: Package Android test APK
         shell: bash
