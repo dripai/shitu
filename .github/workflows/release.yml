@@ -236,7 +236,8 @@ jobs:
         run: cargo install --git https://github.com/rust-mobile/xbuild.git --rev e67b501cbe0e9ca5436c223aa7ec0fe5e27544d1
 
       - name: Build debug-signed Android test APK
-        run: x build --package shiping-android --platform android --arch arm64 --format apk --release
+        working-directory: apps/shiping-android
+        run: x build --platform android --arch arm64 --format apk --release
 
       - name: Package Android test APK
         shell: bash

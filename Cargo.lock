@@ -4313,7 +4313,7 @@ dependencies = [
 
 [[package]]
 name = "shi-foundation"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "serde",
  "slint",
@@ -4322,11 +4322,11 @@ dependencies = [
 
 [[package]]
 name = "shi-ui"
-version = "0.1.15"
+version = "0.1.16"
 
 [[package]]
 name = "shiping"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "anyhow",
  "apple-metal",
@@ -4350,7 +4350,7 @@ dependencies = [
 
 [[package]]
 name = "shiping-android"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "jni 0.22.4",
  "slint",
@@ -4359,7 +4359,7 @@ dependencies = [
 
 [[package]]
 name = "shitu"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4381,7 +4381,7 @@ dependencies = [
 
 [[package]]
 name = "shiyin"
-version = "0.1.15"
+version = "0.1.16"
 
 [[package]]
 name = "shlex"
