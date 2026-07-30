@@ -27,6 +27,62 @@ windows.workspace = true
 [target.'cfg(target_os = "macos")'.dependencies]
 # apple-metal 0.8.x uses macOS 26 Metal symbols even when targeting macOS 15.
 apple-metal = { version = "=0.6.0", default-features = false }
+block2 = "0.6.2"
+objc2 = "0.6.4"
+objc2-av-foundation = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "AVAssetWriter",
+    "AVAssetWriterInput",
+    "AVMediaFormat",
+    "AVVideoSettings",
+    "block2",
+    "objc2-core-media",
+    "objc2-core-video",
+] }
+objc2-avf-audio = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "AVAudioSettings",
+] }
+objc2-core-audio-types = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "CoreAudioBaseTypes",
+] }
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "CFBase",
+    "CFDictionary",
+    "CFString",
+] }
+objc2-core-media = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "CMBase",
+    "CMBlockBuffer",
+    "CMFormatDescription",
+    "CMSampleBuffer",
+    "CMTime",
+    "objc2",
+    "objc2-core-audio-types",
+] }
+objc2-core-video = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "CVBase",
+    "CVBuffer",
+    "CVImageBuffer",
+    "CVPixelBuffer",
+    "CVPixelBufferPool",
+    "CVReturn",
+    "objc2",
+] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "NSDictionary",
+    "NSError",
+    "NSObject",
+    "NSString",
+    "NSURL",
+    "NSValue",
+    "objc2-core-foundation",
+] }
 rfd.workspace = true
 screencapturekit = { version = "8.0.1", features = ["macos_15_0"] }
 

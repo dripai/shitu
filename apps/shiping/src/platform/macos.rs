@@ -34,7 +34,7 @@ use crate::{
     },
 };
 
-use super::ffmpeg::FfmpegWriter;
+use super::macos_writer::MacOsMp4Writer;
 
 pub(super) static DESKTOP_INTEGRATION: MacOsDesktopIntegration = MacOsDesktopIntegration;
 pub(super) static RECORDING_BACKEND: MacOsRecordingBackend = MacOsRecordingBackend;
@@ -167,7 +167,7 @@ impl RecordingBackend for MacOsRecordingBackend {
         include_audio: bool,
     ) -> Result<Box<dyn MediaWriter>> {
         match format {
-            OutputFormat::Mp4 => Ok(Box::new(FfmpegWriter::create(
+            OutputFormat::Mp4 => Ok(Box::new(MacOsMp4Writer::create(
                 path,
                 width,
                 height,

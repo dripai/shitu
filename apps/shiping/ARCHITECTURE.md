@@ -25,8 +25,9 @@ Slint UI
 - `src/application/recording_service.rs`：统一处理暂停、继续、停止、时间轴、丢帧、运行时选项和输出提交；伪后端单元测试验证该核心不依赖具体平台。
 - `src/platform/windows`：Win32 目标枚举、GDI 视频、WASAPI 音频、Media Foundation MP4 和 Shell 集成。
 - `src/platform/macos.rs`：ScreenCaptureKit 显示器/窗口枚举、画面与音频采集，`open` 桌面集成。
+- `src/platform/macos_writer.rs`：使用 AVFoundation、CoreVideo 和 CoreMedia 将 BGRA/PCM 写为 H.264/AAC MP4。
 - `src/platform/linux.rs`：XDG ScreenCast Portal 授权、PipeWire 视频流、`pw-record` 麦克风和 `xdg-open` 桌面集成。
-- `src/platform/ffmpeg.rs`：macOS/Linux 共用的 FFmpeg MP4 适配器，写入原始 BGRA/PCM 临时数据后统一编码并保证失败清理。
+- `src/platform/ffmpeg.rs`：Linux 的 FFmpeg MP4 适配器，写入原始 BGRA/PCM 临时数据后统一编码并保证失败清理。
 - `src/output.rs`：三平台共用的 GIF 编码和输出文件生命周期。
 
 ## 实施状态
@@ -41,7 +42,8 @@ Slint UI
    - 使用 ScreenCaptureKit 8.0.1 的 `SCShareableContent`、`SCContentFilter`、`SCScreenshotManager` 和 `SCStream`。
    - 保留 ShiPing 现有目标选择交互，因此目标列表使用 `SCShareableContent`，未叠加第二套 `SCContentSharingPicker` 界面。
    - 麦克风输出使用 macOS 15 API；macOS 构建目标因此固定为 15.0。
-   - MP4 通过外部 `ffmpeg` 的 H.264/AAC 编码器生成；缺少命令时明确报错，不切换到其他编码路径。
+   - MP4 使用 Apple `AVAssetWriter` 原生管线生成：BGRA 画面经 `CVPixelBuffer` 输入 H.264 编码器，48 kHz 双声道 PCM 经 `CMSampleBuffer` 输入 AAC 编码器。
+   - macOS 不再调用外部 `ffmpeg`，也不保留另一条 MP4 回退路径。
 4. **已完成代码实现：Linux Wayland/Flatpak 后端**
    - 使用 XDG Desktop Portal `ScreenCast` 取得用户授权和 PipeWire 节点，使用 pipewire-rs 读取 BGRA/BGRx/RGBA/RGBx 视频。
    - 窗口和显示器最终选择由系统 Portal 完成；区域模式在已授权显示器流上裁剪。
@@ -57,7 +59,7 @@ Slint UI
 ## 已确认限制
 
 - macOS 最低系统版本为 15.0；录屏和麦克风仍受系统权限控制。
-- macOS/Linux 的 MP4 输出要求 `ffmpeg` 可从 `PATH` 启动。
+- Linux 的 MP4 输出要求 `ffmpeg` 可从 `PATH` 启动；macOS 不需要安装 FFmpeg。
 - Linux 需要 XDG Desktop Portal、PipeWire 及 `pw-record`。Portal 会话开始后不能动态切换光标捕获；系统声音和鼠标点击高亮在 UI 中禁用。
 - GitHub Release 中的 macOS `.app.zip` 使用 ad-hoc 签名，没有 Developer ID 签名或 Apple 公证；它是测试产物，不是已完成正式分发认证的安装包。
 - Linux `.tar.gz` 是便携归档，不是 Flatpak；桌面集成文件随包提供，但运行时依赖由目标系统提供。
@@ -70,6 +72,9 @@ Slint UI
 - [Slint 桌面平台](https://docs.slint.dev/latest/docs/slint/guide/platforms/desktop/)
 - [Apple ScreenCaptureKit](https://developer.apple.com/documentation/screencapturekit)
 - [Apple SCContentSharingPicker](https://developer.apple.com/documentation/screencapturekit/sccontentsharingpicker)
+- [Apple AVAssetWriter](https://developer.apple.com/documentation/avfoundation/avassetwriter)
+- [Apple AVAssetWriterInputPixelBufferAdaptor](https://developer.apple.com/documentation/avfoundation/avassetwriterinputpixelbufferadaptor)
+- [Apple CMSampleBuffer](https://developer.apple.com/documentation/coremedia/cmsamplebuffer)
 - [XDG ScreenCast Portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.ScreenCast.html)
 - [XDG GlobalShortcuts Portal](https://flatpak.github.io/xdg-desktop-portal/docs/doc-org.freedesktop.portal.GlobalShortcuts.html)
 - [pipewire-rs](https://pipewire.pages.freedesktop.org/pipewire-rs/pipewire/)
@@ -79,5 +84,6 @@ Slint UI
 ## 验证边界
 
 - Windows：当前开发设备执行编译、单元测试和 Clippy。
-- macOS/Linux：由各自 GitHub Actions runner 执行编译和单元测试。
+- macOS 原生写入器：当前开发设备已对 ARM64 和 x64 macOS 目标完成独立类型检查；完整应用构建仍由 macOS GitHub Actions runner 验证。
+- Linux：由 GitHub Actions runner 执行编译和单元测试。
 - 未进行 macOS/Linux 真实设备录制测试；这符合当前阶段“只验证编译和单元测试”的范围。

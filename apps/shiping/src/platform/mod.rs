@@ -2,7 +2,7 @@ mod windowing;
 
 pub(crate) use windowing::{begin_window_drag, configure_visual_overlay};
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 mod ffmpeg;
 
 #[cfg(target_os = "windows")]
@@ -10,6 +10,9 @@ mod windows;
 
 #[cfg(target_os = "macos")]
 mod macos;
+
+#[cfg(target_os = "macos")]
+mod macos_writer;
 
 #[cfg(target_os = "linux")]
 mod linux;
