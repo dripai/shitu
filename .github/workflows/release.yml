@@ -227,7 +227,8 @@ jobs:
             find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit
           )"
           test -n "$sdkmanager_path"
-          "$sdkmanager_path" "platforms;android-33"
+          JAVA_HOME="$JAVA_HOME_17_X64" \
+            "$sdkmanager_path" --sdk_root="$ANDROID_HOME" "platforms;android-33"
           test -d "$ANDROID_HOME/build-tools/35.0.0"
           test -d "$ANDROID_NDK_ROOT"
           gradle --version
