@@ -86,7 +86,7 @@ pub extern "system" fn Java_com_dripai_shiping_MainActivity_nativeOnScreenCaptur
 ) {
     unowned_env
         .with_env(|_env| -> jni::errors::Result<()> {
-            permission::set(if granted != 0 {
+            permission::set(if granted {
                 PermissionState::Granted
             } else {
                 PermissionState::Denied
