@@ -220,10 +220,10 @@ jobs:
         with:
           gradle-version: '7.5.1'
 
-      - name: Verify preinstalled Android toolchain
+      - name: Prepare Android SDK 33 toolchain
         shell: bash
         run: |
-          test -d "$ANDROID_HOME/platforms/android-33"
+          sdkmanager "platforms;android-33"
           test -d "$ANDROID_HOME/build-tools/35.0.0"
           test -d "$ANDROID_NDK_ROOT"
           gradle --version
