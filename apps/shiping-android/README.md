@@ -12,7 +12,7 @@
 ## 构建要求
 
 - Rust `aarch64-linux-android` target；
-- Android SDK 35；
+- Android SDK 33（当前固定版本 xbuild 的 NDK/AGP 打包上限）；
 - Android NDK；
 - 可供 Android Gradle 构建使用的 JDK；
 - 从指定提交安装的 `xbuild`。
