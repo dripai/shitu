@@ -240,7 +240,7 @@ jobs:
         shell: bash
         env:
           RUST_BACKTRACE: '1'
-          XBUILD_LOG: trace
+          XBUILD_LOG: error
         run: |
           log_file="$RUNNER_TEMP/shiping-android-build.log"
           set +e
@@ -254,10 +254,24 @@ jobs:
           import pathlib
           import sys
 
-          lines = pathlib.Path(sys.argv[1]).read_text(
+          text = pathlib.Path(sys.argv[1]).read_text(
               encoding="utf-8", errors="replace"
-          ).splitlines()
-          message = "\n".join(lines[-60:])
+          )
+          lines = text.splitlines()
+          error_lines = [
+              line for line in lines
+              if any(marker in line.lower() for marker in (
+                  "error",
+                  "failed",
+                  "failure",
+                  "caused by",
+                  "not found",
+                  "cannot find",
+                  "panicked",
+              ))
+          ]
+          selected = error_lines[-60:] + ["--- final output ---"] + lines[-30:]
+          message = "\n".join(selected)[-12000:]
           message = (
               message.replace("%", "%25")
               .replace("\r", "%0D")
