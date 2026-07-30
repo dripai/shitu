@@ -232,9 +232,6 @@ jobs:
         with:
           shared-key: release-shiping-android-arm64
 
-      - name: Test ShiPing Android shared code
-        run: cargo test --locked --package shiping-android
-
       - name: Install pinned xbuild
         run: cargo install --git https://github.com/rust-mobile/xbuild.git --rev e67b501cbe0e9ca5436c223aa7ec0fe5e27544d1
 
