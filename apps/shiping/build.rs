@@ -1,10 +1,6 @@
 fn main() {
     println!("cargo:rerun-if-changed=assets/app.ico");
-    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
-        let mut resource = winresource::WindowsResource::new();
-        resource.set_icon("assets/app.ico");
-        resource.compile().expect("compile Windows resources");
-    }
+    compile_windows_resources();
 
     let library_paths =
         std::collections::HashMap::from([("shi-ui".to_owned(), shi_ui::slint_library_path())]);
@@ -15,3 +11,15 @@ fn main() {
         .with_default_translation_context(slint_build::DefaultTranslationContext::None);
     slint_build::compile_with_config("ui/app.slint", config).expect("compile ShiPing Slint UI");
 }
+
+#[cfg(target_os = "windows")]
+fn compile_windows_resources() {
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        let mut resource = winresource::WindowsResource::new();
+        resource.set_icon("assets/app.ico");
+        resource.compile().expect("compile Windows resources");
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn compile_windows_resources() {}

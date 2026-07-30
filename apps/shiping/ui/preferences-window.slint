@@ -177,6 +177,9 @@ export component PreferencesDialog inherits Dialog {
     in-out property <int> output-format: 0;
     in-out property <bool> system-audio: true;
     in-out property <bool> microphone: false;
+    in property <bool> system-audio-available: true;
+    in property <bool> microphone-available: true;
+    in property <bool> highlight-clicks-available: true;
     in-out property <bool> show-cursor: true;
     in-out property <bool> highlight-clicks: false;
 
@@ -449,13 +452,17 @@ export component PreferencesDialog inherits Dialog {
                             Switch {
                                 height: root.setting-row-height;
                                 text: @tr("默认录制系统声音");
-                                enabled: !root.recording-active && root.output-format == 0;
+                                enabled: !root.recording-active
+                                    && root.output-format == 0
+                                    && root.system-audio-available;
                                 checked <=> root.system-audio;
                             }
                             Switch {
                                 height: root.setting-row-height;
                                 text: @tr("默认录制麦克风");
-                                enabled: !root.recording-active && root.output-format == 0;
+                                enabled: !root.recording-active
+                                    && root.output-format == 0
+                                    && root.microphone-available;
                                 checked <=> root.microphone;
                             }
                             Switch {
@@ -467,7 +474,8 @@ export component PreferencesDialog inherits Dialog {
                             Switch {
                                 height: root.setting-row-height;
                                 text: @tr("突出鼠标点击");
-                                enabled: !root.recording-active;
+                                enabled: !root.recording-active
+                                    && root.highlight-clicks-available;
                                 checked <=> root.highlight-clicks;
                             }
 

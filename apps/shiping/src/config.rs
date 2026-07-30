@@ -217,13 +217,34 @@ impl Config {
 }
 
 pub fn default_video_directory() -> PathBuf {
-    std::env::var_os("USERPROFILE")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("Videos")
+    home_directory()
+        .join(platform_video_directory_name())
         .join("ShiPing")
 }
 
+#[cfg(target_os = "windows")]
+fn home_directory() -> PathBuf {
+    std::env::var_os("USERPROFILE")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn home_directory() -> PathBuf {
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+#[cfg(target_os = "macos")]
+const fn platform_video_directory_name() -> &'static str {
+    "Movies"
+}
+
+#[cfg(not(target_os = "macos"))]
+const fn platform_video_directory_name() -> &'static str {
+    "Videos"
+}
 fn replace_file(source: &std::path::Path, target: &std::path::Path) -> Result<()> {
     crate::platform::desktop_integration().replace_file(source, target)
 }

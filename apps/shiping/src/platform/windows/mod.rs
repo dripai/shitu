@@ -8,8 +8,8 @@ use crate::{
     domain::WindowId,
     output::GifWriter,
     ports::{
-        AudioCapture, DesktopIntegration, MediaWriter, RecordingBackend, RecordingThreadRuntime,
-        TargetSelection, VideoCapture,
+        AudioCapture, DesktopIntegration, MediaWriter, RecordingBackend, RecordingCapabilities,
+        RecordingThreadRuntime, TargetSelection, VideoCapture,
     },
 };
 
@@ -62,15 +62,34 @@ impl Drop for ComRuntime {
 impl RecordingThreadRuntime for ComRuntime {}
 
 impl RecordingBackend for WindowsRecordingBackend {
+    fn capabilities(&self) -> RecordingCapabilities {
+        RecordingCapabilities {
+            system_audio: true,
+            microphone: true,
+            highlight_clicks: true,
+        }
+    }
+
     fn initialize_thread(&self) -> Result<Box<dyn RecordingThreadRuntime>> {
         Ok(Box::new(ComRuntime::initialize()?))
     }
 
-    fn create_video_capture(&self, width: u32, height: u32) -> Result<Box<dyn VideoCapture>> {
+    fn create_video_capture(
+        &self,
+        _target: crate::domain::RecordingTarget,
+        width: u32,
+        height: u32,
+        _show_cursor: bool,
+    ) -> Result<Box<dyn VideoCapture>> {
         Ok(Box::new(capture::FrameGrabber::new(width, height)?))
     }
 
-    fn create_audio_capture(&self) -> Box<dyn AudioCapture> {
+    fn create_audio_capture(
+        &self,
+        _target: crate::domain::RecordingTarget,
+        _system_enabled: bool,
+        _microphone_enabled: bool,
+    ) -> Box<dyn AudioCapture> {
         Box::new(audio::AudioSources::initialize())
     }
 

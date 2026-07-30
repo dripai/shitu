@@ -8,4 +8,6 @@ publish = false
 [dependencies]
 serde.workspace = true
 slint.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
 windows = { workspace = true, features = ["Win32_Globalization"] }

@@ -29,7 +29,7 @@ pub(crate) static WINDOWS_TARGET_SELECTION: WindowsTargetSelection = WindowsTarg
 pub(crate) struct WindowsTargetSelection;
 
 impl TargetSelection for WindowsTargetSelection {
-    fn monitors(&self) -> Result<MonitorCandidates> {
+    fn monitors(&self, _owner: Option<&slint::Window>) -> Result<MonitorCandidates> {
         snapshot_monitors()
     }
 

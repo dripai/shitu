@@ -14,8 +14,8 @@ use crate::{
     },
     output::GifWriter,
     ports::{
-        AudioCapture, DesktopIntegration, MediaWriter, RecordingBackend, RecordingThreadRuntime,
-        TargetSelection, VideoCapture,
+        AudioCapture, DesktopIntegration, MediaWriter, RecordingBackend, RecordingCapabilities,
+        RecordingThreadRuntime, TargetSelection, VideoCapture,
     },
 };
 
@@ -34,7 +34,7 @@ struct UnavailableAudioCapture;
 impl RecordingThreadRuntime for UnsupportedRuntime {}
 
 impl TargetSelection for UnsupportedTargetSelection {
-    fn monitors(&self) -> Result<MonitorCandidates> {
+    fn monitors(&self, _owner: Option<&slint::Window>) -> Result<MonitorCandidates> {
         Err(not_implemented("display selection"))
     }
 
@@ -59,15 +59,34 @@ impl TargetSelection for UnsupportedTargetSelection {
 }
 
 impl RecordingBackend for UnsupportedRecordingBackend {
+    fn capabilities(&self) -> RecordingCapabilities {
+        RecordingCapabilities {
+            system_audio: false,
+            microphone: false,
+            highlight_clicks: false,
+        }
+    }
+
     fn initialize_thread(&self) -> Result<Box<dyn RecordingThreadRuntime>> {
         Ok(Box::new(UnsupportedRuntime))
     }
 
-    fn create_video_capture(&self, _width: u32, _height: u32) -> Result<Box<dyn VideoCapture>> {
+    fn create_video_capture(
+        &self,
+        _target: RecordingTarget,
+        _width: u32,
+        _height: u32,
+        _show_cursor: bool,
+    ) -> Result<Box<dyn VideoCapture>> {
         Err(not_implemented("video capture"))
     }
 
-    fn create_audio_capture(&self) -> Box<dyn AudioCapture> {
+    fn create_audio_capture(
+        &self,
+        _target: RecordingTarget,
+        _system_enabled: bool,
+        _microphone_enabled: bool,
+    ) -> Box<dyn AudioCapture> {
         Box::new(UnavailableAudioCapture)
     }
 

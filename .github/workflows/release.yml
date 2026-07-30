@@ -1,4 +1,4 @@
-name: Publish Windows release
+name: Publish cross-platform validated release
 
 on:
   push:
@@ -9,13 +9,15 @@ permissions:
   contents: read
 
 jobs:
-  release-build:
-    name: Build Windows x64
-    runs-on: windows-latest
+  release-metadata:
+    name: Verify release metadata
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
 
       - name: Verify tag matches package versions
         shell: pwsh
@@ -37,6 +39,66 @@ jobs:
               throw "Release tag $env:GITHUB_REF_NAME must match $($package.name) version $expectedTag"
             }
           }
+
+  platform-validation:
+    name: Validate ShiPing (${{ matrix.platform }})
+    needs: release-metadata
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: Windows
+            os: windows-latest
+          - platform: macOS
+            os: macos-15
+          - platform: Linux
+            os: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '15.0'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release-shiping-${{ runner.os }}
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            libdbus-1-dev \
+            libfontconfig1-dev \
+            libpipewire-0.3-dev \
+            libwayland-dev \
+            libx11-dev \
+            libxcb1-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev \
+            libxrandr-dev \
+            pkg-config
+
+      - name: Compile ShiPing
+        run: cargo check --locked --package shiping
+
+      - name: Test ShiPing
+        run: cargo test --locked --package shiping
+
+  release-build:
+    name: Build Windows x64
+    needs: platform-validation
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
 
       - name: Test
         run: cargo test --workspace --locked

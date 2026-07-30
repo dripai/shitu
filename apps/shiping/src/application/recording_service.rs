@@ -191,10 +191,13 @@ fn run_with_output(
     events: &Sender<Event>,
 ) -> Result<()> {
     let (width, height) = output_size;
-    let mut audio = options
-        .output_format
-        .supports_audio()
-        .then(|| services.backend.create_audio_capture());
+    let mut audio = options.output_format.supports_audio().then(|| {
+        services.backend.create_audio_capture(
+            options.target,
+            options.system_audio,
+            options.microphone,
+        )
+    });
     let mut warnings = Vec::new();
     if let Some(audio) = audio.as_ref() {
         if options.system_audio && !audio.system_available() {
@@ -254,7 +257,12 @@ fn run_with_output(
         options.frames_per_second,
         include_audio,
     )?;
-    let mut grabber = services.backend.create_video_capture(width, height)?;
+    let mut grabber = services.backend.create_video_capture(
+        options.target,
+        width,
+        height,
+        options.show_cursor,
+    )?;
     let audio_sample_rate = services.backend.audio_sample_rate();
     events
         .send(Event::Started {
@@ -472,8 +480,8 @@ mod tests {
         domain::{AudioSourceKind, Bounds, MonitorCandidates, RecordingTarget, WindowCandidates},
         platform::target_selection,
         ports::{
-            AudioCapture, MediaWriter, RecordingBackend, RecordingThreadRuntime, TargetSelection,
-            VideoCapture,
+            AudioCapture, MediaWriter, RecordingBackend, RecordingCapabilities,
+            RecordingThreadRuntime, TargetSelection, VideoCapture,
         },
     };
 
@@ -534,7 +542,7 @@ mod tests {
     }
 
     impl TargetSelection for FakeTargetSelection {
-        fn monitors(&self) -> Result<MonitorCandidates> {
+        fn monitors(&self, _owner: Option<&slint::Window>) -> Result<MonitorCandidates> {
             Ok(MonitorCandidates::new(Vec::new()))
         }
 
@@ -632,18 +640,37 @@ mod tests {
     }
 
     impl RecordingBackend for FakeBackend {
+        fn capabilities(&self) -> RecordingCapabilities {
+            RecordingCapabilities {
+                system_audio: true,
+                microphone: true,
+                highlight_clicks: true,
+            }
+        }
+
         fn initialize_thread(&self) -> Result<Box<dyn RecordingThreadRuntime>> {
             Ok(Box::new(FakeRuntime))
         }
 
-        fn create_video_capture(&self, width: u32, height: u32) -> Result<Box<dyn VideoCapture>> {
+        fn create_video_capture(
+            &self,
+            _target: RecordingTarget,
+            width: u32,
+            height: u32,
+            _show_cursor: bool,
+        ) -> Result<Box<dyn VideoCapture>> {
             Ok(Box::new(FakeVideoCapture {
                 pixels: vec![0; width as usize * height as usize * 4],
                 trace: Arc::clone(&self.trace),
             }))
         }
 
-        fn create_audio_capture(&self) -> Box<dyn AudioCapture> {
+        fn create_audio_capture(
+            &self,
+            _target: RecordingTarget,
+            _system_enabled: bool,
+            _microphone_enabled: bool,
+        ) -> Box<dyn AudioCapture> {
             Box::new(FakeAudioCapture {
                 trace: Arc::clone(&self.trace),
             })

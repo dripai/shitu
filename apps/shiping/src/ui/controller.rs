@@ -21,8 +21,10 @@ use crate::{
         AudioSourceKind as SourceKind, Bounds, MonitorCandidates, RecordingTarget, WindowCandidates,
     },
     platform::{
-        begin_window_drag, configure_visual_overlay, desktop_integration, target_selection,
+        begin_window_drag, configure_visual_overlay, desktop_integration, recording_backend,
+        target_selection,
     },
+    ports::RecordingCapabilities,
 };
 
 use super::hotkeys::{
@@ -66,16 +68,23 @@ pub(crate) fn run() -> Result<(), slint::PlatformError> {
             .map(|config| config.language)
             .unwrap_or(LanguageMode::English),
     );
-    let (config, load_error) = match config_result {
+    let (mut config, load_error) = match config_result {
         Ok(config) => (config, None),
         Err(error) => (Config::default(), Some(error.to_string())),
     };
+    let capabilities = recording_backend().capabilities();
+    normalize_recording_capabilities(&mut config, capabilities);
     let main = MainWindow::new()?;
     let language_error = shi_foundation::i18n::apply(config.language).err();
     let tray = RecordingTray::new()?;
     let preferences = PreferencesDialog::new()?;
     preferences.set_version_text(format!("v{}", env!("CARGO_PKG_VERSION")).into());
     preferences.set_build_text(build_information().into());
+    main.set_system_audio_available(capabilities.system_audio);
+    main.set_microphone_available(capabilities.microphone);
+    preferences.set_system_audio_available(capabilities.system_audio);
+    preferences.set_microphone_available(capabilities.microphone);
+    preferences.set_highlight_clicks_available(capabilities.highlight_clicks);
     apply_config(&main, &config);
     apply_shortcut_labels(&main, &tray, &config);
     let initial_hotkeys = config.hotkeys();
@@ -111,6 +120,7 @@ pub(crate) fn run() -> Result<(), slint::PlatformError> {
         selection_desktop: None,
         hotkey_issue: None,
     }));
+    main.show()?;
     if let Err(error) = refresh_screens(&main, &state) {
         set_status(&main, error.to_string(), true);
     }
@@ -218,7 +228,6 @@ pub(crate) fn run() -> Result<(), slint::PlatformError> {
         });
     }
 
-    main.show()?;
     tray.show()?;
     let result = slint::run_event_loop();
     drop((preferences, hotkeys));
@@ -371,7 +380,8 @@ fn bind_preferences(
             let (Some(main), Some(preferences)) = (main.upgrade(), preferences.upgrade()) else {
                 return;
             };
-            let defaults = Config::default();
+            let mut defaults = Config::default();
+            normalize_recording_capabilities(&mut defaults, recording_backend().capabilities());
             if let Err(error) = i18n::apply(defaults.language) {
                 preferences.set_status_text(
                     format!(
@@ -630,6 +640,7 @@ fn apply_preferences(
         new_config.output_format.supports_audio() && preferences.get_microphone();
     new_config.show_cursor = preferences.get_show_cursor();
     new_config.highlight_clicks = preferences.get_highlight_clicks();
+    normalize_recording_capabilities(&mut new_config, recording_backend().capabilities());
 
     if let Err(error) = i18n::apply(new_config.language) {
         return Err(ShortcutIssue {
@@ -1000,7 +1011,7 @@ fn bind_callbacks(main: &MainWindow, state: Rc<RefCell<UiState>>) {
 }
 
 fn refresh_screens(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<()> {
-    let monitors = target_selection().monitors()?;
+    let monitors = target_selection().monitors(Some(main.window()))?;
     let labels = monitors.labels();
     let previous = state.borrow().selected_screen;
     let selected_index = previous
@@ -1762,10 +1773,15 @@ fn recording_options(main: &MainWindow, state: &Rc<RefCell<UiState>>) -> Result<
         quality_preset: main.get_quality_preset().clamp(0, 3) as u8,
         frames_per_second: output_format.frames_per_second(main.get_frame_rate().clamp(0, 1) as u8),
         output_format,
-        system_audio: output_format.supports_audio() && main.get_system_audio(),
-        microphone: output_format.supports_audio() && main.get_microphone(),
+        system_audio: output_format.supports_audio()
+            && recording_backend().capabilities().system_audio
+            && main.get_system_audio(),
+        microphone: output_format.supports_audio()
+            && recording_backend().capabilities().microphone
+            && main.get_microphone(),
         show_cursor: main.get_show_cursor(),
-        highlight_clicks: main.get_highlight_clicks(),
+        highlight_clicks: recording_backend().capabilities().highlight_clicks
+            && main.get_highlight_clicks(),
         save_directory: state.borrow().config.save_directory.clone(),
     })
 }
@@ -1929,6 +1945,13 @@ fn update_config_from_main(main: &MainWindow, config: &mut Config) {
     config.highlight_clicks = main.get_highlight_clicks();
     config.countdown_seconds = main.get_countdown_seconds().clamp(0, 10) as u8;
     config.auto_minimize_after_start = main.get_auto_minimize_after_start();
+    normalize_recording_capabilities(config, recording_backend().capabilities());
+}
+
+fn normalize_recording_capabilities(config: &mut Config, capabilities: RecordingCapabilities) {
+    config.system_audio &= capabilities.system_audio;
+    config.microphone &= capabilities.microphone;
+    config.highlight_clicks &= capabilities.highlight_clicks;
 }
 
 fn set_status(main: &MainWindow, message: impl Into<String>, error: bool) {
@@ -1938,7 +1961,8 @@ fn set_status(main: &MainWindow, message: impl Into<String>, error: bool) {
 
 fn build_information() -> String {
     format!(
-        "Windows {} · Slint 1.17.0 · {}",
+        "{} {} · Slint 1.17.0 · {}",
+        std::env::consts::OS,
         std::env::consts::ARCH,
         if cfg!(debug_assertions) {
             "Debug"
@@ -1956,6 +1980,33 @@ fn format_duration(duration: Duration) -> String {
         seconds / 60 % 60,
         seconds % 60
     )
+}
+
+#[cfg(test)]
+mod capability_tests {
+    use super::normalize_recording_capabilities;
+    use crate::{config::Config, ports::RecordingCapabilities};
+
+    #[test]
+    fn unavailable_platform_features_are_disabled_in_configuration() {
+        let mut config = Config {
+            system_audio: true,
+            microphone: true,
+            highlight_clicks: true,
+            ..Config::default()
+        };
+        normalize_recording_capabilities(
+            &mut config,
+            RecordingCapabilities {
+                system_audio: false,
+                microphone: true,
+                highlight_clicks: false,
+            },
+        );
+        assert!(!config.system_audio);
+        assert!(config.microphone);
+        assert!(!config.highlight_clicks);
+    }
 }
 
 #[cfg(test)]

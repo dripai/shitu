@@ -298,6 +298,8 @@ export component MainWindow inherits Window {
     in-out property <int> output-format: 0;
     in-out property <bool> system-audio: true;
     in-out property <bool> microphone: false;
+    in property <bool> system-audio-available: true;
+    in property <bool> microphone-available: true;
     in-out property <bool> show-cursor: true;
     in-out property <bool> highlight-clicks: false;
     in-out property <int> countdown-seconds: 3;
@@ -568,7 +570,9 @@ export component MainWindow inherits Window {
                         icon-stroked: false;
                         checkable: true;
                         checked: root.system-audio;
-                        enabled: !root.recording-busy && root.output-format == 0;
+                        enabled: !root.recording-busy
+                            && root.output-format == 0
+                            && root.system-audio-available;
                         clicked => {
                             root.system-audio = !root.system-audio;
                             root.system-audio-changed(root.system-audio);
@@ -586,7 +590,9 @@ export component MainWindow inherits Window {
                         icon-stroked: false;
                         checkable: true;
                         checked: root.microphone;
-                        enabled: !root.recording-busy && root.output-format == 0;
+                        enabled: !root.recording-busy
+                            && root.output-format == 0
+                            && root.microphone-available;
                         clicked => {
                             root.microphone = !root.microphone;
                             root.microphone-changed(root.microphone);

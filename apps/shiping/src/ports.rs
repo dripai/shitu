@@ -10,7 +10,7 @@ use crate::{
 };
 
 pub(crate) trait TargetSelection: Sync {
-    fn monitors(&self) -> Result<MonitorCandidates>;
+    fn monitors(&self, owner: Option<&slint::Window>) -> Result<MonitorCandidates>;
     fn windows(&self, desktop: Bounds) -> Result<WindowCandidates>;
     fn primary_screen_bounds(&self) -> Result<Bounds>;
     fn virtual_desktop_bounds(&self) -> Result<Bounds>;
@@ -46,10 +46,29 @@ pub(crate) trait MediaWriter {
 
 pub(crate) trait RecordingThreadRuntime {}
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct RecordingCapabilities {
+    pub(crate) system_audio: bool,
+    pub(crate) microphone: bool,
+    pub(crate) highlight_clicks: bool,
+}
+
 pub(crate) trait RecordingBackend: Sync {
+    fn capabilities(&self) -> RecordingCapabilities;
     fn initialize_thread(&self) -> Result<Box<dyn RecordingThreadRuntime>>;
-    fn create_video_capture(&self, width: u32, height: u32) -> Result<Box<dyn VideoCapture>>;
-    fn create_audio_capture(&self) -> Box<dyn AudioCapture>;
+    fn create_video_capture(
+        &self,
+        target: RecordingTarget,
+        width: u32,
+        height: u32,
+        show_cursor: bool,
+    ) -> Result<Box<dyn VideoCapture>>;
+    fn create_audio_capture(
+        &self,
+        target: RecordingTarget,
+        system_enabled: bool,
+        microphone_enabled: bool,
+    ) -> Box<dyn AudioCapture>;
     fn create_writer(
         &self,
         format: OutputFormat,

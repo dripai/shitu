@@ -80,6 +80,11 @@ impl MonitorCandidates {
         self.values.get(index).copied()
     }
 
+    #[cfg(target_os = "macos")]
+    pub(crate) fn into_values(self) -> impl Iterator<Item = MonitorCandidate> {
+        self.values.into_iter()
+    }
+
     pub(crate) fn primary_index(&self) -> usize {
         self.values
             .iter()

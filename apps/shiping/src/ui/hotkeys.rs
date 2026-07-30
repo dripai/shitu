@@ -256,7 +256,7 @@ pub(super) fn display_shortcut(value: Option<&str>) -> String {
         parts.push("Shift".to_owned());
     }
     if hotkey.mods.contains(Modifiers::SUPER) {
-        parts.push("Win".to_owned());
+        parts.push(platform_super_label().to_owned());
     }
     let key = hotkey.key.to_string();
     parts.push(
@@ -266,6 +266,16 @@ pub(super) fn display_shortcut(value: Option<&str>) -> String {
             .to_owned(),
     );
     parts.join(" + ")
+}
+
+fn platform_super_label() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "Command"
+    } else if cfg!(target_os = "linux") {
+        "Super"
+    } else {
+        "Win"
+    }
 }
 
 fn parse_shortcuts(
@@ -557,6 +567,19 @@ mod tests {
         let letter = shortcut_from_key_event("a", true, false, true, false).unwrap();
         assert_eq!(display_shortcut(Some(&letter)), "Ctrl + Shift + A");
         assert!(shortcut_from_key_event("a", false, false, false, false).is_err());
+    }
+
+    #[test]
+    fn super_key_uses_the_platform_label() {
+        let label = display_shortcut(Some("super+F10"));
+        let expected = if cfg!(target_os = "macos") {
+            "Command + F10"
+        } else if cfg!(target_os = "linux") {
+            "Super + F10"
+        } else {
+            "Win + F10"
+        };
+        assert_eq!(label, expected);
     }
 
     #[test]
