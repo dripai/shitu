@@ -17,11 +17,9 @@ import com.dripai.shiping.R
 
 class RecordingService : Service(), ScreenRecorder.Callbacks {
     private var recorder: ScreenRecorder? = null
-    private lateinit var overlayController: RecordingOverlayController
 
     override fun onCreate() {
         super.onCreate()
-        overlayController = RecordingOverlayController(this)
         createNotificationChannel()
     }
 
@@ -36,7 +34,6 @@ class RecordingService : Service(), ScreenRecorder.Callbacks {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        overlayController.hide()
         recorder?.stop()
         recorder = null
         super.onDestroy()
@@ -73,11 +70,9 @@ class RecordingService : Service(), ScreenRecorder.Callbacks {
                 config = config,
                 callbacks = this,
             )
-            overlayController.show(::stopRecording)
             recorder?.start()
             unownedProjection = null
         } catch (error: Exception) {
-            overlayController.hide()
             recorder?.stop()
             recorder = null
             runCatching { unownedProjection?.stop() }
@@ -96,7 +91,6 @@ class RecordingService : Service(), ScreenRecorder.Callbacks {
         }
 
         RecordingStateStore.finalizing(RecordingStateStore.state.value.elapsedMs)
-        overlayController.hide()
         current.stop()
     }
 
@@ -157,16 +151,13 @@ class RecordingService : Service(), ScreenRecorder.Callbacks {
 
     override fun onRecording(elapsedMs: Long) {
         RecordingStateStore.recording(elapsedMs)
-        overlayController.updateElapsed(elapsedMs)
     }
 
     override fun onFinalizing(elapsedMs: Long) {
-        overlayController.hide()
         RecordingStateStore.finalizing(elapsedMs)
     }
 
     override fun onCompleted(elapsedMs: Long, outputUri: String) {
-        overlayController.hide()
         recorder = null
         RecordingStateStore.completed(elapsedMs, outputUri)
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -174,7 +165,6 @@ class RecordingService : Service(), ScreenRecorder.Callbacks {
     }
 
     override fun onFailed(elapsedMs: Long, message: String) {
-        overlayController.hide()
         recorder = null
         RecordingStateStore.failed(message, elapsedMs)
         stopForeground(STOP_FOREGROUND_REMOVE)

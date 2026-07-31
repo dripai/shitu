@@ -1,12 +1,12 @@
 package com.dripai.shiping.recording
 
-enum class RecordingPhase(val code: Int) {
-    Idle(0),
-    Authorizing(1),
-    Recording(2),
-    Finalizing(3),
-    Completed(4),
-    Failed(5),
+enum class RecordingPhase {
+    Idle,
+    Authorizing,
+    Recording,
+    Finalizing,
+    Completed,
+    Failed,
 }
 
 enum class VideoQuality(val label: String, val longEdge: Int?) {

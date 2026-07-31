@@ -1,6 +1,5 @@
 package com.dripai.shiping.recording
 
-import com.dripai.shiping.RustBridge
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,7 +39,6 @@ object RecordingStateStore {
             message = "录制已保存到系统视频目录",
             outputUri = outputUri,
         )
-        RustBridge.updateState(RecordingPhase.Completed.code, elapsedMs)
     }
 
     fun failed(message: String, elapsedMs: Long = mutableState.value.elapsedMs) {
@@ -50,12 +48,10 @@ object RecordingStateStore {
             message = message,
             outputUri = null,
         )
-        RustBridge.updateState(RecordingPhase.Failed.code, elapsedMs)
     }
 
     fun idle(message: String = "准备开始录制") {
         mutableState.value = RecordingUiState(message = message)
-        RustBridge.updateState(RecordingPhase.Idle.code, 0)
     }
 
     private fun update(
@@ -69,6 +65,5 @@ object RecordingStateStore {
             message = message,
             outputUri = null,
         )
-        RustBridge.updateState(phase.code, elapsedMs)
     }
 }

@@ -22,7 +22,7 @@ jobs:
       - name: Verify tag matches package versions
         shell: pwsh
         run: |
-          $packageNames = @('shitu', 'shiping', 'shiping-android')
+          $packageNames = @('shitu', 'shiping')
           $packages = @(
             (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages |
               Where-Object { $_.name -in $packageNames }
@@ -200,16 +200,11 @@ jobs:
           if-no-files-found: error
 
   android-release-build:
-    name: Build ShiPing Android ARM64 test APK
+    name: Build ShiPing Android test APK
     needs: release-metadata
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.96.0
-          targets: aarch64-linux-android
 
       - uses: actions/setup-java@v5
         with:
@@ -231,85 +226,11 @@ jobs:
             "platforms;android-36" \
             "build-tools;35.0.0"
           test -d "$ANDROID_HOME/build-tools/35.0.0"
-          test -d "$ANDROID_NDK_ROOT"
           build_tools="$ANDROID_HOME/build-tools/35.0.0"
-          llvm_bin="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          test -x "$llvm_bin/aarch64-linux-android26-clang"
           test -x "$build_tools/apksigner"
           test -x "$build_tools/zipalign"
-          test -x "$llvm_bin/llvm-readobj"
           echo "$build_tools" >> "$GITHUB_PATH"
-          echo "$llvm_bin" >> "$GITHUB_PATH"
-          "$llvm_bin/llvm-readobj" --version
           gradle --version
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: release-shiping-android-arm64
-
-      - name: Build Rust Android shared library
-        shell: bash
-        run: |
-          log_file="$RUNNER_TEMP/shiping-android-build.log"
-          llvm_bin="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$llvm_bin/aarch64-linux-android26-clang"
-
-          set +e
-          cargo test --locked --package shiping-android --features android-jni-check 2>&1 |
-            tee "$log_file"
-          status="${PIPESTATUS[0]}"
-          if [ "$status" -eq 0 ]; then
-            cargo build \
-              --release \
-              --locked \
-              --package shiping-android \
-              --target aarch64-linux-android 2>&1 |
-              tee -a "$log_file"
-            status="${PIPESTATUS[0]}"
-          fi
-          set -e
-
-          if [ "$status" -ne 0 ]; then
-            python - "$log_file" <<'PY'
-          import pathlib
-          import sys
-
-          text = pathlib.Path(sys.argv[1]).read_text(
-              encoding="utf-8", errors="replace"
-          )
-          lines = text.splitlines()
-          error_lines = [
-              line for line in lines
-              if any(marker in line.lower() for marker in (
-                  "error",
-                  "failed",
-                  "failure",
-                  "caused by",
-                  "not found",
-                  "cannot find",
-                  "panicked",
-              ))
-          ]
-          selected = error_lines[-60:] + ["--- final output ---"] + lines[-30:]
-          message = "\n".join(selected)[-12000:]
-          message = (
-              message.replace("%", "%25")
-              .replace("\r", "%0D")
-              .replace("\n", "%0A")
-          )
-          print(f"::error title=Android Rust build failed::{message}")
-          PY
-          fi
-
-          if [ "$status" -eq 0 ]; then
-            native_dir="apps/shiping-android/android/native-libs/arm64-v8a"
-            mkdir -p "$native_dir"
-            cp \
-              target/aarch64-linux-android/release/libshiping_android.so \
-              "$native_dir/libshiping_android.so"
-          fi
-
-          exit "$status"
 
       - name: Build Android Compose APK
         working-directory: apps/shiping-android/android
@@ -381,13 +302,13 @@ jobs:
           test -f "$apk"
 
           mkdir -p release-assets
-          asset="ShiPing-${GITHUB_REF_NAME}-android-arm64-test.apk"
+          asset="ShiPing-${GITHUB_REF_NAME}-android-test.apk"
           cp "$apk" "release-assets/$asset"
           sha256sum "release-assets/$asset" > "release-assets/$asset.sha256"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: shiping-android-arm64-test
+          name: shiping-android-test
           path: release-assets/*
           if-no-files-found: error
 

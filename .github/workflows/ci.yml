@@ -70,15 +70,10 @@ jobs:
         run: cargo test --locked --package shiping
 
   shiping-android:
-    name: ShiPing Android ARM64
+    name: ShiPing Android
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.96.0
-          targets: aarch64-linux-android
 
       - uses: actions/setup-java@v5
         with:
@@ -99,30 +94,6 @@ jobs:
           "$sdkmanager_path" --sdk_root="$ANDROID_HOME" \
             "platforms;android-36" \
             "build-tools;35.0.0"
-          test -d "$ANDROID_NDK_ROOT"
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: ci-shiping-android-arm64
-
-      - name: Test Android Rust state and JNI
-        run: cargo test --locked --package shiping-android --features android-jni-check
-
-      - name: Build Android Rust shared library
-        shell: bash
-        run: |
-          llvm_bin="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$llvm_bin/aarch64-linux-android26-clang"
-          cargo build \
-            --release \
-            --locked \
-            --package shiping-android \
-            --target aarch64-linux-android
-          native_dir="apps/shiping-android/android/native-libs/arm64-v8a"
-          mkdir -p "$native_dir"
-          cp \
-            target/aarch64-linux-android/release/libshiping_android.so \
-            "$native_dir/libshiping_android.so"
 
       - name: Compile Android Compose application
         working-directory: apps/shiping-android/android

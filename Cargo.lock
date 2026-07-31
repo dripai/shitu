@@ -4325,13 +4325,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shiping-android"
-version = "0.1.31"
-dependencies = [
- "jni",
-]
-
-[[package]]
 name = "shitu"
 version = "0.1.31"
 dependencies = [

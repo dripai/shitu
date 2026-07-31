@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         val releaseVersion = providers.gradleProperty("shipingVersion")
-            .orElse("0.1.31")
+            .orElse("0.1.32")
             .get()
         val versionParts = releaseVersion.split('.').map(String::toInt)
         require(versionParts.size == 3) {
@@ -27,12 +27,7 @@ android {
             versionParts[2]
         versionName = releaseVersion
 
-        ndk {
-            abiFilters += "arm64-v8a"
-        }
     }
-
-    sourceSets["main"].jniLibs.srcDir("../native-libs")
 
     buildTypes {
         release {
@@ -51,9 +46,6 @@ android {
     }
 
     packaging {
-        jniLibs {
-            useLegacyPackaging = false
-        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
@@ -83,17 +75,4 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")
-}
-
-val verifyRustLibrary by tasks.registering {
-    val library = file("../native-libs/arm64-v8a/libshiping_android.so")
-    doLast {
-        check(library.isFile) {
-            "Missing Rust Android library: ${library.absolutePath}"
-        }
-    }
-}
-
-tasks.named("preBuild") {
-    dependsOn(verifyRustLibrary)
 }

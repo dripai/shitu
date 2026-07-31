@@ -78,14 +78,13 @@ flowchart TB
         WRITER --> DOUTPUT
     end
 
-    subgraph ANDROID_LANE["③-B Android 原生管线 · 当前实现，新增交互待真机复测"]
+    subgraph ANDROID_LANE["③-B Android 原生管线 · 当前实现，交互待真机复测"]
         direction TB
 
-        ASESSION["AndroidRecordingCoordinator<br/>Kotlin 当前适配器<br/>统一 Session 接口待并入"]
-        BRIDGE["Rust 状态核心 + JNI<br/>RustBridge · 原子状态快照"]
-        PERMISSION["MainActivity<br/>MediaProjectionManager<br/>录屏 · 录音 · 悬浮窗授权"]
-        SERVICE["RecordingService<br/>前台服务 · 常驻通知<br/>系统停止回调"]
-        OVERLAY["录制悬浮状态条<br/>TYPE_APPLICATION_OVERLAY<br/>停止按钮 · 计时 · FLAG_SECURE"]
+        ASESSION["Kotlin 录制状态层<br/>RecordingUiState · StateFlow<br/>与桌面端不共享运行时"]
+        PERMISSION["MainActivity<br/>MediaProjectionManager<br/>录屏与录音授权"]
+        BACKGROUND["授权后自动退到后台<br/>Activity.moveTaskToBack"]
+        SERVICE["RecordingService<br/>前台服务 · 常驻通知<br/>通知停止操作 · 系统停止回调"]
         RECORDER["ScreenRecorder<br/>Android 平台编排与资源回滚"]
         PROJECTION["MediaProjection"]
         DISPLAY["VirtualDisplay"]
@@ -95,12 +94,11 @@ flowchart TB
         ACODEC["MediaCodec<br/>AAC-LC 音频编码"]
         MUXER["MediaMuxer<br/>H.264 + AAC → MP4"]
         AOUTPUT["MediaStore / URI<br/>Movies/ShiPing<br/>Android 10+ IS_PENDING"]
-        HISTORY["RecordingHistoryRepository<br/>录像列表 · 元数据<br/>ACTION_VIEW 系统播放器"]
+        HISTORY["RecordingHistoryRepository<br/>列表 · 重命名 · 删除 · 详情<br/>MediaExtractor 元数据 · 系统播放器"]
 
-        ASESSION --> BRIDGE
-        BRIDGE --> PERMISSION
+        ASESSION --> PERMISSION
         PERMISSION --> SERVICE
-        SERVICE --> OVERLAY
+        PERMISSION --> BACKGROUND
         SERVICE --> RECORDER
         RECORDER --> PROJECTION
         PROJECTION --> DISPLAY
@@ -112,16 +110,17 @@ flowchart TB
         ACODEC --> MUXER
         MUXER --> AOUTPUT
         AOUTPUT --> HISTORY
-        SERVICE -.状态回调.-> BRIDGE
+        SERVICE -.状态回调.-> ASESSION
     end
 
-    SESSION --> DSESSION & ASESSION
+    SESSION --> DSESSION
+    SESSION -.接口规划，不共享运行时.-> ASESSION
 
     subgraph OS_ROW["④ 操作系统能力层"]
         direction LR
 
         DESKTOP_OS["桌面系统后端<br/><br/>Windows：Win32 · GDI · WASAPI · Media Foundation<br/>macOS：ScreenCaptureKit · FFmpeg<br/>Linux：XDG Portal · PipeWire · FFmpeg"]
-        ANDROID_OS["Android 系统后端<br/><br/>ComponentActivity · Foreground Service · WindowManager<br/>MediaProjection · MediaCodec · MediaMuxer<br/>AudioRecord · MediaStore · 系统播放器"]
+        ANDROID_OS["Android 系统后端<br/><br/>ComponentActivity · Foreground Service · Notification<br/>MediaProjection · MediaCodec · MediaMuxer<br/>AudioRecord · MediaStore · 系统播放器"]
         DESKTOP_OS ~~~ ANDROID_OS
     end
 

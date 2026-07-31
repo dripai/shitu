@@ -6,10 +6,8 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,17 +26,6 @@ class MainActivity : ComponentActivity() {
     private val historyRepository by lazy {
         RecordingHistoryRepository(applicationContext)
     }
-
-    private val overlayPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            val config = pendingConfig ?: return@registerForActivityResult
-            if (Settings.canDrawOverlays(this)) {
-                continueRecordingRequest(config)
-            } else {
-                pendingConfig = null
-                RecordingStateStore.failed("悬浮窗权限被拒绝，无法显示录制状态")
-            }
-        }
 
     private val audioPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -71,6 +58,7 @@ class MainActivity : ComponentActivity() {
                 projectionData = result.data!!,
                 config = config,
             )
+            moveTaskToBack(true)
         }
 
     private val notificationPermissionLauncher =
@@ -94,6 +82,9 @@ class MainActivity : ComponentActivity() {
                     onStart = ::requestRecording,
                     onStop = { RecordingService.stop(this) },
                     onLoadRecordings = historyRepository::load,
+                    onRenameRecording = historyRepository::rename,
+                    onDeleteRecording = historyRepository::delete,
+                    onLoadRecordingDetails = historyRepository::loadDetails,
                     canOpenRecording = ::canOpenRecording,
                     onOpenRecording = ::openRecording,
                 )
@@ -103,22 +94,6 @@ class MainActivity : ComponentActivity() {
 
     private fun requestRecording(config: RecordingConfig) {
         if (RecordingStateStore.state.value.isActive) {
-            return
-        }
-
-        if (!Settings.canDrawOverlays(this)) {
-            pendingConfig = config
-            RecordingStateStore.authorizing("正在等待悬浮窗权限")
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName"),
-            )
-            if (intent.resolveActivity(packageManager) == null) {
-                pendingConfig = null
-                RecordingStateStore.failed("当前系统没有可用的悬浮窗权限设置页面")
-                return
-            }
-            overlayPermissionLauncher.launch(intent)
             return
         }
 

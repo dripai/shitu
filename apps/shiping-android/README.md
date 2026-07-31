@@ -5,58 +5,42 @@
 
 ## 当前实现
 
-- `MainActivity` 使用 Activity Result API 请求系统录屏、录音和悬浮窗权限；
+- `MainActivity` 使用 Activity Result API 请求系统录屏和录音权限，授权成功后自动将应用退到后台；
 - Compose Material 3 提供紧凑录制首页、录像记录和关于页；
-- 录像记录按文件逐行展示，并通过系统播放器打开可播放的 MP4；
-- `RecordingService` 维持前台录制、常驻通知和可拖动的悬浮停止计时条；
+- 录像记录支持系统播放器打开、长按重命名、删除和查看媒体详情；
+- `RecordingService` 维持前台录制和带停止操作的常驻通知；
 - `MediaProjection` + `VirtualDisplay` 捕获屏幕；
 - `MediaCodec` 通过 Surface 硬件编码 H.264；
 - 可选系统声音或麦克风，经 `AudioRecord` + `MediaCodec` 编码 AAC；
 - `MediaMuxer` 封装 MP4，并通过 `MediaStore` 保存到 `Movies/ShiPing`；
-- Rust `cdylib` 保存跨 JNI 的录制状态快照。
+- Kotlin `StateFlow` 保存录制状态并驱动 Compose 界面。
 
 声音来源当前为“无声音 / 系统声音 / 麦克风”三选一。系统声音要求 Android 10
 或更高版本，并且只能捕获目标应用允许被录制的媒体、游戏或未知用途音频。录制中
 旋转屏幕需要停止后重新开始；编码能力和 60 FPS 是否可用由设备的
 `MediaCodec` 实现决定，不提供静默降级。
 
-开始录制前必须授予“显示在其他应用上层”权限。悬浮计时条使用系统
-`TYPE_APPLICATION_OVERLAY`，并设置 `FLAG_SECURE` 以避免进入录制画面；不同厂商
-仍可能调整悬浮窗位置或可见性，需要逐台真机确认。
+应用不创建录制悬浮窗，也不申请“显示在其他应用上层”权限。录制时可从常驻通知
+停止，或者返回 ShiPing 后停止。部分聊天、金融或隐私页面受系统和目标应用的安全
+策略保护，录制结果可能显示黑屏或模糊，ShiPing 不会绕过这些安全限制。
 
 ## 构建要求
 
-- Rust `aarch64-linux-android` target；
 - Android SDK 36；
 - Android Build Tools 35.0.0；
-- Android NDK；
 - JDK 17；
 - Gradle 8.13。
 
-先编译 Rust 动态库，并放入 Gradle 的原生库目录：
+直接使用 Gradle 构建 Kotlin/Compose APK：
 
 ```powershell
-rustup target add aarch64-linux-android
-$llvmBin = Join-Path $env:ANDROID_NDK_ROOT 'toolchains\llvm\prebuilt\windows-x86_64\bin'
-$env:CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER = Join-Path $llvmBin 'aarch64-linux-android26-clang.cmd'
-cargo build --release --package shiping-android --target aarch64-linux-android
-
-$nativeDir = 'apps\shiping-android\android\native-libs\arm64-v8a'
-New-Item -ItemType Directory -Force -Path $nativeDir | Out-Null
-Copy-Item `
-  'target\aarch64-linux-android\release\libshiping_android.so' `
-  (Join-Path $nativeDir 'libshiping_android.so')
-
 Push-Location 'apps\shiping-android\android'
 gradle :app:assembleDebug
 Pop-Location
 ```
 
-Android 目标的 Rust 动态库固定为 `libshiping_android.so`；Gradle 按 Android
-ABI 目录约定将其打进 APK。
-
-标签发布时，GitHub Actions 先用 NDK 编译 Rust `.so`，再用 Gradle 构建
-Compose APK，并生成文件名带 `-test.apk` 的测试包。流水线使用临时测试证书
+标签发布时，GitHub Actions 用 Gradle 构建 Compose APK，并生成文件名带
+`-test.apk` 的测试包。流水线使用临时测试证书
 完成对齐、签名和签名验证；证书只存在于当前 runner，任务结束后销毁。
 
 该测试证书每次构建都会变化，因此安装新标签的测试包前需要先卸载旧测试版。
@@ -64,6 +48,7 @@ Compose APK，并生成文件名带 `-test.apk` 的测试包。流水线使用�
 
 ## 尚未由 CI 证明的内容
 
-CI 只能证明 Rust/JNI、Kotlin/Compose 和 APK 编译通过。悬浮窗行为、系统播放器
-跳转、厂商编码器、系统音频捕获、长时间录制和旋转屏幕必须在真实 Android 设备上
-验证。基础系统录屏和 MP4 保存已完成一次真机验证，本次 UI 与悬浮窗改动仍需复测。
+CI 只能证明 Kotlin/Compose 单元测试和 APK 编译通过。系统播放器跳转、媒体重命名
+和删除、厂商编码器、系统音频捕获、自动退到后台、长时间录制和旋转屏幕必须在真实
+Android 设备上验证。基础系统录屏和 MP4 保存已完成一次真机验证，本次交互与纯
+Kotlin 构建改动仍需复测。
