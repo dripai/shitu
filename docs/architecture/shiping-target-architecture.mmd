@@ -1,0 +1,136 @@
+---
+config:
+  theme: neutral
+  themeVariables:
+    fontFamily: "Microsoft YaHei, Segoe UI, Arial, sans-serif"
+  flowchart:
+    curve: basis
+    htmlLabels: true
+    nodeSpacing: 32
+    rankSpacing: 48
+---
+flowchart TB
+    subgraph UI_ROW["① UI 入口层：两个独立入口横向并列"]
+        direction LR
+
+        subgraph DESKTOP_UI["桌面 UI · 当前，保持不动"]
+            DUI["apps/shiping<br/>Rust + Slint 1.17"]
+            DPAGES["主窗口<br/>首选项<br/>目标选择<br/>系统托盘"]
+            DUX["鼠标 · 键盘<br/>多窗口 · 全局快捷键"]
+            DUI --> DPAGES --> DUX
+        end
+
+        subgraph MOBILE_UI["Android UI · 当前实现"]
+            AUI["apps/shiping-android/android<br/>Kotlin + Jetpack Compose"]
+            APAGES["Material 3<br/>录制首页 · 记录 · 设置<br/>参数与状态展示"]
+            AUX["ComponentActivity<br/>Activity Result API<br/>触控 · 系统返回"]
+            AUI --> APAGES --> AUX
+        end
+
+        subgraph UI_SHARED["跨 UI 共享规范 · 侧向支撑"]
+            COMPONENTS["交互与状态规范<br/>录制状态 · 参数语义<br/>错误与完成事件"]
+            THEME["品牌设计令牌<br/>颜色 · 字体 · 间距<br/>图标语义"]
+            I18N["文案与翻译键<br/>中文 · 英文"]
+        end
+    end
+
+    UI_SHARED -.规范映射，不共享控件代码.-> DESKTOP_UI
+    UI_SHARED -.规范映射，不共享控件代码.-> MOBILE_UI
+
+    subgraph SHARED_CORE["② 横向共享层：公共接口与录制业务核心"]
+        direction LR
+
+        API["Recorder API<br/>start · pause<br/>resume · stop"]
+        MODEL["Options / Capabilities<br/>画质 · 帧率 · 音频<br/>输出格式 · 平台能力"]
+        STATE["公共状态机<br/>Idle → Authorizing<br/>Recording ↔ Paused<br/>Finalizing → Completed"]
+        TIMELINE["公共时间轴<br/>有效录制时长<br/>暂停扣除 · 时间戳连续"]
+        SESSION["RecordingSession<br/>统一平台会话接口"]
+        EVENTS["统一事件<br/>Started · Progress<br/>Paused · Completed · Failed"]
+
+        API --> MODEL
+        MODEL --> STATE
+        STATE --> TIMELINE
+        TIMELINE --> SESSION
+        SESSION --> EVENTS
+        EVENTS --> API
+    end
+
+    DUX --> API
+    AUX --> API
+
+    subgraph DESKTOP_LANE["③-A 桌面逐帧管线 · 当前"]
+        direction TB
+
+        DSESSION["DesktopRecordingSession"]
+        TARGET["目标选择<br/>显示器 · 窗口 · 区域"]
+        CAPTURE["视频采集<br/>GDI / ScreenCaptureKit / PipeWire<br/>输出 BGRA 帧"]
+        DAUDIO["音频采集<br/>系统声音 · 麦克风<br/>输出 PCM"]
+        LOOP["桌面录制循环<br/>帧率调度 · 丢帧处理<br/>暂停与时间轴"]
+        WRITER["编码与封装<br/>Media Foundation / FFmpeg<br/>MP4 / GIF"]
+        DOUTPUT["桌面文件系统<br/>临时文件 → 正式文件"]
+
+        DSESSION --> TARGET
+        TARGET --> CAPTURE
+        DSESSION --> DAUDIO
+        CAPTURE --> LOOP
+        DAUDIO --> LOOP
+        LOOP --> WRITER
+        WRITER --> DOUTPUT
+    end
+
+    subgraph ANDROID_LANE["③-B Android 原生管线 · 第一版已实现，待真机验证"]
+        direction TB
+
+        ASESSION["AndroidRecordingCoordinator<br/>Kotlin 当前适配器<br/>统一 Session 接口待并入"]
+        BRIDGE["Rust 状态核心 + JNI<br/>RustBridge · 原子状态快照"]
+        PERMISSION["MainActivity<br/>MediaProjectionManager<br/>Activity Result API"]
+        SERVICE["RecordingService<br/>前台服务 · 常驻通知<br/>系统停止回调"]
+        RECORDER["ScreenRecorder<br/>Android 平台编排与资源回滚"]
+        PROJECTION["MediaProjection"]
+        DISPLAY["VirtualDisplay"]
+        SURFACE["MediaCodec 输入 Surface"]
+        VCODEC["硬件 H.264 编码<br/>MediaCodec"]
+        AAUDIO["声音来源三选一<br/>系统声音：AudioPlaybackCapture<br/>麦克风：AudioRecord"]
+        ACODEC["MediaCodec<br/>AAC-LC 音频编码"]
+        MUXER["MediaMuxer<br/>H.264 + AAC → MP4"]
+        AOUTPUT["MediaStore / URI<br/>Movies/ShiPing<br/>Android 10+ IS_PENDING"]
+
+        ASESSION --> BRIDGE
+        BRIDGE --> PERMISSION
+        PERMISSION --> SERVICE
+        SERVICE --> RECORDER
+        RECORDER --> PROJECTION
+        PROJECTION --> DISPLAY
+        DISPLAY --> SURFACE
+        SURFACE --> VCODEC
+        RECORDER --> AAUDIO
+        AAUDIO --> ACODEC
+        VCODEC --> MUXER
+        ACODEC --> MUXER
+        MUXER --> AOUTPUT
+        SERVICE -.状态回调.-> BRIDGE
+    end
+
+    SESSION --> DSESSION & ASESSION
+
+    subgraph OS_ROW["④ 操作系统能力层"]
+        direction LR
+
+        DESKTOP_OS["桌面系统后端<br/><br/>Windows：Win32 · GDI · WASAPI · Media Foundation<br/>macOS：ScreenCaptureKit · FFmpeg<br/>Linux：XDG Portal · PipeWire · FFmpeg"]
+        ANDROID_OS["Android 系统后端<br/><br/>ComponentActivity · Foreground Service<br/>MediaProjection · MediaCodec · MediaMuxer<br/>AudioRecord · MediaStore"]
+        DESKTOP_OS ~~~ ANDROID_OS
+    end
+
+    DOUTPUT --> DESKTOP_OS
+    AOUTPUT --> ANDROID_OS
+    subgraph ENGINEERING_SHARED["侧向工程共享，不进入运行主链路"]
+        direction LR
+        TESTS["公共单元测试<br/>状态机 · 时间轴 · 错误回滚"]
+        FAKE["Fake RecordingSession<br/>无需真实操作系统"]
+        LOGGING["统一日志与错误模型"]
+        CI["多平台 CI 与发布规则"]
+        TESTS ~~~ FAKE ~~~ LOGGING ~~~ CI
+    end
+
+    DESKTOP_OS -.工程支撑.-> ENGINEERING_SHARED
+    ANDROID_OS -.工程支撑.-> ENGINEERING_SHARED

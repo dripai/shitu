@@ -3,7 +3,12 @@
 /download/
 
 # Local product and commercial documentation
-/docs/
+/docs/*
+!/docs/architecture/
+/docs/architecture/*
+!/docs/architecture/shiping-target-architecture.mmd
+!/docs/architecture/shiping-target-architecture.png
+!/docs/architecture/shiping-target-architecture.svg
 
 # Local runtime data
 *.log

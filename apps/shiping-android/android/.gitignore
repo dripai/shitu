@@ -1,0 +1,4 @@
+/.gradle/
+/app/build/
+/native-libs/
+/local.properties

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ShiPing</string>
+    <string name="recording_channel_name">屏幕录制</string>
+    <string name="recording_notification_title">ShiPing 正在录制屏幕</string>
+    <string name="recording_notification_stop">停止录制</string>
+</resources>

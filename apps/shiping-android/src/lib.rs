@@ -1,8 +1,6 @@
-mod permission;
+mod recording_state;
 
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", feature = "android-jni-check"))]
 mod android;
 
-slint::include_modules!();
-
-pub use permission::PermissionState;
+pub use recording_state::{RecordingState, RecordingStatus};

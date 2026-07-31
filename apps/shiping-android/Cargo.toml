@@ -2,26 +2,14 @@
 name = "shiping-android"
 version.workspace = true
 edition.workspace = true
-description = "ShiPing Android application shell"
+description = "ShiPing Android shared state and JNI bridge"
 publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+android-jni-check = []
+
 [dependencies]
-slint = { version = "=1.17.0", default-features = false, features = [
-    "compat-1-2",
-    "std",
-] }
-
-[target.'cfg(target_os = "android")'.dependencies]
 jni = "=0.22.4"
-slint = { version = "=1.17.0", default-features = false, features = [
-    "backend-android-activity-06",
-    "compat-1-2",
-    "renderer-skia",
-    "std",
-] }
-
-[build-dependencies]
-slint-build = "=1.17.0"

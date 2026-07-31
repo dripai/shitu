@@ -214,25 +214,27 @@ jobs:
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '11'
+          java-version: '17'
 
       - uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: '7.5.1'
+          gradle-version: '8.13'
 
-      - name: Prepare Android SDK 33 toolchain
+      - name: Prepare Android SDK 36 toolchain
         shell: bash
         run: |
           sdkmanager_path="$(
             find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit
           )"
           test -n "$sdkmanager_path"
-          JAVA_HOME="$JAVA_HOME_17_X64" \
-            "$sdkmanager_path" --sdk_root="$ANDROID_HOME" "platforms;android-33"
+          "$sdkmanager_path" --sdk_root="$ANDROID_HOME" \
+            "platforms;android-36" \
+            "build-tools;35.0.0"
           test -d "$ANDROID_HOME/build-tools/35.0.0"
           test -d "$ANDROID_NDK_ROOT"
           build_tools="$ANDROID_HOME/build-tools/35.0.0"
           llvm_bin="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          test -x "$llvm_bin/aarch64-linux-android26-clang"
           test -x "$build_tools/apksigner"
           test -x "$build_tools/zipalign"
           test -x "$llvm_bin/llvm-readobj"
@@ -245,21 +247,26 @@ jobs:
         with:
           shared-key: release-shiping-android-arm64
 
-      - name: Install pinned xbuild
-        run: cargo install --git https://github.com/rust-mobile/xbuild.git --rev e67b501cbe0e9ca5436c223aa7ec0fe5e27544d1
-
-      - name: Build debug-signed Android test APK
-        working-directory: apps/shiping-android
+      - name: Build Rust Android shared library
         shell: bash
-        env:
-          RUST_BACKTRACE: '1'
-          XBUILD_LOG: error
         run: |
           log_file="$RUNNER_TEMP/shiping-android-build.log"
+          llvm_bin="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$llvm_bin/aarch64-linux-android26-clang"
+
           set +e
-          x build --verbose --platform android --arch arm64 --format apk --release 2>&1 |
+          cargo test --locked --package shiping-android --features android-jni-check 2>&1 |
             tee "$log_file"
           status="${PIPESTATUS[0]}"
+          if [ "$status" -eq 0 ]; then
+            cargo build \
+              --release \
+              --locked \
+              --package shiping-android \
+              --target aarch64-linux-android 2>&1 |
+              tee -a "$log_file"
+            status="${PIPESTATUS[0]}"
+          fi
           set -e
 
           if [ "$status" -ne 0 ]; then
@@ -290,22 +297,43 @@ jobs:
               .replace("\r", "%0D")
               .replace("\n", "%0A")
           )
-          print(f"::error title=Android xbuild failed::{message}")
+          print(f"::error title=Android Rust build failed::{message}")
           PY
           fi
 
+          if [ "$status" -eq 0 ]; then
+            native_dir="apps/shiping-android/android/native-libs/arm64-v8a"
+            mkdir -p "$native_dir"
+            cp \
+              target/aarch64-linux-android/release/libshiping_android.so \
+              "$native_dir/libshiping_android.so"
+          fi
+
+          exit "$status"
+
+      - name: Build Android Compose APK
+        working-directory: apps/shiping-android/android
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          log_file="$RUNNER_TEMP/shiping-android-build.log"
+          set +e
+          gradle \
+            --no-daemon \
+            --stacktrace \
+            -PshipingVersion="$version" \
+            :app:testReleaseUnitTest \
+            :app:assembleRelease 2>&1 |
+            tee -a "$log_file"
+          status="${PIPESTATUS[0]}"
+          set -e
           exit "$status"
 
       - name: Sign Android test APK
         shell: bash
         run: |
-          mapfile -t apks < <(find target/x/release/android -maxdepth 1 -type f -name '*.apk')
-          if [ "${#apks[@]}" -ne 1 ]; then
-            printf 'Expected exactly one unsigned Android APK, found %s\n' "${#apks[@]}" >&2
-            exit 1
-          fi
-
-          unsigned_apk="${apks[0]}"
+          unsigned_apk="apps/shiping-android/android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          test -f "$unsigned_apk"
           aligned_apk="$RUNNER_TEMP/shiping-android-aligned.apk"
           signed_apk="$RUNNER_TEMP/shiping-android-signed.apk"
           keystore="$RUNNER_TEMP/shiping-android-test.jks"
@@ -349,15 +377,12 @@ jobs:
       - name: Package Android test APK
         shell: bash
         run: |
-          mapfile -t apks < <(find target/x/release/android -maxdepth 1 -type f -name '*.apk')
-          if [ "${#apks[@]}" -ne 1 ]; then
-            printf 'Expected exactly one signed Android APK, found %s\n' "${#apks[@]}" >&2
-            exit 1
-          fi
+          apk="apps/shiping-android/android/app/build/outputs/apk/release/app-release-unsigned.apk"
+          test -f "$apk"
 
           mkdir -p release-assets
           asset="ShiPing-${GITHUB_REF_NAME}-android-arm64-test.apk"
-          cp "${apks[0]}" "release-assets/$asset"
+          cp "$apk" "release-assets/$asset"
           sha256sum "release-assets/$asset" > "release-assets/$asset.sha256"
 
       - uses: actions/upload-artifact@v4
