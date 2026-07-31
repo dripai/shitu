@@ -3,7 +3,7 @@ use std::{
     fs,
     path::Path,
     process::Command,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, OnceLock},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -11,7 +11,7 @@ use anyhow::{Context, Result, anyhow};
 use screencapturekit::{
     cm::CMSampleBufferExt,
     screenshot_manager::{CGImageExt, SCScreenshotManager},
-    shareable_content::{SCDisplay, SCShareableContent},
+    shareable_content::SCShareableContent,
     stream::{
         SCStream,
         configuration::{SCStreamConfiguration, pixel_format::PixelFormat},
@@ -20,6 +20,7 @@ use screencapturekit::{
     },
 };
 use shi_foundation::i18n;
+use slint::winit_030::{WinitWindowAccessor, winit::platform::macos::MonitorHandleExtMacOS};
 
 use crate::{
     config::OutputFormat,
@@ -40,33 +41,51 @@ pub(super) static DESKTOP_INTEGRATION: MacOsDesktopIntegration = MacOsDesktopInt
 pub(super) static RECORDING_BACKEND: MacOsRecordingBackend = MacOsRecordingBackend;
 pub(super) static TARGET_SELECTION: MacOsTargetSelection = MacOsTargetSelection;
 
+static DISPLAYS: OnceLock<Mutex<Vec<DisplayMapping>>> = OnceLock::new();
+
 pub(super) struct MacOsDesktopIntegration;
 pub(super) struct MacOsRecordingBackend;
 pub(super) struct MacOsTargetSelection;
+
+#[derive(Clone, Copy, Debug)]
+struct PointBounds {
+    left: f64,
+    top: f64,
+    width: f64,
+    height: f64,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct DisplayMapping {
+    display_id: u32,
+    points: PointBounds,
+    pixels: Bounds,
+    primary: bool,
+}
 
 struct MacOsRuntime;
 
 impl RecordingThreadRuntime for MacOsRuntime {}
 
 impl TargetSelection for MacOsTargetSelection {
-    fn monitors(&self, _owner: Option<&slint::Window>) -> Result<MonitorCandidates> {
-        let content = shareable_content()?;
-        let monitors = content
-            .displays()
-            .iter()
-            .map(|display| {
-                let bounds = display_bounds(display);
-                MonitorCandidate {
-                    bounds,
-                    primary: bounds.contains(0, 0),
-                }
-            })
-            .collect();
-        Ok(MonitorCandidates::new(monitors))
+    fn monitors(&self, owner: Option<&slint::Window>) -> Result<MonitorCandidates> {
+        if let Some(owner) = owner {
+            refresh_display_mappings(owner)?;
+        }
+        Ok(MonitorCandidates::new(
+            display_mappings()?
+                .into_iter()
+                .map(|display| MonitorCandidate {
+                    bounds: display.pixels,
+                    primary: display.primary,
+                })
+                .collect(),
+        ))
     }
 
     fn windows(&self, _desktop: Bounds) -> Result<WindowCandidates> {
         let content = shareable_content()?;
+        let displays = display_mappings()?;
         let windows = content
             .windows()
             .into_iter()
@@ -78,7 +97,7 @@ impl TargetSelection for MacOsTargetSelection {
                 }
                 Some(WindowCandidate {
                     id: WindowId::from_platform_value(window.window_id() as u64),
-                    bounds: cg_bounds(window.frame()),
+                    bounds: point_rect_to_physical(point_bounds(window.frame()), &displays).ok()?,
                     title,
                 })
             })
@@ -87,35 +106,39 @@ impl TargetSelection for MacOsTargetSelection {
     }
 
     fn primary_screen_bounds(&self) -> Result<Bounds> {
-        self.monitors(None)?
-            .get(0)
-            .map(|monitor| monitor.bounds)
+        display_mappings()?
+            .into_iter()
+            .find(|display| display.primary)
+            .map(|display| display.pixels)
             .ok_or_else(|| anyhow!(i18n::text("未找到显示器", "No display was found")))
     }
 
     fn virtual_desktop_bounds(&self) -> Result<Bounds> {
         union_bounds(
-            self.monitors(None)?
-                .into_values()
-                .map(|monitor| monitor.bounds),
+            display_mappings()?
+                .into_iter()
+                .map(|display| display.pixels),
         )
     }
 
     fn current_bounds(&self, target: RecordingTarget) -> Result<Bounds> {
         match target {
             RecordingTarget::Screen(bounds) | RecordingTarget::Region(bounds) => bounds.validate(),
-            RecordingTarget::Window { id, .. } => shareable_content()?
-                .windows()
-                .into_iter()
-                .find(|window| window.window_id() as u64 == id.platform_value())
-                .map(|window| cg_bounds(window.frame()))
-                .ok_or_else(|| {
-                    anyhow!(i18n::text(
-                        "所选窗口已关闭或不可共享",
-                        "The selected window is closed or no longer shareable"
-                    ))
-                })?
-                .validate(),
+            RecordingTarget::Window { id, .. } => {
+                let displays = display_mappings()?;
+                shareable_content()?
+                    .windows()
+                    .into_iter()
+                    .find(|window| window.window_id() as u64 == id.platform_value())
+                    .map(|window| point_rect_to_physical(point_bounds(window.frame()), &displays))
+                    .ok_or_else(|| {
+                        anyhow!(i18n::text(
+                            "所选窗口已关闭或不可共享",
+                            "The selected window is closed or no longer shareable"
+                        ))
+                    })??
+                    .validate()
+            }
         }
     }
 }
@@ -206,23 +229,8 @@ impl ScreenCaptureKitGrabber {
             .with_height(height)
             .with_pixel_format(PixelFormat::BGRA);
         if let RecordingTarget::Region(bounds) = target {
-            let display = shareable_content()?
-                .displays()
-                .into_iter()
-                .find(|display| display_bounds(display).contains(bounds.left, bounds.top))
-                .ok_or_else(|| {
-                    anyhow!(i18n::text(
-                        "未找到区域所在的显示器",
-                        "The display containing the selected region was not found"
-                    ))
-                })?;
-            let display = display_bounds(&display);
-            configuration.set_source_rect(screencapturekit::cg::CGRect::new(
-                bounds.left.saturating_sub(display.left) as f64,
-                bounds.top.saturating_sub(display.top) as f64,
-                bounds.width as f64,
-                bounds.height as f64,
-            ));
+            let display = display_for_physical_bounds(bounds)?;
+            configuration.set_source_rect(source_rect_in_points(bounds, display)?);
         }
         Ok(Self {
             filter,
@@ -485,22 +493,25 @@ fn content_filter(target: RecordingTarget) -> Result<SCContentFilter> {
                     "The selected window is closed or no longer shareable"
                 ))
             }),
-        RecordingTarget::Screen(bounds) | RecordingTarget::Region(bounds) => content
-            .displays()
-            .into_iter()
-            .find(|display| display_bounds(display).contains(bounds.left, bounds.top))
-            .map(|display| {
-                SCContentFilter::create()
-                    .with_display(&display)
-                    .with_excluding_windows(&[])
-                    .build()
-            })
-            .ok_or_else(|| {
-                anyhow!(i18n::text(
-                    "未找到目标显示器",
-                    "Target display was not found"
-                ))
-            }),
+        RecordingTarget::Screen(bounds) | RecordingTarget::Region(bounds) => {
+            let mapping = display_for_physical_bounds(bounds)?;
+            content
+                .displays()
+                .into_iter()
+                .find(|display| mapping.display_id == display.display_id())
+                .map(|display| {
+                    SCContentFilter::create()
+                        .with_display(&display)
+                        .with_excluding_windows(&[])
+                        .build()
+                })
+                .ok_or_else(|| {
+                    anyhow!(i18n::text(
+                        "未找到目标显示器",
+                        "Target display was not found"
+                    ))
+                })
+        }
     }
 }
 
@@ -551,23 +562,164 @@ fn append_audio_sample(
         .extend(frames);
 }
 
-fn display_bounds(display: &SCDisplay) -> Bounds {
-    let frame = display.frame();
-    Bounds {
-        left: frame.origin.x.round() as i32,
-        top: frame.origin.y.round() as i32,
-        width: display.width() as i32,
-        height: display.height() as i32,
+fn display_cache() -> &'static Mutex<Vec<DisplayMapping>> {
+    DISPLAYS.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn display_mappings() -> Result<Vec<DisplayMapping>> {
+    let displays = display_cache()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    if displays.is_empty() {
+        Err(anyhow!(i18n::text(
+            "显示器信息尚未初始化",
+            "Display information has not been initialized"
+        )))
+    } else {
+        Ok(displays)
     }
 }
 
-fn cg_bounds(rect: screencapturekit::cg::CGRect) -> Bounds {
-    Bounds {
-        left: rect.origin.x.round() as i32,
-        top: rect.origin.y.round() as i32,
-        width: rect.size.width.round() as i32,
-        height: rect.size.height.round() as i32,
+fn refresh_display_mappings(owner: &slint::Window) -> Result<()> {
+    let physical_displays = owner
+        .with_winit_window(|window| {
+            let primary = window.primary_monitor();
+            window
+                .available_monitors()
+                .map(|monitor| {
+                    let position = monitor.position();
+                    let size = monitor.size();
+                    (
+                        monitor.native_id(),
+                        Bounds {
+                            left: position.x,
+                            top: position.y,
+                            width: size.width as i32,
+                            height: size.height as i32,
+                        },
+                        primary.as_ref() == Some(&monitor),
+                    )
+                })
+                .collect::<Vec<_>>()
+        })
+        .ok_or_else(|| {
+            anyhow!(i18n::text(
+                "Slint Winit 窗口尚未创建，无法读取显示器",
+                "The Slint Winit window is not ready, so displays cannot be enumerated"
+            ))
+        })?;
+    let content = shareable_content()?;
+    let shareable_displays = content.displays();
+    let mappings = physical_displays
+        .into_iter()
+        .map(|(display_id, pixels, primary)| {
+            let display = shareable_displays
+                .iter()
+                .find(|display| display.display_id() == display_id)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "{}: {display_id}",
+                        i18n::text(
+                            "ScreenCaptureKit 未返回 Winit 显示器",
+                            "ScreenCaptureKit did not return the Winit display"
+                        )
+                    )
+                })?;
+            Ok(DisplayMapping {
+                display_id,
+                points: point_bounds(display.frame()),
+                pixels,
+                primary,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    if mappings.is_empty() {
+        return Err(anyhow!(i18n::text("未找到显示器", "No display was found")));
     }
+    *display_cache()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = mappings;
+    Ok(())
+}
+
+fn point_bounds(rect: screencapturekit::cg::CGRect) -> PointBounds {
+    PointBounds {
+        left: rect.origin.x,
+        top: rect.origin.y,
+        width: rect.size.width,
+        height: rect.size.height,
+    }
+}
+
+fn point_rect_to_physical(rect: PointBounds, displays: &[DisplayMapping]) -> Result<Bounds> {
+    let display = displays
+        .iter()
+        .max_by(|left, right| {
+            point_intersection_area(rect, left.points)
+                .total_cmp(&point_intersection_area(rect, right.points))
+        })
+        .filter(|display| point_intersection_area(rect, display.points) > 0.0)
+        .ok_or_else(|| {
+            anyhow!(i18n::text(
+                "窗口不在任何已知显示器中",
+                "The window is not on a known display"
+            ))
+        })?;
+    let scale_x = display.pixels.width as f64 / display.points.width;
+    let scale_y = display.pixels.height as f64 / display.points.height;
+    Bounds {
+        left: display.pixels.left + ((rect.left - display.points.left) * scale_x).round() as i32,
+        top: display.pixels.top + ((rect.top - display.points.top) * scale_y).round() as i32,
+        width: (rect.width * scale_x).round() as i32,
+        height: (rect.height * scale_y).round() as i32,
+    }
+    .validate()
+}
+
+fn point_intersection_area(left: PointBounds, right: PointBounds) -> f64 {
+    let width = (left.left + left.width).min(right.left + right.width) - left.left.max(right.left);
+    let height = (left.top + left.height).min(right.top + right.height) - left.top.max(right.top);
+    width.max(0.0) * height.max(0.0)
+}
+
+fn display_for_physical_bounds(bounds: Bounds) -> Result<DisplayMapping> {
+    display_mappings()?
+        .into_iter()
+        .find(|display| contains_bounds(display.pixels, bounds))
+        .ok_or_else(|| {
+            anyhow!(i18n::text(
+                "所选区域必须完全位于一个显示器内",
+                "The selected region must be entirely within one display"
+            ))
+        })
+}
+
+fn contains_bounds(container: Bounds, value: Bounds) -> bool {
+    value.left >= container.left
+        && value.top >= container.top
+        && value.left.saturating_add(value.width) <= container.left.saturating_add(container.width)
+        && value.top.saturating_add(value.height) <= container.top.saturating_add(container.height)
+}
+
+fn source_rect_in_points(
+    bounds: Bounds,
+    display: DisplayMapping,
+) -> Result<screencapturekit::cg::CGRect> {
+    let scale_x = display.pixels.width as f64 / display.points.width;
+    let scale_y = display.pixels.height as f64 / display.points.height;
+    if scale_x <= 0.0 || scale_y <= 0.0 {
+        return Err(anyhow!(i18n::text(
+            "显示器缩放比例无效",
+            "The display scale factor is invalid"
+        )));
+    }
+    Ok(screencapturekit::cg::CGRect::new(
+        bounds.left.saturating_sub(display.pixels.left) as f64 / scale_x,
+        bounds.top.saturating_sub(display.pixels.top) as f64 / scale_y,
+        bounds.width as f64 / scale_x,
+        bounds.height as f64 / scale_y,
+    ))
 }
 
 fn union_bounds(values: impl Iterator<Item = Bounds>) -> Result<Bounds> {
@@ -610,7 +762,10 @@ fn unix_timestamp() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Bounds, union_bounds};
+    use super::{
+        Bounds, DisplayMapping, PointBounds, point_rect_to_physical, source_rect_in_points,
+        union_bounds,
+    };
 
     #[test]
     fn virtual_desktop_union_keeps_negative_display_coordinates() {
@@ -641,5 +796,78 @@ mod tests {
                 height: 1440,
             }
         );
+    }
+
+    #[test]
+    fn retina_window_points_are_mapped_to_physical_pixels() {
+        let display = DisplayMapping {
+            display_id: 1,
+            points: PointBounds {
+                left: 0.0,
+                top: 0.0,
+                width: 1440.0,
+                height: 900.0,
+            },
+            pixels: Bounds {
+                left: 0,
+                top: 0,
+                width: 2880,
+                height: 1800,
+            },
+            primary: true,
+        };
+        let actual = point_rect_to_physical(
+            PointBounds {
+                left: 100.0,
+                top: 80.0,
+                width: 920.0,
+                height: 436.0,
+            },
+            &[display],
+        )
+        .unwrap();
+        assert_eq!(
+            actual,
+            Bounds {
+                left: 200,
+                top: 160,
+                width: 1840,
+                height: 872,
+            }
+        );
+    }
+
+    #[test]
+    fn physical_region_is_converted_back_to_display_points() {
+        let display = DisplayMapping {
+            display_id: 1,
+            points: PointBounds {
+                left: 0.0,
+                top: 0.0,
+                width: 1440.0,
+                height: 900.0,
+            },
+            pixels: Bounds {
+                left: 0,
+                top: 0,
+                width: 2880,
+                height: 1800,
+            },
+            primary: true,
+        };
+        let actual = source_rect_in_points(
+            Bounds {
+                left: 200,
+                top: 160,
+                width: 1840,
+                height: 872,
+            },
+            display,
+        )
+        .unwrap();
+        assert_eq!(actual.origin.x, 100.0);
+        assert_eq!(actual.origin.y, 80.0);
+        assert_eq!(actual.size.width, 920.0);
+        assert_eq!(actual.size.height, 436.0);
     }
 }

@@ -80,11 +80,11 @@ impl MacOsMp4Writer {
             .context("AVFoundation did not expose the MPEG-4 file type")?;
         let writer = unsafe { AVAssetWriter::assetWriterWithURL_fileType_error(&url, file_type) }
             .map_err(|error| {
-                anyhow!(
-                    "Failed to create the Apple MP4 writer: {}",
-                    error.localizedDescription()
-                )
-            })?;
+            anyhow!(
+                "Failed to create the Apple MP4 writer: {}",
+                error.localizedDescription()
+            )
+        })?;
 
         let video_settings = video_settings(width, height)?;
         let video_media_type =
