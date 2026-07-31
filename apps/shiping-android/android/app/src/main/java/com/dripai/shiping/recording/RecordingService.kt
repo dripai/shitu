@@ -57,7 +57,11 @@ class RecordingService : Service(), ScreenRecorder.Callbacks {
 
         try {
             val projectionManager = getSystemService(MediaProjectionManager::class.java)
-            val projection = projectionManager.getMediaProjection(resultCode, projectionData)
+            val projection = checkNotNull(
+                projectionManager.getMediaProjection(resultCode, projectionData),
+            ) {
+                "系统未返回有效的录屏授权"
+            }
             recorder = ScreenRecorder(
                 context = applicationContext,
                 projection = projection,
