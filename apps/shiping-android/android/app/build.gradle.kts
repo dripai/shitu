@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         val releaseVersion = providers.gradleProperty("shipingVersion")
-            .orElse("0.1.32")
+            .orElse("0.1.33")
             .get()
         val versionParts = releaseVersion.split('.').map(String::toInt)
         require(versionParts.size == 3) {

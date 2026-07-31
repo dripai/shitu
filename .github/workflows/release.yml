@@ -24,7 +24,7 @@ jobs:
         run: |
           $packageNames = @('shitu', 'shiping')
           $packages = @(
-            (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages |
+            (cargo metadata --locked --format-version 1 | ConvertFrom-Json).packages |
               Where-Object { $_.name -in $packageNames }
           )
           if ($packages.Count -ne $packageNames.Count) {

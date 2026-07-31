@@ -10,6 +10,17 @@ permissions:
   contents: read
 
 jobs:
+  lockfile:
+    name: Cargo lockfile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+      - name: Verify Cargo.lock is current
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
   format:
     name: Rustfmt
     runs-on: ubuntu-latest
@@ -23,6 +34,7 @@ jobs:
 
   shiping:
     name: ShiPing (${{ matrix.platform }})
+    needs: lockfile
     strategy:
       fail-fast: false
       matrix:
