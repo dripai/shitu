@@ -5,9 +5,10 @@
 
 ## 当前实现
 
-- `MainActivity` 使用 Activity Result API 请求系统录屏和录音权限；
-- Compose Material 3 首页、录制状态、画质、帧率和声音来源设置；
-- `RecordingService` 维持前台录制和常驻通知；
+- `MainActivity` 使用 Activity Result API 请求系统录屏、录音和悬浮窗权限；
+- Compose Material 3 提供紧凑录制首页、录像记录和关于页；
+- 录像记录按文件逐行展示，并通过系统播放器打开可播放的 MP4；
+- `RecordingService` 维持前台录制、常驻通知和可拖动的悬浮停止计时条；
 - `MediaProjection` + `VirtualDisplay` 捕获屏幕；
 - `MediaCodec` 通过 Surface 硬件编码 H.264；
 - 可选系统声音或麦克风，经 `AudioRecord` + `MediaCodec` 编码 AAC；
@@ -18,6 +19,10 @@
 或更高版本，并且只能捕获目标应用允许被录制的媒体、游戏或未知用途音频。录制中
 旋转屏幕需要停止后重新开始；编码能力和 60 FPS 是否可用由设备的
 `MediaCodec` 实现决定，不提供静默降级。
+
+开始录制前必须授予“显示在其他应用上层”权限。悬浮计时条使用系统
+`TYPE_APPLICATION_OVERLAY`，并设置 `FLAG_SECURE` 以避免进入录制画面；不同厂商
+仍可能调整悬浮窗位置或可见性，需要逐台真机确认。
 
 ## 构建要求
 
@@ -59,6 +64,6 @@ Compose APK，并生成文件名带 `-test.apk` 的测试包。流水线使用�
 
 ## 尚未由 CI 证明的内容
 
-CI 只能证明 Rust/JNI、Kotlin/Compose 和 APK 编译通过。系统录屏授权、前台服务、
-厂商编码器、系统音频捕获、长时间录制、旋转屏幕和最终 MP4 播放必须在真实 Android
-设备上验证。
+CI 只能证明 Rust/JNI、Kotlin/Compose 和 APK 编译通过。悬浮窗行为、系统播放器
+跳转、厂商编码器、系统音频捕获、长时间录制和旋转屏幕必须在真实 Android 设备上
+验证。基础系统录屏和 MP4 保存已完成一次真机验证，本次 UI 与悬浮窗改动仍需复测。

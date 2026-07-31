@@ -17,9 +17,11 @@ import com.dripai.shiping.R
 
 class RecordingService : Service(), ScreenRecorder.Callbacks {
     private var recorder: ScreenRecorder? = null
+    private lateinit var overlayController: RecordingOverlayController
 
     override fun onCreate() {
         super.onCreate()
+        overlayController = RecordingOverlayController(this)
         createNotificationChannel()
     }
 
@@ -34,6 +36,7 @@ class RecordingService : Service(), ScreenRecorder.Callbacks {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        overlayController.hide()
         recorder?.stop()
         recorder = null
         super.onDestroy()
@@ -46,6 +49,7 @@ class RecordingService : Service(), ScreenRecorder.Callbacks {
 
         val config = intent.toRecordingConfig()
         startTypedForeground(config.audioMode)
+        var unownedProjection: android.media.projection.MediaProjection? = null
 
         val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
         val projectionData = intent.parcelableIntentExtra(EXTRA_PROJECTION_DATA)
@@ -62,13 +66,21 @@ class RecordingService : Service(), ScreenRecorder.Callbacks {
             ) {
                 "系统未返回有效的录屏授权"
             }
+            unownedProjection = projection
             recorder = ScreenRecorder(
                 context = applicationContext,
                 projection = projection,
                 config = config,
                 callbacks = this,
-            ).also(ScreenRecorder::start)
+            )
+            overlayController.show(::stopRecording)
+            recorder?.start()
+            unownedProjection = null
         } catch (error: Exception) {
+            overlayController.hide()
+            recorder?.stop()
+            recorder = null
+            runCatching { unownedProjection?.stop() }
             RecordingStateStore.failed("无法启动录屏：${error.readableMessage()}")
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -84,6 +96,7 @@ class RecordingService : Service(), ScreenRecorder.Callbacks {
         }
 
         RecordingStateStore.finalizing(RecordingStateStore.state.value.elapsedMs)
+        overlayController.hide()
         current.stop()
     }
 
@@ -144,13 +157,16 @@ class RecordingService : Service(), ScreenRecorder.Callbacks {
 
     override fun onRecording(elapsedMs: Long) {
         RecordingStateStore.recording(elapsedMs)
+        overlayController.updateElapsed(elapsedMs)
     }
 
     override fun onFinalizing(elapsedMs: Long) {
+        overlayController.hide()
         RecordingStateStore.finalizing(elapsedMs)
     }
 
     override fun onCompleted(elapsedMs: Long, outputUri: String) {
+        overlayController.hide()
         recorder = null
         RecordingStateStore.completed(elapsedMs, outputUri)
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -158,6 +174,7 @@ class RecordingService : Service(), ScreenRecorder.Callbacks {
     }
 
     override fun onFailed(elapsedMs: Long, message: String) {
+        overlayController.hide()
         recorder = null
         RecordingStateStore.failed(message, elapsedMs)
         stopForeground(STOP_FOREGROUND_REMOVE)

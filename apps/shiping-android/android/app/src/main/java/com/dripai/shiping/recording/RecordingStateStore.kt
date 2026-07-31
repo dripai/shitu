@@ -9,11 +9,11 @@ object RecordingStateStore {
     private val mutableState = MutableStateFlow(RecordingUiState())
     val state: StateFlow<RecordingUiState> = mutableState.asStateFlow()
 
-    fun authorizing() {
+    fun authorizing(message: String = "正在等待系统录屏授权") {
         update(
             phase = RecordingPhase.Authorizing,
             elapsedMs = 0,
-            message = "正在等待系统录屏授权",
+            message = message,
         )
     }
 
