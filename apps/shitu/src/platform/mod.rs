@@ -17,5 +17,11 @@ pub fn replace_file(source: &Path, target: &Path) -> Result<()> {
 
 #[cfg(not(windows))]
 pub fn replace_file(source: &Path, target: &Path) -> Result<()> {
-    std::fs::rename(source, target).with_context(|| format!("替换文件失败：{}", target.display()))
+    std::fs::rename(source, target).with_context(|| {
+        format!(
+            "{}: {}",
+            crate::i18n::text("替换文件失败"),
+            target.display()
+        )
+    })
 }

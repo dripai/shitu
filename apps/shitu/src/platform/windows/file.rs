@@ -28,5 +28,5 @@ pub fn replace(source: &Path, target: &Path) -> Result<()> {
             flags,
         )
     }
-    .with_context(|| format!("替换文件失败：{target_display}"))
+    .with_context(|| format!("{}: {target_display}", crate::i18n::text("替换文件失败")))
 }

@@ -40,7 +40,7 @@ unsafe fn write_image(image: &CapturedImage) -> Result<()> {
     let target = GlobalLock(allocation);
     if target.is_null() {
         let _ = GlobalFree(Some(allocation));
-        return Err(anyhow!("GlobalLock 失败"));
+        return Err(anyhow!(crate::i18n::text("GlobalLock 失败")));
     }
 
     ptr::copy_nonoverlapping(
@@ -82,7 +82,7 @@ unsafe fn write_text(text: &str) -> Result<()> {
     let target = GlobalLock(allocation);
     if target.is_null() {
         let _ = GlobalFree(Some(allocation));
-        return Err(anyhow!("GlobalLock 失败"));
+        return Err(anyhow!(crate::i18n::text("GlobalLock 失败")));
     }
     ptr::copy_nonoverlapping(wide.as_ptr().cast::<u8>(), target.cast::<u8>(), byte_len);
     let _ = GlobalUnlock(allocation);
@@ -107,7 +107,7 @@ unsafe fn write_text(text: &str) -> Result<()> {
 #[allow(unsafe_op_in_unsafe_fn)]
 unsafe fn read_image_impl(left: i32, top: i32) -> Result<CapturedImage> {
     if IsClipboardFormatAvailable(CF_DIB).is_err() {
-        return Err(anyhow!("剪贴板中没有可用图像"));
+        return Err(anyhow!(crate::i18n::text("剪贴板中没有可用图像")));
     }
     OpenClipboard(None)?;
     let result = (|| -> Result<CapturedImage> {
@@ -116,7 +116,7 @@ unsafe fn read_image_impl(left: i32, top: i32) -> Result<CapturedImage> {
         let size = GlobalSize(global);
         let data = GlobalLock(global);
         if data.is_null() {
-            return Err(anyhow!("剪贴板图像数据无效"));
+            return Err(anyhow!(crate::i18n::text("剪贴板图像数据无效")));
         }
 
         let result = decode_locked_dib(data.cast::<u8>(), size, left, top);
@@ -135,21 +135,21 @@ unsafe fn decode_locked_dib(
     top: i32,
 ) -> Result<CapturedImage> {
     if size < size_of::<BITMAPINFOHEADER>() {
-        return Err(anyhow!("剪贴板图像数据无效"));
+        return Err(anyhow!(crate::i18n::text("剪贴板图像数据无效")));
     }
     let bytes = std::slice::from_raw_parts(data, size);
     let header = ptr::read_unaligned(bytes.as_ptr().cast::<BITMAPINFOHEADER>());
     let width = header.biWidth.unsigned_abs();
     let height = header.biHeight.unsigned_abs();
     if width == 0 || height == 0 || !matches!(header.biBitCount, 24 | 32) {
-        return Err(anyhow!("暂不支持该剪贴板图像格式"));
+        return Err(anyhow!(crate::i18n::text("暂不支持该剪贴板图像格式")));
     }
 
     let header_size = header.biSize as usize;
     let stride = (width as usize * header.biBitCount as usize).div_ceil(32) * 4;
     let required = header_size.saturating_add(stride.saturating_mul(height as usize));
     if header_size < size_of::<BITMAPINFOHEADER>() || required > bytes.len() {
-        return Err(anyhow!("剪贴板图像数据不完整"));
+        return Err(anyhow!(crate::i18n::text("剪贴板图像数据不完整")));
     }
 
     let pixels = &bytes[header_size..required];

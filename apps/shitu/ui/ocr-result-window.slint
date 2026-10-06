@@ -1,5 +1,7 @@
 import { Button, TextEdit } from "std-widgets.slint";
-import { AppTheme } from "theme.slint";
+import { AppTheme, NativeFrameStyle } from "theme.slint";
+
+export enum OcrResultStatus { ready, copied, recognition-failed, completed, copy-failed }
 
 export component OcrResultWindow inherits Window {
     title: @tr("OCR 识别结果");
@@ -12,10 +14,22 @@ export component OcrResultWindow inherits Window {
     default-font-size: 12.07px;
 
     in-out property <string> result-text;
-    in property <string> status-text: @tr("可选择文字，或复制全部内容。");
+    in property <OcrResultStatus> status: ready;
+    in property <string> error-details;
+    // Keep translated bindings reactive even after a result has been shown.
+    private property <string> status-text:
+        root.status == OcrResultStatus.copied ? @tr("已复制全部文字")
+        : root.status == OcrResultStatus.recognition-failed ? @tr("OCR 识别失败，错误详情已写入日志。")
+        : root.status == OcrResultStatus.completed ? @tr("OCR 识别已完成。")
+        : root.status == OcrResultStatus.copy-failed ? @tr("复制失败") + ": " + root.error-details
+        : @tr("可选择文字，或复制全部内容。");
+    out property <NativeFrameStyle> native-frame-style: AppTheme.native-frame-style;
 
     callback copy-text();
     callback close-result();
+    callback native-frame-changed();
+
+    changed native-frame-style => { root.native-frame-changed(); }
 
     FocusScope {
         key-pressed(event) => {

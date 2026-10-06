@@ -26,7 +26,11 @@ pub fn availability() -> Result<AiOcrState, OcrFailure> {
         AIFeatureReadyState::NotReady => AiOcrState::ModelNotInstalled,
         AIFeatureReadyState::NotSupportedOnCurrentSystem => AiOcrState::Unsupported,
         AIFeatureReadyState::DisabledByUser => AiOcrState::DisabledByUser,
-        other => AiOcrState::Failed(format!("未知 Windows AI 状态：{}", other.0)),
+        other => AiOcrState::Failed(format!(
+            "{}: {}",
+            crate::i18n::text("未知 Windows AI 状态"),
+            other.0
+        )),
     })
 }
 
@@ -84,7 +88,7 @@ pub fn prepare() -> Result<AiOcrState, OcrFailure> {
         let message = result
             .ErrorDisplayText()
             .map(|value| value.to_string())
-            .unwrap_or_else(|_| "Windows AI OCR 模型准备失败".to_owned());
+            .unwrap_or_else(|_| crate::i18n::text("Windows AI OCR 模型准备失败").to_owned());
         return Err(OcrFailure::Failed(message));
     }
     availability()

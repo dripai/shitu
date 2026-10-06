@@ -135,21 +135,12 @@ impl Config {
             }
             Err(error) => {
                 return Err(error).with_context(|| {
-                    format!(
-                        "{}: {}",
-                        i18n::text("读取配置失败", "Failed to read settings"),
-                        path.display()
-                    )
+                    format!("{}: {}", i18n::text("读取配置失败"), path.display())
                 });
             }
         };
-        let mut config: Self = serde_json::from_slice(&bytes).with_context(|| {
-            format!(
-                "{}: {}",
-                i18n::text("配置文件格式无效", "Invalid settings file"),
-                path.display()
-            )
-        })?;
+        let mut config: Self = serde_json::from_slice(&bytes)
+            .with_context(|| format!("{}: {}", i18n::text("配置文件格式无效"), path.display()))?;
         config.validate()?;
         Ok(config)
     }
@@ -159,19 +150,11 @@ impl Config {
         config.validate()?;
 
         let path = Self::path();
-        let parent = path.parent().ok_or_else(|| {
-            anyhow!(i18n::text(
-                "配置路径没有父目录",
-                "The settings path has no parent directory"
-            ))
-        })?;
-        fs::create_dir_all(parent).with_context(|| {
-            format!(
-                "{}: {}",
-                i18n::text("创建配置目录失败", "Failed to create settings folder"),
-                parent.display()
-            )
-        })?;
+        let parent = path
+            .parent()
+            .ok_or_else(|| anyhow!(i18n::text("配置路径没有父目录")))?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("{}: {}", i18n::text("创建配置目录失败"), parent.display()))?;
 
         let temp_path = path.with_extension("json.tmp");
         let json = serde_json::to_vec_pretty(&config)?;
@@ -179,30 +162,21 @@ impl Config {
             let mut file = fs::File::create(&temp_path).with_context(|| {
                 format!(
                     "{}: {}",
-                    i18n::text(
-                        "创建临时配置失败",
-                        "Failed to create temporary settings file"
-                    ),
+                    i18n::text("创建临时配置失败"),
                     temp_path.display()
                 )
             })?;
             file.write_all(&json).with_context(|| {
                 format!(
                     "{}: {}",
-                    i18n::text(
-                        "写入临时配置失败",
-                        "Failed to write temporary settings file"
-                    ),
+                    i18n::text("写入临时配置失败"),
                     temp_path.display()
                 )
             })?;
             file.sync_all().with_context(|| {
                 format!(
                     "{}: {}",
-                    i18n::text(
-                        "同步临时配置失败",
-                        "Failed to flush temporary settings file"
-                    ),
+                    i18n::text("同步临时配置失败"),
                     temp_path.display()
                 )
             })?;
@@ -229,19 +203,13 @@ impl Config {
 
         self.capture.filename_template = self.capture.filename_template.trim().to_owned();
         if self.capture.filename_template.is_empty() {
-            return Err(anyhow!(i18n::text(
-                "文件名模板不能为空",
-                "Filename template cannot be empty"
-            )));
+            return Err(anyhow!(i18n::text("文件名模板不能为空")));
         }
         if self.capture.filename_template.chars().any(|ch| {
             ch.is_control() || matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
         }) || is_reserved_windows_filename(&self.capture.filename_template)
         {
-            return Err(anyhow!(i18n::text(
-                "文件名模板包含 Windows 不允许的字符",
-                "Filename template contains characters that Windows does not allow"
-            )));
+            return Err(anyhow!(i18n::text("文件名模板包含 Windows 不允许的字符")));
         }
 
         if self.capture.save_directory.as_os_str().is_empty() {

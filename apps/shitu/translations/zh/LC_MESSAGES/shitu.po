@@ -1,0 +1,827 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: shitu\n"
+"Language: zh\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "取消截图"
+msgstr "取消截图"
+
+msgid "撤销上一步操作"
+msgstr "撤销上一步操作"
+
+msgid "重做上一步操作"
+msgstr "重做上一步操作"
+
+msgid "画笔标注"
+msgstr "画笔标注"
+
+msgid "选择 / 编辑标注"
+msgstr "选择 / 编辑标注"
+
+msgid "绘制矩形"
+msgstr "绘制矩形"
+
+msgid "绘制圆形 / 椭圆"
+msgstr "绘制圆形 / 椭圆"
+
+msgid "绘制箭头"
+msgstr "绘制箭头"
+
+msgid "添加文字"
+msgstr "添加文字"
+
+msgid "擦除标注"
+msgstr "擦除标注"
+
+msgid "添加马赛克"
+msgstr "添加马赛克"
+
+msgid "识别选区文字"
+msgstr "识别选区文字"
+
+msgid "识别图像文字"
+msgstr "识别图像文字"
+
+msgid "将截图钉在屏幕上"
+msgstr "将截图钉在屏幕上"
+
+msgid "保存截图到文件"
+msgstr "保存截图到文件"
+
+msgid "复制截图到剪贴板"
+msgstr "复制截图到剪贴板"
+
+msgid "红色"
+msgstr "红色"
+
+msgid "蓝色"
+msgstr "蓝色"
+
+msgid "绿色"
+msgstr "绿色"
+
+msgid "黄色"
+msgstr "黄色"
+
+msgid "橙色"
+msgstr "橙色"
+
+msgid "紫色"
+msgstr "紫色"
+
+msgid "粉色"
+msgstr "粉色"
+
+msgid "青色"
+msgstr "青色"
+
+msgid "黑色"
+msgstr "黑色"
+
+msgid "白色"
+msgstr "白色"
+
+msgid "灰色"
+msgstr "灰色"
+
+msgid "棕色"
+msgstr "棕色"
+
+msgid "线宽"
+msgstr "线宽"
+
+msgid "文字大小"
+msgstr "文字大小"
+
+msgid "马赛克大小"
+msgstr "马赛克大小"
+
+msgid "边框样式"
+msgstr "边框样式"
+
+msgid "拾图"
+msgstr "拾图"
+
+msgid "就绪"
+msgstr "就绪"
+
+msgid "OCR 识别结果"
+msgstr "OCR 识别结果"
+
+msgid "可选择文字，或复制全部内容。"
+msgstr "可选择文字，或复制全部内容。"
+
+msgid "识别结果"
+msgstr "识别结果"
+
+msgid "复制全部"
+msgstr "复制全部"
+
+msgid "关闭"
+msgstr "关闭"
+
+msgid "选择截图区域"
+msgstr "选择截图区域"
+
+msgid "钉住工具栏"
+msgstr "钉住工具栏"
+
+msgid "图像另存为..."
+msgstr "图像另存为..."
+
+msgid "复制图像"
+msgstr "复制图像"
+
+msgid "关闭钉住"
+msgstr "关闭钉住"
+
+msgid "钉住"
+msgstr "钉住"
+
+msgid "钉住图像"
+msgstr "钉住图像"
+
+msgid "OCR 识别"
+msgstr "OCR 识别"
+
+msgid "显示工具栏"
+msgstr "显示工具栏"
+
+msgid "窗口阴影"
+msgstr "窗口阴影"
+
+msgid "始终置顶"
+msgstr "始终置顶"
+
+msgid "不透明度"
+msgstr "不透明度"
+
+msgid "缩放（{}%）"
+msgstr "缩放（{}%）"
+
+msgid "适合屏幕"
+msgstr "适合屏幕"
+
+msgid "恢复原始大小"
+msgstr "恢复原始大小"
+
+msgid "图像处理"
+msgstr "图像处理"
+
+msgid "向左旋转 90°"
+msgstr "向左旋转 90°"
+
+msgid "向右旋转 90°"
+msgstr "向右旋转 90°"
+
+msgid "水平翻转"
+msgstr "水平翻转"
+
+msgid "垂直翻转"
+msgstr "垂直翻转"
+
+msgid "替换图像"
+msgstr "替换图像"
+
+msgid "从剪贴板"
+msgstr "从剪贴板"
+
+msgid "从文件..."
+msgstr "从文件..."
+
+msgid "在文件夹中显示"
+msgstr "在文件夹中显示"
+
+msgid "原始尺寸：{}"
+msgstr "原始尺寸：{}"
+
+msgid "应用"
+msgstr "应用"
+
+msgid "开机启动"
+msgstr "开机启动"
+
+msgid "启动最小化"
+msgstr "启动最小化"
+
+msgid "外观模式"
+msgstr "外观模式"
+
+msgid "跟随系统"
+msgstr "跟随系统"
+
+msgid "浅色"
+msgstr "浅色"
+
+msgid "深色"
+msgstr "深色"
+
+msgid "界面语言"
+msgstr "界面语言"
+
+msgid "简体中文"
+msgstr "简体中文"
+
+msgid "文件与诊断"
+msgstr "文件与诊断"
+
+msgid "打开日志"
+msgstr "打开日志"
+
+msgid "打开配置"
+msgstr "打开配置"
+
+msgid "输出"
+msgstr "输出"
+
+msgid "图像格式"
+msgstr "图像格式"
+
+msgid "质量"
+msgstr "质量"
+
+msgid "无损"
+msgstr "无损"
+
+msgid "保存目录"
+msgstr "保存目录"
+
+msgid "选择..."
+msgstr "选择..."
+
+msgid "打开目录"
+msgstr "打开目录"
+
+msgid "文件名模板"
+msgstr "文件名模板"
+
+msgid "自动保存（执行复制或钉住时同时保存）"
+msgstr "自动保存（执行复制或钉住时同时保存）"
+
+msgid "显示保存结果"
+msgstr "显示保存结果"
+
+msgid "识别引擎"
+msgstr "识别引擎"
+
+msgid "默认引擎"
+msgstr "默认引擎"
+
+msgid "兼容系统 OCR"
+msgstr "兼容系统 OCR"
+
+msgid "Windows AI OCR（增强）"
+msgstr "Windows AI OCR（增强）"
+
+msgid "兼容 OCR"
+msgstr "兼容 OCR"
+
+msgid "增强 OCR"
+msgstr "增强 OCR"
+
+msgid "安装模型"
+msgstr "安装模型"
+
+msgid "增强 OCR 输出"
+msgstr "增强 OCR 输出"
+
+msgid "最低置信度"
+msgstr "最低置信度"
+
+msgid "仅过滤 Windows AI OCR 返回的低置信度词语。"
+msgstr "仅过滤 Windows AI OCR 返回的低置信度词语。"
+
+msgid "新建钉住窗口"
+msgstr "新建钉住窗口"
+
+msgid "默认不透明度"
+msgstr "默认不透明度"
+
+msgid "启用滚轮缩放"
+msgstr "启用滚轮缩放"
+
+msgid "缩放步长"
+msgstr "缩放步长"
+
+msgid "双击关闭"
+msgstr "双击关闭"
+
+msgid "全局快捷键"
+msgstr "全局快捷键"
+
+msgid "区域截图"
+msgstr "区域截图"
+
+msgid "默认 Ctrl+Alt+C；留空则关闭"
+msgstr "默认 Ctrl+Alt+C；留空则关闭"
+
+msgid "清除"
+msgstr "清除"
+
+msgid "未设置时不会注册任何全局快捷键。"
+msgstr "未设置时不会注册任何全局快捷键。"
+
+msgid "一款轻量、便捷的截图、标注与钉图工具。"
+msgstr "一款轻量、便捷的截图、标注与钉图工具。"
+
+msgid "作者："
+msgstr "作者："
+
+msgid "使用 Rust 与 Slint 构建 · © 2026"
+msgstr "使用 Rust 与 Slint 构建 · © 2026"
+
+msgid "常规"
+msgstr "常规"
+
+msgid "截图"
+msgstr "截图"
+
+msgid "快捷键"
+msgstr "快捷键"
+
+msgid "关于"
+msgstr "关于"
+
+msgid "开始截图"
+msgstr "开始截图"
+
+msgid "恢复默认"
+msgstr "恢复默认"
+
+msgid "保存"
+msgstr "保存"
+
+msgid "显示控制面板"
+msgstr "显示控制面板"
+
+msgid "隐藏控制面板"
+msgstr "隐藏控制面板"
+
+msgid "退出"
+msgstr "退出"
+
+msgid "标注颜色无效"
+msgstr "标注颜色无效"
+
+msgid "就绪。右键托盘图标可打开菜单。"
+msgstr "就绪。右键托盘图标可打开菜单。"
+
+msgid "配置加载失败，已使用默认值"
+msgstr "配置加载失败，已使用默认值"
+
+msgid "语言初始化失败"
+msgstr "语言初始化失败"
+
+msgid "已复制全部文字"
+msgstr "已复制全部文字"
+
+msgid "已复制 OCR 文字"
+msgstr "已复制 OCR 文字"
+
+msgid "复制失败"
+msgstr "复制失败"
+
+msgid "OCR 文字复制失败"
+msgstr "OCR 文字复制失败"
+
+msgid "OCR 识别失败，错误详情已写入日志。"
+msgstr "OCR 识别失败，错误详情已写入日志。"
+
+msgid "OCR 识别已完成。"
+msgstr "OCR 识别已完成。"
+
+msgid "OCR 结果窗口已不可用"
+msgstr "OCR 结果窗口已不可用"
+
+msgid "启动快捷键异常"
+msgstr "启动快捷键异常"
+
+msgid "可用（Windows 系统 OCR）"
+msgstr "可用（Windows 系统 OCR）"
+
+msgid "不可用"
+msgstr "不可用"
+
+msgid "读取配置失败"
+msgstr "读取配置失败"
+
+msgid "配置文件格式无效"
+msgstr "配置文件格式无效"
+
+msgid "配置路径没有父目录"
+msgstr "配置路径没有父目录"
+
+msgid "创建配置目录失败"
+msgstr "创建配置目录失败"
+
+msgid "创建临时配置失败"
+msgstr "创建临时配置失败"
+
+msgid "写入临时配置失败"
+msgstr "写入临时配置失败"
+
+msgid "同步临时配置失败"
+msgstr "同步临时配置失败"
+
+msgid "文件名模板不能为空"
+msgstr "文件名模板不能为空"
+
+msgid "文件名模板包含 Windows 不允许的字符"
+msgstr "文件名模板包含 Windows 不允许的字符"
+
+msgid "组合键无效"
+msgstr "组合键无效"
+
+msgid "已被占用"
+msgstr "已被占用"
+
+msgid "系统拒绝注册"
+msgstr "系统拒绝注册"
+
+msgid "图像像素尺寸无效"
+msgstr "图像像素尺寸无效"
+
+msgid "无法读取图像"
+msgstr "无法读取图像"
+
+msgid "当前平台尚未实现文字标注"
+msgstr "当前平台尚未实现文字标注"
+
+msgid "图像裁剪坐标溢出"
+msgstr "图像裁剪坐标溢出"
+
+msgid "图像裁剪区域无效"
+msgstr "图像裁剪区域无效"
+
+msgid "创建截图保存目录失败"
+msgstr "创建截图保存目录失败"
+
+msgid "PNG 图像"
+msgstr "PNG 图像"
+
+msgid "JPEG 图像"
+msgstr "JPEG 图像"
+
+msgid "创建目录失败"
+msgstr "创建目录失败"
+
+msgid "创建图像文件失败"
+msgstr "创建图像文件失败"
+
+msgid "PNG 编码失败"
+msgstr "PNG 编码失败"
+
+msgid "JPEG 编码失败"
+msgstr "JPEG 编码失败"
+
+msgid "写入图像文件失败"
+msgstr "写入图像文件失败"
+
+msgid "同步图像文件失败"
+msgstr "同步图像文件失败"
+
+msgid "已有截图任务正在进行，请先完成或取消"
+msgstr "已有截图任务正在进行，请先完成或取消"
+
+msgid "正在准备截图..."
+msgstr "正在准备截图..."
+
+msgid "截图窗口打开失败"
+msgstr "截图窗口打开失败"
+
+msgid "选区无效"
+msgstr "选区无效"
+
+msgid "已保存到"
+msgstr "已保存到"
+
+msgid "保存失败"
+msgstr "保存失败"
+
+msgid "正在识别文字..."
+msgstr "正在识别文字..."
+
+msgid "OCR 失败"
+msgstr "OCR 失败"
+
+msgid "钉住失败"
+msgstr "钉住失败"
+
+msgid "已钉住，但自动保存失败"
+msgstr "已钉住，但自动保存失败"
+
+msgid "已将截图钉在屏幕上"
+msgstr "已将截图钉在屏幕上"
+
+msgid "已取消截图"
+msgstr "已取消截图"
+
+msgid "工具栏定位失败"
+msgstr "工具栏定位失败"
+
+msgid "OCR 识别完成"
+msgstr "OCR 识别完成"
+
+msgid "未识别到文字"
+msgstr "未识别到文字"
+
+msgid "缺少可用的 Windows OCR 语言包"
+msgstr "缺少可用的 Windows OCR 语言包"
+
+msgid "当前系统或程序安装方式不支持 Windows 系统 OCR"
+msgstr "当前系统或程序安装方式不支持 Windows 系统 OCR"
+
+msgid "OCR 识别失败"
+msgstr "OCR 识别失败"
+
+msgid "已复制并保存到"
+msgstr "已复制并保存到"
+
+msgid "已复制到剪贴板"
+msgstr "已复制到剪贴板"
+
+msgid "工具栏显示失败"
+msgstr "工具栏显示失败"
+
+msgid "已复制钉住图像"
+msgstr "已复制钉住图像"
+
+msgid "图像已保存到"
+msgstr "图像已保存到"
+
+msgid "图像保存失败"
+msgstr "图像保存失败"
+
+msgid "已从剪贴板替换图像"
+msgstr "已从剪贴板替换图像"
+
+msgid "替换图像失败"
+msgstr "替换图像失败"
+
+msgid "已从文件替换图像"
+msgstr "已从文件替换图像"
+
+msgid "已在文件夹中显示"
+msgstr "已在文件夹中显示"
+
+msgid "当前图像尚未保存"
+msgstr "当前图像尚未保存"
+
+msgid "图像处理失败"
+msgstr "图像处理失败"
+
+msgid "图像已向左旋转"
+msgstr "图像已向左旋转"
+
+msgid "图像已向右旋转"
+msgstr "图像已向右旋转"
+
+msgid "图像已水平翻转"
+msgstr "图像已水平翻转"
+
+msgid "图像已垂直翻转"
+msgstr "图像已垂直翻转"
+
+msgid "操作失败"
+msgstr "操作失败"
+
+msgid "界面语言已预览，点击保存后生效"
+msgstr "界面语言已预览，点击保存后生效"
+
+msgid "语言切换失败"
+msgstr "语言切换失败"
+
+msgid "正在准备 Windows AI OCR 模型..."
+msgstr "正在准备 Windows AI OCR 模型..."
+
+msgid "已恢复当前页默认值，点击保存后生效"
+msgstr "已恢复当前页默认值，点击保存后生效"
+
+msgid "已打开保存目录"
+msgstr "已打开保存目录"
+
+msgid "已打开日志文件夹"
+msgstr "已打开日志文件夹"
+
+msgid "已打开配置文件夹"
+msgstr "已打开配置文件夹"
+
+msgid "手动修改配置后需要重启应用。"
+msgstr "手动修改配置后需要重启应用。"
+
+msgid "快捷键已注销，点击保存后永久生效"
+msgstr "快捷键已注销，点击保存后永久生效"
+
+msgid "快捷键注销失败"
+msgstr "快捷键注销失败"
+
+msgid "设置无效"
+msgstr "设置无效"
+
+msgid "快捷键无效"
+msgstr "快捷键无效"
+
+msgid "设置已保存"
+msgstr "设置已保存"
+
+msgid "开机启动设置失败"
+msgstr "开机启动设置失败"
+
+msgid "快捷键设置失败"
+msgstr "快捷键设置失败"
+
+msgid "恢复开机启动失败"
+msgstr "恢复开机启动失败"
+
+msgid "恢复快捷键失败"
+msgstr "恢复快捷键失败"
+
+msgid "配置保存失败"
+msgstr "配置保存失败"
+
+msgid "；回滚失败："
+msgstr "；回滚失败："
+
+msgid "快捷键已注册"
+msgstr "快捷键已注册"
+
+msgid "可用（Windows AI OCR）"
+msgstr "可用（Windows AI OCR）"
+
+msgid "正在检测 Windows AI OCR..."
+msgstr "正在检测 Windows AI OCR..."
+
+msgid "正在下载并准备识别模型..."
+msgstr "正在下载并准备识别模型..."
+
+msgid "支持，但识别模型尚未安装"
+msgstr "支持，但识别模型尚未安装"
+
+msgid "当前系统、硬件、驱动或策略不支持 Windows AI OCR"
+msgstr "当前系统、硬件、驱动或策略不支持 Windows AI OCR"
+
+msgid "Windows AI 功能已被用户禁用"
+msgstr "Windows AI 功能已被用户禁用"
+
+msgid "Windows AI OCR 组件或包身份不可用"
+msgstr "Windows AI OCR 组件或包身份不可用"
+
+msgid "Windows AI OCR 检测失败"
+msgstr "Windows AI OCR 检测失败"
+
+msgid "文字标注参数无效"
+msgstr "文字标注参数无效"
+
+msgid "创建文字绘制上下文失败"
+msgstr "创建文字绘制上下文失败"
+
+msgid "创建文字字体失败"
+msgstr "创建文字字体失败"
+
+msgid "绘制文字标注失败"
+msgstr "绘制文字标注失败"
+
+msgid "当前平台尚未实现屏幕截图"
+msgstr "当前平台尚未实现屏幕截图"
+
+msgid "当前平台尚未实现图像剪贴板"
+msgstr "当前平台尚未实现图像剪贴板"
+
+msgid "当前平台尚未实现文字剪贴板"
+msgstr "当前平台尚未实现文字剪贴板"
+
+msgid "OCR 结果窗口打开失败"
+msgstr "OCR 结果窗口打开失败"
+
+msgid "没有活动截图"
+msgstr "没有活动截图"
+
+msgid "选区过小"
+msgstr "选区过小"
+
+msgid "尚未选择截图区域"
+msgstr "尚未选择截图区域"
+
+msgid "图像"
+msgstr "图像"
+
+msgid "替换文件失败"
+msgstr "替换文件失败"
+
+msgid "无法定位 OCR 程序"
+msgstr "无法定位 OCR 程序"
+
+msgid "无法启动增强 OCR 检测"
+msgstr "无法启动增强 OCR 检测"
+
+msgid "增强 OCR 准备"
+msgstr "增强 OCR 准备"
+
+msgid "无法读取增强 OCR 检测结果"
+msgstr "无法读取增强 OCR 检测结果"
+
+msgid "增强 OCR 检测结果格式无效"
+msgstr "增强 OCR 检测结果格式无效"
+
+msgid "无法准备 OCR 图像"
+msgstr "无法准备 OCR 图像"
+
+msgid "无法启动 OCR 子进程"
+msgstr "无法启动 OCR 子进程"
+
+msgid "无法读取 OCR 结果"
+msgstr "无法读取 OCR 结果"
+
+msgid "OCR 结果格式无效"
+msgstr "OCR 结果格式无效"
+
+msgid "操作超时"
+msgstr "操作超时"
+
+msgid "无法获取 OCR 子进程状态"
+msgstr "无法获取 OCR 子进程状态"
+
+msgid "未知 OCR 引擎"
+msgstr "未知 OCR 引擎"
+
+msgid "Windows OCR 子进程异常退出"
+msgstr "Windows OCR 子进程异常退出"
+
+msgid "无法创建 OCR 临时目录"
+msgstr "无法创建 OCR 临时目录"
+
+msgid "GlobalLock 失败"
+msgstr "GlobalLock 失败"
+
+msgid "剪贴板中没有可用图像"
+msgstr "剪贴板中没有可用图像"
+
+msgid "剪贴板图像数据无效"
+msgstr "剪贴板图像数据无效"
+
+msgid "暂不支持该剪贴板图像格式"
+msgstr "暂不支持该剪贴板图像格式"
+
+msgid "剪贴板图像数据不完整"
+msgstr "剪贴板图像数据不完整"
+
+msgid "虚拟桌面没有可见像素"
+msgstr "虚拟桌面没有可见像素"
+
+msgid "截图区域没有可见像素"
+msgstr "截图区域没有可见像素"
+
+msgid "截图区域坐标溢出"
+msgstr "截图区域坐标溢出"
+
+msgid "截图区域超出虚拟桌面"
+msgstr "截图区域超出虚拟桌面"
+
+msgid "GetDC 失败"
+msgstr "GetDC 失败"
+
+msgid "CreateCompatibleDC 失败"
+msgstr "CreateCompatibleDC 失败"
+
+msgid "BitBlt 失败"
+msgstr "BitBlt 失败"
+
+msgid "无法在文件夹中显示该文件"
+msgstr "无法在文件夹中显示该文件"
+
+msgid "打开目标失败，系统返回代码"
+msgstr "打开目标失败，系统返回代码"
+
+msgid "打开开机启动注册表失败"
+msgstr "打开开机启动注册表失败"
+
+msgid "无法获取当前程序路径"
+msgstr "无法获取当前程序路径"
+
+msgid "写入开机启动设置失败"
+msgstr "写入开机启动设置失败"
+
+msgid "删除开机启动设置失败"
+msgstr "删除开机启动设置失败"
+
+msgid "未知 Windows AI 状态"
+msgstr "未知 Windows AI 状态"
+
+msgid "Windows AI OCR 模型准备失败"
+msgstr "Windows AI OCR 模型准备失败"
+
+msgid "Cut"
+msgstr "剪切"
+
+msgid "Copy"
+msgstr "复制"
+
+msgid "Paste"
+msgstr "粘贴"
+
+msgid "Select All"
+msgstr "全选"

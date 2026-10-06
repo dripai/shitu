@@ -14,7 +14,7 @@ ShiTu is built for the small screenshot tasks that happen all day: copying part 
 - Pin screenshots above other windows and adjust zoom, opacity, and always-on-top behavior.
 - Recognize text locally with Windows system OCR and copy the result.
 - Start a capture from the system tray or the default `Ctrl+Alt+C` shortcut.
-- Use the system theme with English or Simplified Chinese.
+- Follow the system theme and language, or choose Simplified Chinese, English, Japanese, Korean, French, German, Spanish, Portuguese, Russian, or Hindi in General → Language. Click Save to keep the language after restarting.
 
 See the [v0.2.0 changes](CHANGELOG.md) for themes, annotation editing, and toolbar placement.
 

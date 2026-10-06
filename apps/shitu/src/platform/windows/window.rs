@@ -2,7 +2,10 @@ use std::{cell::Cell, mem::size_of, rc::Rc, time::Duration};
 
 use anyhow::{Context, Result, ensure};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use slint::winit_030::winit::platform::windows::WindowAttributesExtWindows;
+use slint::winit_030::winit::{
+    platform::windows::{Color as WindowColor, WindowAttributesExtWindows, WindowExtWindows},
+    window::{Theme, Window as WinitWindow},
+};
 use slint::winit_030::{EventResult, WinitWindowAccessor, winit::event::WindowEvent};
 use slint::{PhysicalPosition, PhysicalSize, Timer, Window};
 use windows::Win32::{
@@ -62,6 +65,28 @@ pub fn create_without_taskbar<T>(
 
     let _restore = RestoreTaskbarPolicy(SKIP_TASKBAR_ON_CREATION.replace(true));
     create()
+}
+
+pub fn set_titlebar_theme(
+    window: &WinitWindow,
+    dark: bool,
+    background: slint::Color,
+    foreground: slint::Color,
+) {
+    // Slint 1.17's Palette override does not update Windows decorations.
+    // Keep the native frame and use winit 0.30.13's public Windows extensions.
+    // Exact caption colors are supported on Windows 11 build 22000 and newer.
+    window.set_theme(Some(if dark { Theme::Dark } else { Theme::Light }));
+    window.set_title_background_color(Some(WindowColor::from_rgb(
+        background.red(),
+        background.green(),
+        background.blue(),
+    )));
+    window.set_title_text_color(WindowColor::from_rgb(
+        foreground.red(),
+        foreground.green(),
+        foreground.blue(),
+    ));
 }
 
 pub fn hwnd(window: &Window) -> Option<HWND> {

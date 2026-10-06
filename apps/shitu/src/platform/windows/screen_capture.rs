@@ -22,24 +22,24 @@ pub fn virtual_desktop_bounds() -> Result<DesktopBounds> {
         height: unsafe { GetSystemMetrics(SM_CYVIRTUALSCREEN) },
     };
     if bounds.width <= 0 || bounds.height <= 0 {
-        return Err(anyhow!("虚拟桌面没有可见像素"));
+        return Err(anyhow!(crate::i18n::text("虚拟桌面没有可见像素")));
     }
     Ok(bounds)
 }
 
 pub fn capture_region(bounds: DesktopBounds) -> Result<CapturedImage> {
     if bounds.width <= 0 || bounds.height <= 0 {
-        return Err(anyhow!("截图区域没有可见像素"));
+        return Err(anyhow!(crate::i18n::text("截图区域没有可见像素")));
     }
     let desktop = virtual_desktop_bounds()?;
     let right = bounds
         .left
         .checked_add(bounds.width)
-        .ok_or_else(|| anyhow!("截图区域坐标溢出"))?;
+        .ok_or_else(|| anyhow!(crate::i18n::text("截图区域坐标溢出")))?;
     let bottom = bounds
         .top
         .checked_add(bounds.height)
-        .ok_or_else(|| anyhow!("截图区域坐标溢出"))?;
+        .ok_or_else(|| anyhow!(crate::i18n::text("截图区域坐标溢出")))?;
     let desktop_right = desktop.left + desktop.width;
     let desktop_bottom = desktop.top + desktop.height;
     if bounds.left < desktop.left
@@ -47,7 +47,7 @@ pub fn capture_region(bounds: DesktopBounds) -> Result<CapturedImage> {
         || right > desktop_right
         || bottom > desktop_bottom
     {
-        return Err(anyhow!("截图区域超出虚拟桌面"));
+        return Err(anyhow!(crate::i18n::text("截图区域超出虚拟桌面")));
     }
     unsafe { capture(bounds) }
 }
@@ -56,12 +56,12 @@ pub fn capture_region(bounds: DesktopBounds) -> Result<CapturedImage> {
 unsafe fn capture(bounds: DesktopBounds) -> Result<CapturedImage> {
     let screen_dc = GetDC(None);
     if screen_dc.0.is_null() {
-        return Err(anyhow!("GetDC 失败"));
+        return Err(anyhow!(crate::i18n::text("GetDC 失败")));
     }
     let memory_dc = CreateCompatibleDC(Some(screen_dc));
     if memory_dc.0.is_null() {
         let _ = ReleaseDC(None, screen_dc);
-        return Err(anyhow!("CreateCompatibleDC 失败"));
+        return Err(anyhow!(crate::i18n::text("CreateCompatibleDC 失败")));
     }
 
     let bitmap_info = super::bitmap_info(bounds.width, -bounds.height);
@@ -100,7 +100,7 @@ unsafe fn capture(bounds: DesktopBounds) -> Result<CapturedImage> {
 
     if copied.is_err() {
         let _ = DeleteObject(bitmap.into());
-        return Err(anyhow!("BitBlt 失败"));
+        return Err(anyhow!(crate::i18n::text("BitBlt 失败")));
     }
 
     let pixel_count = bounds.width as usize * bounds.height as usize;

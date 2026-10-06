@@ -11,7 +11,7 @@ pub fn virtual_desktop_bounds() -> Result<DesktopBounds> {
 
 #[cfg(not(windows))]
 pub fn virtual_desktop_bounds() -> Result<DesktopBounds> {
-    Err(anyhow!("当前平台尚未实现屏幕截图"))
+    Err(anyhow!(crate::i18n::text("当前平台尚未实现屏幕截图")))
 }
 
 #[cfg(windows)]
@@ -21,7 +21,7 @@ pub fn capture_region(bounds: DesktopBounds) -> Result<CapturedImage> {
 
 #[cfg(not(windows))]
 pub fn capture_region(_bounds: DesktopBounds) -> Result<CapturedImage> {
-    Err(anyhow!("当前平台尚未实现屏幕截图"))
+    Err(anyhow!(crate::i18n::text("当前平台尚未实现屏幕截图")))
 }
 
 #[cfg(windows)]
@@ -31,7 +31,7 @@ pub fn copy_to_clipboard(image: &CapturedImage) -> Result<()> {
 
 #[cfg(not(windows))]
 pub fn copy_to_clipboard(_image: &CapturedImage) -> Result<()> {
-    Err(anyhow!("当前平台尚未实现图像剪贴板"))
+    Err(anyhow!(crate::i18n::text("当前平台尚未实现图像剪贴板")))
 }
 
 #[cfg(windows)]
@@ -41,7 +41,7 @@ pub fn copy_text_to_clipboard(text: &str) -> Result<()> {
 
 #[cfg(not(windows))]
 pub fn copy_text_to_clipboard(_text: &str) -> Result<()> {
-    Err(anyhow!("当前平台尚未实现文字剪贴板"))
+    Err(anyhow!(crate::i18n::text("当前平台尚未实现文字剪贴板")))
 }
 
 #[cfg(windows)]
@@ -51,5 +51,5 @@ pub fn image_from_clipboard(left: i32, top: i32) -> Result<CapturedImage> {
 
 #[cfg(not(windows))]
 pub fn image_from_clipboard(_left: i32, _top: i32) -> Result<CapturedImage> {
-    Err(anyhow!("当前平台尚未实现图像剪贴板"))
+    Err(anyhow!(crate::i18n::text("当前平台尚未实现图像剪贴板")))
 }

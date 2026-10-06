@@ -1,5 +1,11 @@
 import { Palette } from "std-widgets.slint";
 
+export struct NativeFrameStyle {
+    dark: bool,
+    background: color,
+    foreground: color,
+}
+
 // Slint 1.17 Fluent exposes read-only colors and a writable color-scheme.
 // Its solid background already resolves Unknown against the live system theme.
 // Derive the decorative colors from that background, without another OS observer.
@@ -26,4 +32,9 @@ export global AppTheme {
     out property <color> shadow: dark ? #00000030 : #172b4d0d;
     out property <color> success: dark ? #70df9c : #187e43;
     out property <color> error: dark ? #ff98a3 : #c5273b;
+    out property <NativeFrameStyle> native-frame-style: {
+        dark: self.dark,
+        background: self.background,
+        foreground: self.text,
+    };
 }

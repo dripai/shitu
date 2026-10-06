@@ -1,4 +1,4 @@
-import { AppTheme } from "theme.slint";
+import { AppTheme, NativeFrameStyle } from "theme.slint";
 import { SettingsPanel } from "settings-panel.slint";
 import { StatusBar } from "@shi-ui/status-bar.slint";
 
@@ -26,6 +26,7 @@ export component MainWindow inherits Window {
 
     in-out property <int> current-tab: 0;
     in-out property <int> theme-mode <=> AppTheme.mode;
+    out property <NativeFrameStyle> native-frame-style: AppTheme.native-frame-style;
     in-out property <int> language-mode: 0;
     in-out property <bool> launch-at-startup: false;
     in-out property <bool> start-minimized: false;
@@ -63,11 +64,16 @@ export component MainWindow inherits Window {
     callback prepare-ai-ocr();
     callback preview-language(int);
     callback theme-changed(int);
+    callback native-frame-changed();
     callback ai-ocr-prepared(string);
 
     changed theme-mode => {
         root.theme-changed(root.theme-mode);
     }
+
+    // Observe the resolved colors as well as manual mode changes. System theme
+    // changes also update the native frame while the mode remains "system".
+    changed native-frame-style => { root.native-frame-changed(); }
 
     VerticalLayout {
         spacing: 0px;

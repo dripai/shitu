@@ -80,6 +80,8 @@ export component CaptureToolbar inherits Rectangle {
     in-out property <int> stroke-radius: 2;
     in-out property <int> text-size: 20;
     in-out property <bool> dashed: false;
+    property <[int]> stroke-radii: [1, 2, 3, 4, 6, 8, 12];
+    property <[int]> font-sizes: [8, 12, 16, 20, 24, 32, 48, 64, 96];
     property <bool> tool-properties-visible: root.annotation-tools-visible
         && ((root.active-tool > 0 && root.active-tool < 5)
             || root.active-tool == 6 || root.active-tool == 7);
@@ -294,9 +296,26 @@ export component CaptureToolbar inherits Rectangle {
         }
         VerticalLayout {
             width: 188px;
-            height: root.shape-tool ? 66px : 32px;
+            height: root.shape-tool || root.active-tool == 4 ? 66px : 32px;
             spacing: 2px;
             alignment: center;
+
+            if root.active-tool == 4: ComboBox {
+                width: 188px;
+                height: 32px;
+                model: ["8", "12", "16", "20", "24", "32", "48", "64", "96"];
+                // Leave presets unselected when the numeric editor has a custom size.
+                current-index: root.text-size == 8 ? 0 : root.text-size == 12 ? 1
+                    : root.text-size == 16 ? 2 : root.text-size == 20 ? 3
+                    : root.text-size == 24 ? 4 : root.text-size == 32 ? 5
+                    : root.text-size == 48 ? 6 : root.text-size == 64 ? 7
+                    : root.text-size == 96 ? 8 : -1;
+                accessible-label: @tr("文字大小");
+                selected(value) => {
+                    root.text-size = root.font-sizes[self.current-index];
+                    root.select-text-size(root.text-size);
+                }
+            }
 
             if root.active-tool == 4: SpinBox {
                 width: 188px;
@@ -312,11 +331,19 @@ export component CaptureToolbar inherits Rectangle {
                 width: 188px;
                 height: 32px;
                 // Mosaic values are the image-pixel brush diameters (radius * 2).
-                model: root.active-tool == 6 ? ["20", "36", "60"] : ["2", "4", "8"];
-                current-index: root.stroke-radius == 1 ? 0 : root.stroke-radius == 4 ? 2 : 1;
+                model: root.active-tool == 6 ? ["20", "36", "60"]
+                    : ["2", "4", "6", "8", "12", "16", "24"];
+                current-index: root.active-tool == 6
+                    ? (root.stroke-radius == 1 ? 0 : root.stroke-radius >= 4 ? 2 : 1)
+                    : root.stroke-radius == 1 ? 0 : root.stroke-radius == 2 ? 1
+                    : root.stroke-radius == 3 ? 2 : root.stroke-radius == 4 ? 3
+                    : root.stroke-radius == 6 ? 4 : root.stroke-radius == 8 ? 5
+                    : root.stroke-radius == 12 ? 6 : -1;
                 accessible-label: root.active-tool == 6 ? @tr("马赛克大小") : @tr("线宽");
                 selected(value) => {
-                    root.stroke-radius = self.current-index == 0 ? 1 : self.current-index == 2 ? 4 : 2;
+                    root.stroke-radius = root.active-tool == 6
+                        ? (self.current-index == 0 ? 1 : self.current-index == 2 ? 4 : 2)
+                        : root.stroke-radii[self.current-index];
                     root.select-width(root.stroke-radius);
                 }
             }

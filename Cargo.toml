@@ -7,10 +7,10 @@ members = [
     "crates/shi-ui",
 ]
 default-members = ["apps/shitu"]
-exclude = ["tools/windows-ai-bindgen"]
+exclude = ["tools/windows-ai-bindgen", "vendor/i-slint-core"]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 
 [workspace.dependencies]
@@ -61,6 +61,10 @@ windows-core = "0.62.2"
 windows-future = "0.3.2"
 slint-build = "=1.17.0"
 winresource = "0.1.31"
+
+[patch.crates-io]
+# Slint 1.17.0 drops popup boundary constraints when updating their position.
+i-slint-core = { path = "vendor/i-slint-core" }
 
 [profile.release]
 opt-level = "z"

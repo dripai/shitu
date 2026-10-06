@@ -12,32 +12,14 @@ component FieldLabel inherits Text {
     Tooltip { text: @markdown("\{root.text}"); }
 }
 
-// Fluent GroupBox supplies the heading, layout and accessible grouping, but no
-// rounded card background or shadow. This wrapper only adds those decorations.
-component SettingsCard inherits Rectangle {
-    in property <string> title;
+// Native GroupBox provides the heading and accessible grouping without card decoration.
+component SettingsGroup inherits GroupBox {
     vertical-stretch: 0;
-    border-width: 1px;
-    border-color: AppTheme.border;
-    border-radius: 10px;
-    background: AppTheme.card;
-    drop-shadow-offset-y: 2px;
-    drop-shadow-blur: 8px;
-    drop-shadow-color: AppTheme.shadow;
+    content-padding: 0px;
 
     VerticalLayout {
-        padding-left: 14px;
-        padding-right: 14px;
-        padding-bottom: 14px;
-        GroupBox {
-            title: root.title;
-            content-padding: 0px;
-            VerticalLayout {
-                spacing: 10px;
-                Rectangle { height: 1px; background: AppTheme.divider; }
-                @children
-            }
-        }
+        spacing: 10px;
+        @children
     }
 }
 
@@ -48,10 +30,18 @@ component SettingsPage inherits ScrollView {
     viewport-height: max(root.visible-height, page.min-height);
 
     page := VerticalLayout {
+        // An explicitly sized child is centered by default; keep short pages at the top.
+        x: 0px;
+        y: 0px;
         width: root.viewport-width;
         height: self.min-height;
-        padding: 12px;
-        spacing: 12px;
+        alignment: start;
+        padding-left: 12px;
+        padding-right: 12px;
+        // Fluent GroupBox adds 16px above its heading, giving a 20px top inset.
+        padding-top: 4px;
+        padding-bottom: 12px;
+        spacing: 8px;
         @children
     }
 }
@@ -203,7 +193,7 @@ export component SettingsPanel inherits Rectangle {
             Tab {
                 title: @tr("常规");
                 SettingsPage {
-                    SettingsCard {
+                    SettingsGroup {
                         title: @tr("应用");
                         HorizontalLayout {
                             height: 26px;
@@ -230,13 +220,16 @@ export component SettingsPanel inherits Rectangle {
                             spacing: 10px;
                             FieldLabel { text: @tr("界面语言"); }
                             ComboBox {
-                                model: [@tr("跟随系统"), @tr("简体中文"), "English"];
+                                model: [
+                                    @tr("跟随系统"), "简体中文", "English", "日本語", "한국어",
+                                    "Français", "Deutsch", "Español", "Português", "Русский", "हिन्दी"
+                                ];
                                 current-index <=> root.language-mode;
                                 selected(value) => { root.preview-language(root.language-mode); }
                             }
                         }
                     }
-                    SettingsCard {
+                    SettingsGroup {
                         title: @tr("文件与诊断");
                         HorizontalLayout {
                             height: 32px;
@@ -278,7 +271,7 @@ export component SettingsPanel inherits Rectangle {
             Tab {
                 title: @tr("截图");
                 SettingsPage {
-                    SettingsCard {
+                    SettingsGroup {
                         title: @tr("输出");
                         HorizontalLayout {
                             height: 32px;
@@ -366,7 +359,7 @@ export component SettingsPanel inherits Rectangle {
             Tab {
                 title: "OCR";
                 SettingsPage {
-                    SettingsCard {
+                    SettingsGroup {
                         title: @tr("识别引擎");
                         HorizontalLayout {
                             height: 32px;
@@ -408,7 +401,7 @@ export component SettingsPanel inherits Rectangle {
                             }
                         }
                     }
-                    SettingsCard {
+                    SettingsGroup {
                         title: @tr("增强 OCR 输出");
                         HorizontalLayout {
                             height: 32px;
@@ -437,7 +430,7 @@ export component SettingsPanel inherits Rectangle {
             Tab {
                 title: @tr("钉住");
                 SettingsPage {
-                    SettingsCard {
+                    SettingsGroup {
                         title: @tr("新建钉住窗口");
                         HorizontalLayout {
                             height: 32px;
@@ -472,33 +465,38 @@ export component SettingsPanel inherits Rectangle {
             Tab {
                 title: @tr("快捷键");
                 SettingsPage {
-                    SettingsCard {
+                    SettingsGroup {
                         title: @tr("全局快捷键");
                         HorizontalLayout {
                             height: 32px;
-                            spacing: 8px;
+                            spacing: 10px;
                             FieldLabel { text: @tr("区域截图"); }
                             LineEdit {
                                 horizontal-stretch: 1;
                                 text <=> root.hotkey-text;
                                 placeholder-text: @tr("默认 Ctrl+Alt+C；留空则关闭");
                             }
-                            Button { text: @tr("清除"); clicked => { root.clear-hotkey(); } }
-                            if root.hotkey-status > 0: Rectangle {
-                                width: 22px;
-                                height: 22px;
-                                border-radius: 11px;
-                                background: root.hotkey-status == 1 ? AppTheme.success : AppTheme.error;
-                                Text {
-                                    text: root.hotkey-status == 1 ? "√" : "!";
-                                    color: AppTheme.dark ? #191d25 : #ffffff;
-                                    font-size: 15px;
-                                    font-weight: 700;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
+                            Rectangle {
+                                // Reserve space in every state so the input and button stay still.
+                                width: 20px;
+                                height: 32px;
+                                if root.hotkey-status > 0: Image {
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    width: 16px;
+                                    height: 16px;
+                                    source: root.hotkey-status == 1
+                                        ? @image-url("../src/icons/check.svg")
+                                        : @image-url("../src/icons/circle-alert.svg");
+                                    colorize: root.hotkey-status == 1 ? AppTheme.success : AppTheme.error;
+                                    image-fit: contain;
+                                    accessible-label: root.hotkey-status-tip;
                                 }
-                                Tooltip { text: @markdown("\{root.hotkey-status-tip}"); }
+                                if root.hotkey-status > 0: Tooltip {
+                                    text: @markdown("\{root.hotkey-status-tip}");
+                                }
                             }
+                            Button { text: @tr("清除"); clicked => { root.clear-hotkey(); } }
                         }
                         if root.hotkey-status != 1: Text {
                             text: root.hotkey-status == 0
@@ -514,7 +512,7 @@ export component SettingsPanel inherits Rectangle {
             Tab {
                 title: @tr("关于");
                 SettingsPage {
-                    SettingsCard {
+                    SettingsGroup {
                         title: @tr("拾图");
                         HorizontalLayout {
                             height: 56px;
@@ -559,7 +557,7 @@ export component SettingsPanel inherits Rectangle {
             spacing: 8px;
             Button {
                 text: @tr("开始截图");
-                primary: AppTheme.dark;
+                primary: false;
                 clicked => { root.capture(); }
             }
             Rectangle { }

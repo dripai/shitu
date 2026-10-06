@@ -249,6 +249,24 @@ impl AnnotationHistory {
         self.selected = None;
     }
 
+    pub fn delete_selected(&mut self) -> bool {
+        // Deletion is a separate edit after the pointer gesture has finished.
+        if self.active {
+            return false;
+        }
+        let Some(index) = self
+            .selected
+            .take()
+            .filter(|index| *index < self.commands.len())
+        else {
+            return false;
+        };
+        self.undo.push(self.commands.clone());
+        self.redo.clear();
+        self.commands.remove(index);
+        true
+    }
+
     pub fn begin_edit(&mut self, point: (u32, u32), handle: i32) {
         self.finish();
         if !(-1..=3).contains(&handle) {
@@ -1020,6 +1038,65 @@ mod tests {
         history.redo();
         assert!(history.commands == edited);
         assert_eq!(history.selection_bounds(), None);
+    }
+
+    #[test]
+    fn deleting_selected_annotation_preserves_other_objects_and_undo_redo() {
+        let mut history = AnnotationHistory::default();
+        rectangle(&mut history, (10, 10), (50, 50));
+        rectangle(&mut history, (20, 20), (60, 60));
+        let before = history.commands.clone();
+        let undo_steps = history.undo.len();
+        history.begin(8, (30, 30), style());
+        history.finish();
+
+        assert!(history.delete_selected());
+        assert!(history.commands == before[..1]);
+        assert_eq!(history.selection_bounds(), None);
+        assert_eq!(history.undo.len(), undo_steps + 1);
+        assert!(!history.delete_selected());
+        assert_eq!(history.undo.len(), undo_steps + 1);
+
+        history.undo();
+        assert!(history.commands == before);
+        assert!(
+            !history.delete_selected(),
+            "an empty selection must preserve redo"
+        );
+        history.redo();
+        assert!(history.commands == before[..1]);
+
+        history.undo();
+        history.begin(8, (10, 10), style());
+        history.finish();
+        assert_eq!(history.selected, Some(0));
+        assert!(history.delete_selected());
+        assert!(history.commands == before[1..]);
+        history.redo();
+        assert!(
+            history.commands == before[1..],
+            "new deletion must discard the old redo branch"
+        );
+    }
+
+    #[test]
+    fn deletion_does_not_interrupt_an_active_annotation_edit() {
+        let mut history = AnnotationHistory::default();
+        rectangle(&mut history, (10, 10), (50, 50));
+        let before = history.commands.clone();
+        let undo_steps = history.undo.len();
+        history.begin(8, (30, 30), style());
+        history.update((35, 40), false, (100, 100));
+        let pending = history.commands.clone();
+
+        assert!(!history.delete_selected());
+        assert!(history.commands == pending);
+        assert!(history.selection_bounds().is_some());
+        assert_eq!(history.undo.len(), undo_steps);
+
+        history.finish();
+        history.undo();
+        assert!(history.commands == before);
     }
 
     #[test]

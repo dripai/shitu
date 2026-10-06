@@ -20,7 +20,7 @@ pub fn reveal_in_folder(path: &Path) -> Result<()> {
         .arg(format!("/select,{}", canonical.display()))
         .status()?;
     if !status.success() {
-        return Err(anyhow!("无法在文件夹中显示该文件"));
+        return Err(anyhow!(crate::i18n::text("无法在文件夹中显示该文件")));
     }
     Ok(())
 }
@@ -42,7 +42,11 @@ fn shell_execute(target: &OsStr, parameters: Option<&OsStr>) -> Result<()> {
         )
     };
     if result.0 as isize <= 32 {
-        return Err(anyhow!("打开目标失败，系统返回代码 {}", result.0 as isize));
+        return Err(anyhow!(
+            "{}: {}",
+            crate::i18n::text("打开目标失败，系统返回代码"),
+            result.0 as isize
+        ));
     }
     Ok(())
 }

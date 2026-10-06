@@ -1798,8 +1798,6 @@ dependencies = [
 [[package]]
 name = "i-slint-core"
 version = "1.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b7d306bc9d6fe1d1fd5e775837ec1fa1e41d1c8063789181b7de631bd5db41c"
 dependencies = [
  "async-channel",
  "auto_enums",
@@ -4013,7 +4011,7 @@ dependencies = [
 
 [[package]]
 name = "shi-foundation"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "slint",
@@ -4022,18 +4020,20 @@ dependencies = [
 
 [[package]]
 name = "shi-ui"
-version = "0.2.0"
+version = "0.3.0"
 
 [[package]]
 name = "shitu"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
  "global-hotkey",
  "image",
  "raw-window-handle",
+ "regex",
  "rfd",
+ "rspolib",
  "serde",
  "serde_json",
  "shi-foundation",
@@ -4048,7 +4048,7 @@ dependencies = [
 
 [[package]]
 name = "shiyin"
-version = "0.2.0"
+version = "0.3.0"
 
 [[package]]
 name = "shlex"

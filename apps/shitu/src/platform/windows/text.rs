@@ -24,10 +24,7 @@ pub fn render_text_mask(
     font_size: u32,
 ) -> Result<Vec<u8>> {
     if width == 0 || height == 0 || text.is_empty() || font_size == 0 {
-        return Err(anyhow!(i18n::text(
-            "文字标注参数无效",
-            "Invalid text annotation parameters"
-        )));
+        return Err(anyhow!(i18n::text("文字标注参数无效")));
     }
     unsafe { render_text_mask_impl(width, height, position, text, font_size) }
 }
@@ -42,10 +39,7 @@ unsafe fn render_text_mask_impl(
 ) -> Result<Vec<u8>> {
     let dc = CreateCompatibleDC(None);
     if dc.0.is_null() {
-        return Err(anyhow!(i18n::text(
-            "创建文字绘制上下文失败",
-            "Failed to create text rendering context"
-        )));
+        return Err(anyhow!(i18n::text("创建文字绘制上下文失败")));
     }
 
     let bitmap_info = super::bitmap_info(width as i32, -(height as i32));
@@ -83,10 +77,7 @@ unsafe fn render_text_mask_impl(
         let _ = SelectObject(dc, previous_bitmap);
         let _ = DeleteObject(bitmap.into());
         let _ = DeleteDC(dc);
-        return Err(anyhow!(i18n::text(
-            "创建文字字体失败",
-            "Failed to create annotation font"
-        )));
+        return Err(anyhow!(i18n::text("创建文字字体失败")));
     }
 
     let previous_font = SelectObject(dc, font.into());
@@ -109,10 +100,7 @@ unsafe fn render_text_mask_impl(
     let _ = DeleteDC(dc);
 
     if background_mode == 0 || !drawn || !flushed {
-        return Err(anyhow!(i18n::text(
-            "绘制文字标注失败",
-            "Failed to render text annotation"
-        )));
+        return Err(anyhow!(i18n::text("绘制文字标注失败")));
     }
     Ok(mask)
 }

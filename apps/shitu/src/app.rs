@@ -64,7 +64,7 @@ fn annotation_color(index: i32) -> Result<[u8; 4]> {
         .ok()
         .and_then(|index| ANNOTATION_COLORS.get(index))
         .copied()
-        .ok_or_else(|| anyhow!(i18n::text("标注颜色无效", "Invalid annotation color")))
+        .ok_or_else(|| anyhow!(i18n::text("标注颜色无效")))
 }
 
 fn annotation_color_index(rgba: [u8; 4]) -> Result<i32> {
@@ -72,7 +72,7 @@ fn annotation_color_index(rgba: [u8; 4]) -> Result<i32> {
         .iter()
         .position(|color| *color == rgba)
         .map(|index| index as i32)
-        .ok_or_else(|| anyhow!(i18n::text("标注颜色无效", "Invalid annotation color")))
+        .ok_or_else(|| anyhow!(i18n::text("标注颜色无效")))
 }
 
 pub fn run(start_minimized: bool) -> Result<(), slint::PlatformError> {
@@ -107,34 +107,21 @@ pub fn run(start_minimized: bool) -> Result<(), slint::PlatformError> {
     let (config, mut initial_status, mut initial_level) = match config_result {
         Ok(config) => (
             config,
-            i18n::text(
-                "就绪。右键托盘图标可打开菜单。",
-                "Ready. Right-click the tray icon to open the menu.",
-            )
-            .to_owned(),
+            i18n::text("就绪。右键托盘图标可打开菜单。").to_owned(),
             StatusLevel::Success,
         ),
         Err(error) => {
             logging::error(error.to_string());
             (
                 Config::default(),
-                format!(
-                    "{}: {error}",
-                    i18n::text(
-                        "配置加载失败，已使用默认值",
-                        "Failed to load settings; defaults are in use"
-                    )
-                ),
+                format!("{}: {error}", i18n::text("配置加载失败，已使用默认值")),
                 StatusLevel::Error,
             )
         }
     };
     if let Err(error) = i18n::apply(config.language) {
         logging::error(format!("language initialization failed: {error}"));
-        initial_status = format!(
-            "{}: {error}",
-            i18n::text("语言初始化失败", "Language initialization failed")
-        );
+        initial_status = format!("{}: {error}", i18n::text("语言初始化失败"));
         initial_level = StatusLevel::Error;
     }
     let (ocr_available, ocr_status) = selected_ocr_status(
@@ -168,7 +155,7 @@ pub fn run(start_minimized: bool) -> Result<(), slint::PlatformError> {
     bind_main_window(&main, Rc::clone(&state));
     bind_ocr_result_window(&ocr_result, main.as_weak(), Rc::clone(&state));
     settings::bind(&main, Rc::clone(&state));
-    theme::bind(&main, &tray, Rc::clone(&state));
+    theme::bind(&main, &ocr_result, &tray, Rc::clone(&state))?;
     bind_tray(&tray, main.as_weak(), Rc::clone(&state));
     bind_hotkey_events(main.as_weak(), state.borrow().hotkey.active_id_handle());
 
@@ -216,26 +203,23 @@ fn bind_ocr_result_window(
             let text = result.get_result_text();
             match capture::copy_text_to_clipboard(text.as_str()) {
                 Ok(()) => {
-                    result.set_status_text(i18n::text("已复制全部文字", "Copied all text").into());
+                    result.set_error_details("".into());
+                    result.set_status(OcrResultStatus::Copied);
                     set_status_level(
                         &main,
                         &mut state.borrow_mut(),
-                        i18n::text("已复制 OCR 文字", "Copied OCR text").to_owned(),
+                        i18n::text("已复制 OCR 文字").to_owned(),
                         StatusLevel::Success,
                     );
                 }
                 Err(error) => {
                     logging::error(error.to_string());
-                    result.set_status_text(
-                        format!("{}: {error}", i18n::text("复制失败", "Copy failed")).into(),
-                    );
+                    result.set_error_details(error.to_string().into());
+                    result.set_status(OcrResultStatus::CopyFailed);
                     set_status_level(
                         &main,
                         &mut state.borrow_mut(),
-                        format!(
-                            "{}: {error}",
-                            i18n::text("OCR 文字复制失败", "Failed to copy OCR text")
-                        ),
+                        format!("{}: {error}", i18n::text("OCR 文字复制失败")),
                         StatusLevel::Error,
                     );
                 }
@@ -365,48 +349,28 @@ fn refresh_main_if_available(main: &slint::Weak<MainWindow>, state: &AppControll
 }
 
 fn present_ocr_result(result: &slint::Weak<OcrResultWindow>, text: &str) -> Result<()> {
-    present_ocr_window(
-        result,
-        text,
-        i18n::text(
-            "可选择文字，或复制全部内容。",
-            "Select text or copy all content.",
-        ),
-    )
+    present_ocr_window(result, text, OcrResultStatus::Ready)
 }
 
 fn present_ocr_error(result: &slint::Weak<OcrResultWindow>, message: &str) -> Result<()> {
-    present_ocr_window(
-        result,
-        message,
-        i18n::text(
-            "OCR 识别失败，错误详情已写入日志。",
-            "OCR failed. Details were written to the log.",
-        ),
-    )
+    present_ocr_window(result, message, OcrResultStatus::RecognitionFailed)
 }
 
 fn present_ocr_notice(result: &slint::Weak<OcrResultWindow>, message: &str) -> Result<()> {
-    present_ocr_window(
-        result,
-        message,
-        i18n::text("OCR 识别已完成。", "OCR completed."),
-    )
+    present_ocr_window(result, message, OcrResultStatus::Completed)
 }
 
 fn present_ocr_window(
     result: &slint::Weak<OcrResultWindow>,
     text: &str,
-    status: &str,
+    status: OcrResultStatus,
 ) -> Result<()> {
-    let result = result.upgrade().ok_or_else(|| {
-        anyhow!(i18n::text(
-            "OCR 结果窗口已不可用",
-            "The OCR result window is unavailable"
-        ))
-    })?;
+    let result = result
+        .upgrade()
+        .ok_or_else(|| anyhow!(i18n::text("OCR 结果窗口已不可用")))?;
     result.set_result_text(text.into());
-    result.set_status_text(status.into());
+    result.set_error_details("".into());
+    result.set_status(status);
     result.show()?;
     result.window().request_redraw();
     window::activate(result.window());
@@ -454,11 +418,7 @@ impl AppController {
         } = capabilities;
         let hotkey = HotkeyState::new(config.hotkey.as_deref());
         if let Some(error) = hotkey.error() {
-            status = format!(
-                "{}: {}",
-                i18n::text("启动快捷键异常", "Startup hotkey error"),
-                error.message()
-            );
+            status = format!("{}: {}", i18n::text("启动快捷键异常"), error.message());
             status_level = StatusLevel::Error;
         }
         let (ocr_available, ocr_status) = selected_ocr_status(
@@ -518,11 +478,11 @@ fn selected_ocr_status(
 
 fn system_ocr_status(available: bool, failure: Option<&OcrFailure>) -> String {
     if available {
-        i18n::text("可用（Windows 系统 OCR）", "Available (Windows system OCR)").to_owned()
+        i18n::text("可用（Windows 系统 OCR）").to_owned()
     } else {
         failure
             .map(OcrFailure::message)
-            .unwrap_or_else(|| i18n::text("不可用", "Unavailable").to_owned())
+            .unwrap_or_else(|| i18n::text("不可用").to_owned())
     }
 }
 

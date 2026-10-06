@@ -1,0 +1,827 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: shitu\n"
+"Language: hi\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "取消截图"
+msgstr "स्क्रीनशॉट रद्द करें"
+
+msgid "撤销上一步操作"
+msgstr "पिछली क्रिया पूर्ववत करें"
+
+msgid "重做上一步操作"
+msgstr "पिछली क्रिया फिर करें"
+
+msgid "画笔标注"
+msgstr "पेन"
+
+msgid "选择 / 编辑标注"
+msgstr "टिप्पणी चुनें / संपादित करें"
+
+msgid "绘制矩形"
+msgstr "आयत"
+
+msgid "绘制圆形 / 椭圆"
+msgstr "वृत्त / दीर्घवृत्त"
+
+msgid "绘制箭头"
+msgstr "तीर"
+
+msgid "添加文字"
+msgstr "पाठ"
+
+msgid "擦除标注"
+msgstr "रबर"
+
+msgid "添加马赛克"
+msgstr "मोज़ेक"
+
+msgid "识别选区文字"
+msgstr "चयनित क्षेत्र का पाठ पहचानें"
+
+msgid "识别图像文字"
+msgstr "चित्र का पाठ पहचानें"
+
+msgid "将截图钉在屏幕上"
+msgstr "स्क्रीनशॉट पिन करें"
+
+msgid "保存截图到文件"
+msgstr "स्क्रीनशॉट सहेजें"
+
+msgid "复制截图到剪贴板"
+msgstr "स्क्रीनशॉट क्लिपबोर्ड पर कॉपी करें"
+
+msgid "红色"
+msgstr "लाल"
+
+msgid "蓝色"
+msgstr "नीला"
+
+msgid "绿色"
+msgstr "हरा"
+
+msgid "黄色"
+msgstr "पीला"
+
+msgid "橙色"
+msgstr "नारंगी"
+
+msgid "紫色"
+msgstr "बैंगनी"
+
+msgid "粉色"
+msgstr "गुलाबी"
+
+msgid "青色"
+msgstr "सियान"
+
+msgid "黑色"
+msgstr "काला"
+
+msgid "白色"
+msgstr "सफ़ेद"
+
+msgid "灰色"
+msgstr "धूसर"
+
+msgid "棕色"
+msgstr "भूरा"
+
+msgid "线宽"
+msgstr "रेखा की मोटाई"
+
+msgid "文字大小"
+msgstr "पाठ का आकार"
+
+msgid "马赛克大小"
+msgstr "मोज़ेक का आकार"
+
+msgid "边框样式"
+msgstr "बॉर्डर की शैली"
+
+msgid "拾图"
+msgstr "ShiTu"
+
+msgid "就绪"
+msgstr "तैयार"
+
+msgid "OCR 识别结果"
+msgstr "OCR परिणाम"
+
+msgid "可选择文字，或复制全部内容。"
+msgstr "पाठ चुनें या पूरी सामग्री कॉपी करें।"
+
+msgid "识别结果"
+msgstr "परिणाम"
+
+msgid "复制全部"
+msgstr "सब कॉपी करें"
+
+msgid "关闭"
+msgstr "बंद करें"
+
+msgid "选择截图区域"
+msgstr "स्क्रीनशॉट का क्षेत्र चुनें"
+
+msgid "钉住工具栏"
+msgstr "पिन किए चित्र की टूलबार"
+
+msgid "图像另存为..."
+msgstr "चित्र इस रूप में सहेजें..."
+
+msgid "复制图像"
+msgstr "चित्र कॉपी करें"
+
+msgid "关闭钉住"
+msgstr "पिन किया चित्र बंद करें"
+
+msgid "钉住"
+msgstr "पिन किए चित्र"
+
+msgid "钉住图像"
+msgstr "पिन किया चित्र"
+
+msgid "OCR 识别"
+msgstr "OCR"
+
+msgid "显示工具栏"
+msgstr "टूलबार दिखाएँ"
+
+msgid "窗口阴影"
+msgstr "विंडो की छाया"
+
+msgid "始终置顶"
+msgstr "हमेशा ऊपर रखें"
+
+msgid "不透明度"
+msgstr "अपारदर्शिता"
+
+msgid "缩放（{}%）"
+msgstr "ज़ूम ({}%)"
+
+msgid "适合屏幕"
+msgstr "स्क्रीन में फ़िट करें"
+
+msgid "恢复原始大小"
+msgstr "मूल आकार"
+
+msgid "图像处理"
+msgstr "चित्र रूपांतरण"
+
+msgid "向左旋转 90°"
+msgstr "90° बाएँ घुमाएँ"
+
+msgid "向右旋转 90°"
+msgstr "90° दाएँ घुमाएँ"
+
+msgid "水平翻转"
+msgstr "क्षैतिज पलटें"
+
+msgid "垂直翻转"
+msgstr "लंबवत पलटें"
+
+msgid "替换图像"
+msgstr "चित्र बदलें"
+
+msgid "从剪贴板"
+msgstr "क्लिपबोर्ड से"
+
+msgid "从文件..."
+msgstr "फ़ाइल से..."
+
+msgid "在文件夹中显示"
+msgstr "फ़ोल्डर में दिखाएँ"
+
+msgid "原始尺寸：{}"
+msgstr "मूल आकार: {}"
+
+msgid "应用"
+msgstr "ऐप"
+
+msgid "开机启动"
+msgstr "सिस्टम शुरू होने पर चलाएँ"
+
+msgid "启动最小化"
+msgstr "छोटा करके शुरू करें"
+
+msgid "外观模式"
+msgstr "रूप"
+
+msgid "跟随系统"
+msgstr "सिस्टम के अनुसार"
+
+msgid "浅色"
+msgstr "हल्का"
+
+msgid "深色"
+msgstr "गहरा"
+
+msgid "界面语言"
+msgstr "भाषा"
+
+msgid "简体中文"
+msgstr "सरलीकृत चीनी"
+
+msgid "文件与诊断"
+msgstr "फ़ाइलें और निदान"
+
+msgid "打开日志"
+msgstr "लॉग खोलें"
+
+msgid "打开配置"
+msgstr "कॉन्फ़िगरेशन खोलें"
+
+msgid "输出"
+msgstr "आउटपुट"
+
+msgid "图像格式"
+msgstr "चित्र का प्रारूप"
+
+msgid "质量"
+msgstr "गुणवत्ता"
+
+msgid "无损"
+msgstr "दोषरहित"
+
+msgid "保存目录"
+msgstr "सहेजने का फ़ोल्डर"
+
+msgid "选择..."
+msgstr "ब्राउज़ करें..."
+
+msgid "打开目录"
+msgstr "फ़ोल्डर खोलें"
+
+msgid "文件名模板"
+msgstr "फ़ाइल नाम का टेम्पलेट"
+
+msgid "自动保存（执行复制或钉住时同时保存）"
+msgstr "कॉपी या पिन करते समय अपने आप सहेजें"
+
+msgid "显示保存结果"
+msgstr "सहेजने का परिणाम दिखाएँ"
+
+msgid "识别引擎"
+msgstr "पहचान इंजन"
+
+msgid "默认引擎"
+msgstr "डिफ़ॉल्ट इंजन"
+
+msgid "兼容系统 OCR"
+msgstr "सिस्टम OCR (संगत)"
+
+msgid "Windows AI OCR（增强）"
+msgstr "Windows AI OCR (उन्नत)"
+
+msgid "兼容 OCR"
+msgstr "सिस्टम OCR"
+
+msgid "增强 OCR"
+msgstr "उन्नत OCR"
+
+msgid "安装模型"
+msgstr "मॉडल इंस्टॉल करें"
+
+msgid "增强 OCR 输出"
+msgstr "उन्नत OCR आउटपुट"
+
+msgid "最低置信度"
+msgstr "न्यूनतम विश्वास स्तर"
+
+msgid "仅过滤 Windows AI OCR 返回的低置信度词语。"
+msgstr "केवल Windows AI OCR द्वारा लौटाए गए कम विश्वास वाले शब्द हटाता है।"
+
+msgid "新建钉住窗口"
+msgstr "नया पिन किया चित्र"
+
+msgid "默认不透明度"
+msgstr "डिफ़ॉल्ट अपारदर्शिता"
+
+msgid "启用滚轮缩放"
+msgstr "माउस व्हील से ज़ूम करें"
+
+msgid "缩放步长"
+msgstr "ज़ूम का चरण"
+
+msgid "双击关闭"
+msgstr "बंद करने के लिए डबल-क्लिक करें"
+
+msgid "全局快捷键"
+msgstr "ग्लोबल हॉटकी"
+
+msgid "区域截图"
+msgstr "क्षेत्र का स्क्रीनशॉट"
+
+msgid "默认 Ctrl+Alt+C；留空则关闭"
+msgstr "डिफ़ॉल्ट: Ctrl+Alt+C; बंद करने के लिए खाली छोड़ें"
+
+msgid "清除"
+msgstr "साफ़ करें"
+
+msgid "未设置时不会注册任何全局快捷键。"
+msgstr "खाली छोड़ने पर कोई ग्लोबल हॉटकी पंजीकृत नहीं होगी।"
+
+msgid "一款轻量、便捷的截图、标注与钉图工具。"
+msgstr "स्क्रीनशॉट, टिप्पणियों और चित्र पिन करने के लिए हल्का उपकरण।"
+
+msgid "作者："
+msgstr "लेखक:"
+
+msgid "使用 Rust 与 Slint 构建 · © 2026"
+msgstr "Rust और Slint से निर्मित · © 2026"
+
+msgid "常规"
+msgstr "सामान्य"
+
+msgid "截图"
+msgstr "कैप्चर"
+
+msgid "快捷键"
+msgstr "शॉर्टकट"
+
+msgid "关于"
+msgstr "परिचय"
+
+msgid "开始截图"
+msgstr "कैप्चर शुरू करें"
+
+msgid "恢复默认"
+msgstr "डिफ़ॉल्ट बहाल करें"
+
+msgid "保存"
+msgstr "सहेजें"
+
+msgid "显示控制面板"
+msgstr "कंट्रोल पैनल दिखाएँ"
+
+msgid "隐藏控制面板"
+msgstr "कंट्रोल पैनल छिपाएँ"
+
+msgid "退出"
+msgstr "बाहर निकलें"
+
+msgid "标注颜色无效"
+msgstr "टिप्पणी का रंग अमान्य है"
+
+msgid "就绪。右键托盘图标可打开菜单。"
+msgstr "तैयार। मेनू खोलने के लिए ट्रे आइकन पर राइट-क्लिक करें।"
+
+msgid "配置加载失败，已使用默认值"
+msgstr "सेटिंग्स लोड नहीं हो सकीं; डिफ़ॉल्ट मान उपयोग में हैं"
+
+msgid "语言初始化失败"
+msgstr "भाषा आरंभ नहीं हो सकी"
+
+msgid "已复制全部文字"
+msgstr "पूरा पाठ कॉपी किया गया"
+
+msgid "已复制 OCR 文字"
+msgstr "OCR पाठ कॉपी किया गया"
+
+msgid "复制失败"
+msgstr "कॉपी नहीं हो सका"
+
+msgid "OCR 文字复制失败"
+msgstr "OCR पाठ कॉपी नहीं हो सका"
+
+msgid "OCR 识别失败，错误详情已写入日志。"
+msgstr "OCR विफल हुआ। विवरण लॉग में लिखा गया है।"
+
+msgid "OCR 识别已完成。"
+msgstr "OCR पूरा हुआ।"
+
+msgid "OCR 结果窗口已不可用"
+msgstr "OCR परिणाम विंडो उपलब्ध नहीं है"
+
+msgid "启动快捷键异常"
+msgstr "शुरू करते समय हॉटकी त्रुटि"
+
+msgid "可用（Windows 系统 OCR）"
+msgstr "उपलब्ध (Windows सिस्टम OCR)"
+
+msgid "不可用"
+msgstr "उपलब्ध नहीं"
+
+msgid "读取配置失败"
+msgstr "सेटिंग्स पढ़ी नहीं जा सकीं"
+
+msgid "配置文件格式无效"
+msgstr "सेटिंग्स फ़ाइल का प्रारूप अमान्य है"
+
+msgid "配置路径没有父目录"
+msgstr "सेटिंग्स के पथ का मूल फ़ोल्डर नहीं है"
+
+msgid "创建配置目录失败"
+msgstr "सेटिंग्स फ़ोल्डर नहीं बनाया जा सका"
+
+msgid "创建临时配置失败"
+msgstr "अस्थायी सेटिंग्स फ़ाइल नहीं बनाई जा सकी"
+
+msgid "写入临时配置失败"
+msgstr "अस्थायी सेटिंग्स फ़ाइल नहीं लिखी जा सकी"
+
+msgid "同步临时配置失败"
+msgstr "अस्थायी सेटिंग्स फ़ाइल सिंक नहीं हो सकी"
+
+msgid "文件名模板不能为空"
+msgstr "फ़ाइल नाम का टेम्पलेट खाली नहीं हो सकता"
+
+msgid "文件名模板包含 Windows 不允许的字符"
+msgstr "फ़ाइल नाम के टेम्पलेट में Windows द्वारा निषिद्ध वर्ण हैं"
+
+msgid "组合键无效"
+msgstr "कुंजी संयोजन अमान्य है"
+
+msgid "已被占用"
+msgstr "पहले से उपयोग में है"
+
+msgid "系统拒绝注册"
+msgstr "सिस्टम ने पंजीकरण अस्वीकार किया"
+
+msgid "图像像素尺寸无效"
+msgstr "चित्र का पिक्सेल आकार अमान्य है"
+
+msgid "无法读取图像"
+msgstr "चित्र पढ़ा नहीं जा सका"
+
+msgid "当前平台尚未实现文字标注"
+msgstr "इस प्लेटफ़ॉर्म पर पाठ टिप्पणियाँ अभी लागू नहीं हैं"
+
+msgid "图像裁剪坐标溢出"
+msgstr "चित्र काटने के निर्देशांक सीमा से बाहर हैं"
+
+msgid "图像裁剪区域无效"
+msgstr "चित्र काटने का क्षेत्र अमान्य है"
+
+msgid "创建截图保存目录失败"
+msgstr "स्क्रीनशॉट फ़ोल्डर नहीं बनाया जा सका"
+
+msgid "PNG 图像"
+msgstr "PNG चित्र"
+
+msgid "JPEG 图像"
+msgstr "JPEG चित्र"
+
+msgid "创建目录失败"
+msgstr "फ़ोल्डर नहीं बनाया जा सका"
+
+msgid "创建图像文件失败"
+msgstr "चित्र फ़ाइल नहीं बनाई जा सकी"
+
+msgid "PNG 编码失败"
+msgstr "PNG एन्कोडिंग विफल हुई"
+
+msgid "JPEG 编码失败"
+msgstr "JPEG एन्कोडिंग विफल हुई"
+
+msgid "写入图像文件失败"
+msgstr "चित्र फ़ाइल नहीं लिखी जा सकी"
+
+msgid "同步图像文件失败"
+msgstr "चित्र फ़ाइल सिंक नहीं हो सकी"
+
+msgid "已有截图任务正在进行，请先完成或取消"
+msgstr "स्क्रीनशॉट पहले से चल रहा है; पहले पूरा करें या रद्द करें"
+
+msgid "正在准备截图..."
+msgstr "स्क्रीनशॉट तैयार हो रहा है..."
+
+msgid "截图窗口打开失败"
+msgstr "स्क्रीनशॉट विंडो नहीं खुल सकी"
+
+msgid "选区无效"
+msgstr "चयन अमान्य है"
+
+msgid "已保存到"
+msgstr "यहाँ सहेजा गया"
+
+msgid "保存失败"
+msgstr "सहेजा नहीं जा सका"
+
+msgid "正在识别文字..."
+msgstr "पाठ पहचाना जा रहा है..."
+
+msgid "OCR 失败"
+msgstr "OCR विफल हुआ"
+
+msgid "钉住失败"
+msgstr "पिन नहीं हो सका"
+
+msgid "已钉住，但自动保存失败"
+msgstr "पिन किया गया, लेकिन अपने आप सहेजना विफल हुआ"
+
+msgid "已将截图钉在屏幕上"
+msgstr "स्क्रीनशॉट पिन किया गया"
+
+msgid "已取消截图"
+msgstr "स्क्रीनशॉट रद्द किया गया"
+
+msgid "工具栏定位失败"
+msgstr "टूलबार की स्थिति तय नहीं हो सकी"
+
+msgid "OCR 识别完成"
+msgstr "OCR पूरा हुआ"
+
+msgid "未识别到文字"
+msgstr "कोई पाठ नहीं पहचाना गया"
+
+msgid "缺少可用的 Windows OCR 语言包"
+msgstr "कोई संगत Windows OCR भाषा पैक इंस्टॉल नहीं है"
+
+msgid "当前系统或程序安装方式不支持 Windows 系统 OCR"
+msgstr "इस सिस्टम या इंस्टॉलेशन पर Windows सिस्टम OCR समर्थित नहीं है"
+
+msgid "OCR 识别失败"
+msgstr "OCR विफल हुआ"
+
+msgid "已复制并保存到"
+msgstr "कॉपी करके यहाँ सहेजा गया"
+
+msgid "已复制到剪贴板"
+msgstr "क्लिपबोर्ड पर कॉपी किया गया"
+
+msgid "工具栏显示失败"
+msgstr "टूलबार नहीं दिखाई जा सकी"
+
+msgid "已复制钉住图像"
+msgstr "पिन किया चित्र कॉपी किया गया"
+
+msgid "图像已保存到"
+msgstr "चित्र यहाँ सहेजा गया"
+
+msgid "图像保存失败"
+msgstr "चित्र सहेजा नहीं जा सका"
+
+msgid "已从剪贴板替换图像"
+msgstr "क्लिपबोर्ड से चित्र बदला गया"
+
+msgid "替换图像失败"
+msgstr "चित्र बदला नहीं जा सका"
+
+msgid "已从文件替换图像"
+msgstr "फ़ाइल से चित्र बदला गया"
+
+msgid "已在文件夹中显示"
+msgstr "फ़ोल्डर में दिखाया गया"
+
+msgid "当前图像尚未保存"
+msgstr "वर्तमान चित्र अभी सहेजा नहीं गया है"
+
+msgid "图像处理失败"
+msgstr "चित्र प्रसंस्करण विफल हुआ"
+
+msgid "图像已向左旋转"
+msgstr "चित्र बाएँ घुमाया गया"
+
+msgid "图像已向右旋转"
+msgstr "चित्र दाएँ घुमाया गया"
+
+msgid "图像已水平翻转"
+msgstr "चित्र क्षैतिज पलटा गया"
+
+msgid "图像已垂直翻转"
+msgstr "चित्र लंबवत पलटा गया"
+
+msgid "操作失败"
+msgstr "क्रिया विफल हुई"
+
+msgid "界面语言已预览，点击保存后生效"
+msgstr "भाषा का पूर्वावलोकन लागू है; रखने के लिए सहेजें पर क्लिक करें"
+
+msgid "语言切换失败"
+msgstr "भाषा बदली नहीं जा सकी"
+
+msgid "正在准备 Windows AI OCR 模型..."
+msgstr "Windows AI OCR मॉडल तैयार हो रहा है..."
+
+msgid "已恢复当前页默认值，点击保存后生效"
+msgstr "इस पृष्ठ के डिफ़ॉल्ट बहाल हुए; लागू करने के लिए सहेजें पर क्लिक करें"
+
+msgid "已打开保存目录"
+msgstr "सहेजने का फ़ोल्डर खोला गया"
+
+msgid "已打开日志文件夹"
+msgstr "लॉग फ़ोल्डर खोला गया"
+
+msgid "已打开配置文件夹"
+msgstr "सेटिंग्स फ़ोल्डर खोला गया"
+
+msgid "手动修改配置后需要重启应用。"
+msgstr "सेटिंग्स फ़ाइल को हाथ से बदलने के बाद ऐप पुनः शुरू करें।"
+
+msgid "快捷键已注销，点击保存后永久生效"
+msgstr "हॉटकी का पंजीकरण हटाया गया; बनाए रखने के लिए सहेजें पर क्लिक करें"
+
+msgid "快捷键注销失败"
+msgstr "हॉटकी का पंजीकरण हटाया नहीं जा सका"
+
+msgid "设置无效"
+msgstr "सेटिंग्स अमान्य हैं"
+
+msgid "快捷键无效"
+msgstr "हॉटकी अमान्य है"
+
+msgid "设置已保存"
+msgstr "सेटिंग्स सहेजी गईं"
+
+msgid "开机启动设置失败"
+msgstr "सिस्टम शुरू होने पर चलाने की सेटिंग नहीं बदली जा सकी"
+
+msgid "快捷键设置失败"
+msgstr "हॉटकी की सेटिंग नहीं बदली जा सकी"
+
+msgid "恢复开机启动失败"
+msgstr "सिस्टम शुरू होने पर चलाने की सेटिंग बहाल नहीं हो सकी"
+
+msgid "恢复快捷键失败"
+msgstr "हॉटकी बहाल नहीं हो सकी"
+
+msgid "配置保存失败"
+msgstr "सेटिंग्स सहेजी नहीं जा सकीं"
+
+msgid "；回滚失败："
+msgstr "; वापस करना विफल: "
+
+msgid "快捷键已注册"
+msgstr "हॉटकी पंजीकृत है"
+
+msgid "可用（Windows AI OCR）"
+msgstr "उपलब्ध (Windows AI OCR)"
+
+msgid "正在检测 Windows AI OCR..."
+msgstr "Windows AI OCR की उपलब्धता जाँची जा रही है..."
+
+msgid "正在下载并准备识别模型..."
+msgstr "पहचान मॉडल डाउनलोड और तैयार हो रहा है..."
+
+msgid "支持，但识别模型尚未安装"
+msgstr "समर्थित है, लेकिन पहचान मॉडल इंस्टॉल नहीं है"
+
+msgid "当前系统、硬件、驱动或策略不支持 Windows AI OCR"
+msgstr "वर्तमान सिस्टम, हार्डवेयर, ड्राइवर या नीति पर Windows AI OCR समर्थित नहीं है"
+
+msgid "Windows AI 功能已被用户禁用"
+msgstr "उपयोगकर्ता ने Windows AI सुविधाएँ बंद की हैं"
+
+msgid "Windows AI OCR 组件或包身份不可用"
+msgstr "Windows AI OCR घटक या पैकेज पहचान उपलब्ध नहीं है"
+
+msgid "Windows AI OCR 检测失败"
+msgstr "Windows AI OCR की जाँच विफल हुई"
+
+msgid "文字标注参数无效"
+msgstr "पाठ टिप्पणी के पैरामीटर अमान्य हैं"
+
+msgid "创建文字绘制上下文失败"
+msgstr "पाठ रेंडरिंग संदर्भ नहीं बनाया जा सका"
+
+msgid "创建文字字体失败"
+msgstr "टिप्पणी का फ़ॉन्ट नहीं बनाया जा सका"
+
+msgid "绘制文字标注失败"
+msgstr "पाठ टिप्पणी रेंडर नहीं हो सकी"
+
+msgid "当前平台尚未实现屏幕截图"
+msgstr "इस प्लेटफ़ॉर्म पर स्क्रीन कैप्चर अभी लागू नहीं है"
+
+msgid "当前平台尚未实现图像剪贴板"
+msgstr "इस प्लेटफ़ॉर्म पर चित्र क्लिपबोर्ड अभी लागू नहीं है"
+
+msgid "当前平台尚未实现文字剪贴板"
+msgstr "इस प्लेटफ़ॉर्म पर पाठ क्लिपबोर्ड अभी लागू नहीं है"
+
+msgid "OCR 结果窗口打开失败"
+msgstr "OCR परिणाम विंडो नहीं खुल सकी"
+
+msgid "没有活动截图"
+msgstr "कोई सक्रिय स्क्रीनशॉट नहीं है"
+
+msgid "选区过小"
+msgstr "चयनित क्षेत्र बहुत छोटा है"
+
+msgid "尚未选择截图区域"
+msgstr "स्क्रीनशॉट का क्षेत्र नहीं चुना गया"
+
+msgid "图像"
+msgstr "चित्र"
+
+msgid "替换文件失败"
+msgstr "फ़ाइल बदली नहीं जा सकी"
+
+msgid "无法定位 OCR 程序"
+msgstr "OCR प्रोग्राम नहीं मिला"
+
+msgid "无法启动增强 OCR 检测"
+msgstr "उन्नत OCR की जाँच शुरू नहीं हो सकी"
+
+msgid "增强 OCR 准备"
+msgstr "उन्नत OCR की तैयारी"
+
+msgid "无法读取增强 OCR 检测结果"
+msgstr "उन्नत OCR की जाँच का परिणाम पढ़ा नहीं जा सका"
+
+msgid "增强 OCR 检测结果格式无效"
+msgstr "उन्नत OCR की जाँच का परिणाम अमान्य है"
+
+msgid "无法准备 OCR 图像"
+msgstr "OCR चित्र तैयार नहीं हो सका"
+
+msgid "无法启动 OCR 子进程"
+msgstr "OCR सहायक प्रक्रिया शुरू नहीं हो सकी"
+
+msgid "无法读取 OCR 结果"
+msgstr "OCR परिणाम पढ़ा नहीं जा सका"
+
+msgid "OCR 结果格式无效"
+msgstr "OCR परिणाम का प्रारूप अमान्य है"
+
+msgid "操作超时"
+msgstr "क्रिया का समय समाप्त हुआ"
+
+msgid "无法获取 OCR 子进程状态"
+msgstr "OCR सहायक प्रक्रिया की स्थिति नहीं मिल सकी"
+
+msgid "未知 OCR 引擎"
+msgstr "अज्ञात OCR इंजन"
+
+msgid "Windows OCR 子进程异常退出"
+msgstr "Windows OCR सहायक प्रक्रिया अप्रत्याशित रूप से बंद हुई"
+
+msgid "无法创建 OCR 临时目录"
+msgstr "OCR अस्थायी फ़ोल्डर नहीं बनाया जा सका"
+
+msgid "GlobalLock 失败"
+msgstr "GlobalLock विफल हुआ"
+
+msgid "剪贴板中没有可用图像"
+msgstr "क्लिपबोर्ड में कोई चित्र उपलब्ध नहीं है"
+
+msgid "剪贴板图像数据无效"
+msgstr "क्लिपबोर्ड के चित्र का डेटा अमान्य है"
+
+msgid "暂不支持该剪贴板图像格式"
+msgstr "क्लिपबोर्ड के चित्र का प्रारूप समर्थित नहीं है"
+
+msgid "剪贴板图像数据不完整"
+msgstr "क्लिपबोर्ड के चित्र का डेटा अधूरा है"
+
+msgid "虚拟桌面没有可见像素"
+msgstr "वर्चुअल डेस्कटॉप पर कोई दृश्यमान पिक्सेल नहीं है"
+
+msgid "截图区域没有可见像素"
+msgstr "स्क्रीनशॉट के क्षेत्र में कोई दृश्यमान पिक्सेल नहीं है"
+
+msgid "截图区域坐标溢出"
+msgstr "स्क्रीनशॉट के निर्देशांक सीमा से बाहर हैं"
+
+msgid "截图区域超出虚拟桌面"
+msgstr "स्क्रीनशॉट का क्षेत्र वर्चुअल डेस्कटॉप से बाहर है"
+
+msgid "GetDC 失败"
+msgstr "GetDC विफल हुआ"
+
+msgid "CreateCompatibleDC 失败"
+msgstr "CreateCompatibleDC विफल हुआ"
+
+msgid "BitBlt 失败"
+msgstr "BitBlt विफल हुआ"
+
+msgid "无法在文件夹中显示该文件"
+msgstr "फ़ोल्डर में फ़ाइल नहीं दिखाई जा सकी"
+
+msgid "打开目标失败，系统返回代码"
+msgstr "लक्ष्य नहीं खुल सका; सिस्टम कोड"
+
+msgid "打开开机启动注册表失败"
+msgstr "स्टार्टअप रजिस्ट्री कुंजी नहीं खुल सकी"
+
+msgid "无法获取当前程序路径"
+msgstr "ऐप का पथ नहीं मिल सका"
+
+msgid "写入开机启动设置失败"
+msgstr "स्टार्टअप सेटिंग्स नहीं लिखी जा सकीं"
+
+msgid "删除开机启动设置失败"
+msgstr "स्टार्टअप सेटिंग्स हटाई नहीं जा सकीं"
+
+msgid "未知 Windows AI 状态"
+msgstr "अज्ञात Windows AI स्थिति"
+
+msgid "Windows AI OCR 模型准备失败"
+msgstr "Windows AI OCR मॉडल की तैयारी विफल हुई"
+
+msgid "Cut"
+msgstr "काटें"
+
+msgid "Copy"
+msgstr "कॉपी करें"
+
+msgid "Paste"
+msgstr "चिपकाएँ"
+
+msgid "Select All"
+msgstr "सब चुनें"

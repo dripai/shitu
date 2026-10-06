@@ -20,11 +20,9 @@ pub enum HotkeyFailure {
 impl HotkeyFailure {
     pub fn message(&self) -> &'static str {
         match self {
-            Self::Invalid => i18n::text("组合键无效", "Invalid key combination"),
-            Self::Occupied => i18n::text("已被占用", "Already in use"),
-            Self::SystemRejected => {
-                i18n::text("系统拒绝注册", "Registration was rejected by the system")
-            }
+            Self::Invalid => i18n::text("组合键无效"),
+            Self::Occupied => i18n::text("已被占用"),
+            Self::SystemRejected => i18n::text("系统拒绝注册"),
         }
     }
 }

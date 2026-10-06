@@ -1,7 +1,8 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: gridstart\n"
+"Project-Id-Version: shitu\n"
 "Language: en\n"
+"MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
@@ -99,41 +100,8 @@ msgstr "Text size"
 msgid "马赛克大小"
 msgstr "Mosaic brush size"
 
-msgid "实线"
-msgstr "Solid"
-
-msgid "虚线"
-msgstr "Dashed"
-
 msgid "边框样式"
 msgstr "Border style"
-
-msgid "小号文字"
-msgstr "Small text"
-
-msgid "小号马赛克"
-msgstr "Small mosaic brush"
-
-msgid "细线"
-msgstr "Thin line"
-
-msgid "中号文字"
-msgstr "Medium text"
-
-msgid "中号马赛克"
-msgstr "Medium mosaic brush"
-
-msgid "中等线宽"
-msgstr "Medium line"
-
-msgid "大号文字"
-msgstr "Large text"
-
-msgid "大号马赛克"
-msgstr "Large mosaic brush"
-
-msgid "粗线"
-msgstr "Thick line"
 
 msgid "拾图"
 msgstr "ShiTu"
@@ -395,3 +363,465 @@ msgstr "Hide control panel"
 
 msgid "退出"
 msgstr "Quit"
+
+msgid "标注颜色无效"
+msgstr "Invalid annotation color"
+
+msgid "就绪。右键托盘图标可打开菜单。"
+msgstr "Ready. Right-click the tray icon to open the menu."
+
+msgid "配置加载失败，已使用默认值"
+msgstr "Failed to load settings; defaults are in use"
+
+msgid "语言初始化失败"
+msgstr "Language initialization failed"
+
+msgid "已复制全部文字"
+msgstr "Copied all text"
+
+msgid "已复制 OCR 文字"
+msgstr "Copied OCR text"
+
+msgid "复制失败"
+msgstr "Copy failed"
+
+msgid "OCR 文字复制失败"
+msgstr "Failed to copy OCR text"
+
+msgid "OCR 识别失败，错误详情已写入日志。"
+msgstr "OCR failed. Details were written to the log."
+
+msgid "OCR 识别已完成。"
+msgstr "OCR completed."
+
+msgid "OCR 结果窗口已不可用"
+msgstr "The OCR result window is unavailable"
+
+msgid "启动快捷键异常"
+msgstr "Startup hotkey error"
+
+msgid "可用（Windows 系统 OCR）"
+msgstr "Available (Windows system OCR)"
+
+msgid "不可用"
+msgstr "Unavailable"
+
+msgid "读取配置失败"
+msgstr "Failed to read settings"
+
+msgid "配置文件格式无效"
+msgstr "Invalid settings file"
+
+msgid "配置路径没有父目录"
+msgstr "The settings path has no parent directory"
+
+msgid "创建配置目录失败"
+msgstr "Failed to create settings folder"
+
+msgid "创建临时配置失败"
+msgstr "Failed to create temporary settings file"
+
+msgid "写入临时配置失败"
+msgstr "Failed to write temporary settings file"
+
+msgid "同步临时配置失败"
+msgstr "Failed to flush temporary settings file"
+
+msgid "文件名模板不能为空"
+msgstr "Filename template cannot be empty"
+
+msgid "文件名模板包含 Windows 不允许的字符"
+msgstr "Filename template contains characters that Windows does not allow"
+
+msgid "组合键无效"
+msgstr "Invalid key combination"
+
+msgid "已被占用"
+msgstr "Already in use"
+
+msgid "系统拒绝注册"
+msgstr "Registration was rejected by the system"
+
+msgid "图像像素尺寸无效"
+msgstr "Invalid image pixel dimensions"
+
+msgid "无法读取图像"
+msgstr "Failed to read image"
+
+msgid "当前平台尚未实现文字标注"
+msgstr "Text annotation is not implemented on this platform"
+
+msgid "图像裁剪坐标溢出"
+msgstr "Image crop coordinates overflow"
+
+msgid "图像裁剪区域无效"
+msgstr "Invalid image crop area"
+
+msgid "创建截图保存目录失败"
+msgstr "Failed to create screenshot folder"
+
+msgid "PNG 图像"
+msgstr "PNG image"
+
+msgid "JPEG 图像"
+msgstr "JPEG image"
+
+msgid "创建目录失败"
+msgstr "Failed to create folder"
+
+msgid "创建图像文件失败"
+msgstr "Failed to create image file"
+
+msgid "PNG 编码失败"
+msgstr "PNG encoding failed"
+
+msgid "JPEG 编码失败"
+msgstr "JPEG encoding failed"
+
+msgid "写入图像文件失败"
+msgstr "Failed to write image file"
+
+msgid "同步图像文件失败"
+msgstr "Failed to flush image file"
+
+msgid "已有截图任务正在进行，请先完成或取消"
+msgstr "A screenshot is already in progress; finish or cancel it first"
+
+msgid "正在准备截图..."
+msgstr "Preparing screenshot..."
+
+msgid "截图窗口打开失败"
+msgstr "Failed to open screenshot window"
+
+msgid "选区无效"
+msgstr "Invalid selection"
+
+msgid "已保存到"
+msgstr "Saved to"
+
+msgid "保存失败"
+msgstr "Save failed"
+
+msgid "正在识别文字..."
+msgstr "Recognizing text..."
+
+msgid "OCR 失败"
+msgstr "OCR failed"
+
+msgid "钉住失败"
+msgstr "Pin failed"
+
+msgid "已钉住，但自动保存失败"
+msgstr "Pinned, but auto-save failed"
+
+msgid "已将截图钉在屏幕上"
+msgstr "Screenshot pinned"
+
+msgid "已取消截图"
+msgstr "Screenshot canceled"
+
+msgid "工具栏定位失败"
+msgstr "Toolbar placement failed"
+
+msgid "OCR 识别完成"
+msgstr "OCR completed"
+
+msgid "未识别到文字"
+msgstr "No text was recognized"
+
+msgid "缺少可用的 Windows OCR 语言包"
+msgstr "No compatible Windows OCR language pack is installed"
+
+msgid "当前系统或程序安装方式不支持 Windows 系统 OCR"
+msgstr "Windows system OCR is not supported by this system or installation"
+
+msgid "OCR 识别失败"
+msgstr "OCR failed"
+
+msgid "已复制并保存到"
+msgstr "Copied and saved to"
+
+msgid "已复制到剪贴板"
+msgstr "Copied to clipboard"
+
+msgid "工具栏显示失败"
+msgstr "Failed to show toolbar"
+
+msgid "已复制钉住图像"
+msgstr "Copied pinned image"
+
+msgid "图像已保存到"
+msgstr "Image saved to"
+
+msgid "图像保存失败"
+msgstr "Failed to save image"
+
+msgid "已从剪贴板替换图像"
+msgstr "Image replaced from clipboard"
+
+msgid "替换图像失败"
+msgstr "Failed to replace image"
+
+msgid "已从文件替换图像"
+msgstr "Image replaced from file"
+
+msgid "已在文件夹中显示"
+msgstr "Shown in folder"
+
+msgid "当前图像尚未保存"
+msgstr "The current image has not been saved"
+
+msgid "图像处理失败"
+msgstr "Image processing failed"
+
+msgid "图像已向左旋转"
+msgstr "Image rotated left"
+
+msgid "图像已向右旋转"
+msgstr "Image rotated right"
+
+msgid "图像已水平翻转"
+msgstr "Image flipped horizontally"
+
+msgid "图像已垂直翻转"
+msgstr "Image flipped vertically"
+
+msgid "操作失败"
+msgstr "Operation failed"
+
+msgid "界面语言已预览，点击保存后生效"
+msgstr "Language preview applied; click Save to keep it"
+
+msgid "语言切换失败"
+msgstr "Language switch failed"
+
+msgid "正在准备 Windows AI OCR 模型..."
+msgstr "Preparing the Windows AI OCR model..."
+
+msgid "已恢复当前页默认值，点击保存后生效"
+msgstr "Defaults restored for this page; click Save to apply"
+
+msgid "已打开保存目录"
+msgstr "Opened the save folder"
+
+msgid "已打开日志文件夹"
+msgstr "Opened the log folder"
+
+msgid "已打开配置文件夹"
+msgstr "Opened the settings folder"
+
+msgid "手动修改配置后需要重启应用。"
+msgstr "Restart the application after editing the settings file manually."
+
+msgid "快捷键已注销，点击保存后永久生效"
+msgstr "Hotkey unregistered; click Save to make it permanent"
+
+msgid "快捷键注销失败"
+msgstr "Failed to unregister hotkey"
+
+msgid "设置无效"
+msgstr "Invalid settings"
+
+msgid "快捷键无效"
+msgstr "Invalid hotkey"
+
+msgid "设置已保存"
+msgstr "Settings saved"
+
+msgid "开机启动设置失败"
+msgstr "Failed to update launch-at-startup"
+
+msgid "快捷键设置失败"
+msgstr "Failed to update hotkey"
+
+msgid "恢复开机启动失败"
+msgstr "Failed to restore launch-at-startup"
+
+msgid "恢复快捷键失败"
+msgstr "Failed to restore hotkey"
+
+msgid "配置保存失败"
+msgstr "Failed to save settings"
+
+msgid "；回滚失败："
+msgstr "; rollback failed: "
+
+msgid "快捷键已注册"
+msgstr "Hotkey registered"
+
+msgid "可用（Windows AI OCR）"
+msgstr "Available (Windows AI OCR)"
+
+msgid "正在检测 Windows AI OCR..."
+msgstr "Checking Windows AI OCR availability..."
+
+msgid "正在下载并准备识别模型..."
+msgstr "Downloading and preparing the recognition model..."
+
+msgid "支持，但识别模型尚未安装"
+msgstr "Supported, but the recognition model is not installed"
+
+msgid "当前系统、硬件、驱动或策略不支持 Windows AI OCR"
+msgstr "Windows AI OCR is not supported by the current system, hardware, driver, or policy"
+
+msgid "Windows AI 功能已被用户禁用"
+msgstr "Windows AI features were disabled by the user"
+
+msgid "Windows AI OCR 组件或包身份不可用"
+msgstr "The Windows AI OCR component or package identity is unavailable"
+
+msgid "Windows AI OCR 检测失败"
+msgstr "Windows AI OCR check failed"
+
+msgid "文字标注参数无效"
+msgstr "Invalid text annotation parameters"
+
+msgid "创建文字绘制上下文失败"
+msgstr "Failed to create text rendering context"
+
+msgid "创建文字字体失败"
+msgstr "Failed to create annotation font"
+
+msgid "绘制文字标注失败"
+msgstr "Failed to render text annotation"
+
+msgid "当前平台尚未实现屏幕截图"
+msgstr "Screen capture is not implemented on this platform"
+
+msgid "当前平台尚未实现图像剪贴板"
+msgstr "Image clipboard is not implemented on this platform"
+
+msgid "当前平台尚未实现文字剪贴板"
+msgstr "Text clipboard is not implemented on this platform"
+
+msgid "OCR 结果窗口打开失败"
+msgstr "Failed to open OCR result window"
+
+msgid "没有活动截图"
+msgstr "No active screenshot"
+
+msgid "选区过小"
+msgstr "Selection is too small"
+
+msgid "尚未选择截图区域"
+msgstr "No screenshot area selected"
+
+msgid "图像"
+msgstr "Images"
+
+msgid "替换文件失败"
+msgstr "Failed to replace file"
+
+msgid "无法定位 OCR 程序"
+msgstr "Failed to locate OCR executable"
+
+msgid "无法启动增强 OCR 检测"
+msgstr "Failed to start enhanced OCR check"
+
+msgid "增强 OCR 准备"
+msgstr "Enhanced OCR preparation"
+
+msgid "无法读取增强 OCR 检测结果"
+msgstr "Failed to read enhanced OCR check result"
+
+msgid "增强 OCR 检测结果格式无效"
+msgstr "Invalid enhanced OCR check result"
+
+msgid "无法准备 OCR 图像"
+msgstr "Failed to prepare OCR image"
+
+msgid "无法启动 OCR 子进程"
+msgstr "Failed to start OCR worker"
+
+msgid "无法读取 OCR 结果"
+msgstr "Failed to read OCR result"
+
+msgid "OCR 结果格式无效"
+msgstr "Invalid OCR result format"
+
+msgid "操作超时"
+msgstr "Operation timed out"
+
+msgid "无法获取 OCR 子进程状态"
+msgstr "Failed to get OCR worker status"
+
+msgid "未知 OCR 引擎"
+msgstr "Unknown OCR engine"
+
+msgid "Windows OCR 子进程异常退出"
+msgstr "Windows OCR worker exited unexpectedly"
+
+msgid "无法创建 OCR 临时目录"
+msgstr "Failed to create OCR temporary folder"
+
+msgid "GlobalLock 失败"
+msgstr "GlobalLock failed"
+
+msgid "剪贴板中没有可用图像"
+msgstr "No image is available in the clipboard"
+
+msgid "剪贴板图像数据无效"
+msgstr "Invalid clipboard image data"
+
+msgid "暂不支持该剪贴板图像格式"
+msgstr "Unsupported clipboard image format"
+
+msgid "剪贴板图像数据不完整"
+msgstr "Incomplete clipboard image data"
+
+msgid "虚拟桌面没有可见像素"
+msgstr "Virtual desktop has no visible pixels"
+
+msgid "截图区域没有可见像素"
+msgstr "Screenshot area has no visible pixels"
+
+msgid "截图区域坐标溢出"
+msgstr "Screenshot area coordinates overflow"
+
+msgid "截图区域超出虚拟桌面"
+msgstr "Screenshot area is outside the virtual desktop"
+
+msgid "GetDC 失败"
+msgstr "GetDC failed"
+
+msgid "CreateCompatibleDC 失败"
+msgstr "CreateCompatibleDC failed"
+
+msgid "BitBlt 失败"
+msgstr "BitBlt failed"
+
+msgid "无法在文件夹中显示该文件"
+msgstr "Failed to show file in folder"
+
+msgid "打开目标失败，系统返回代码"
+msgstr "Failed to open target; system code"
+
+msgid "打开开机启动注册表失败"
+msgstr "Failed to open startup registry key"
+
+msgid "无法获取当前程序路径"
+msgstr "Failed to get application path"
+
+msgid "写入开机启动设置失败"
+msgstr "Failed to write startup settings"
+
+msgid "删除开机启动设置失败"
+msgstr "Failed to remove startup settings"
+
+msgid "未知 Windows AI 状态"
+msgstr "Unknown Windows AI state"
+
+msgid "Windows AI OCR 模型准备失败"
+msgstr "Windows AI OCR model preparation failed"
+
+msgid "Cut"
+msgstr "Cut"
+
+msgid "Copy"
+msgstr "Copy"
+
+msgid "Paste"
+msgstr "Paste"
+
+msgid "Select All"
+msgstr "Select All"

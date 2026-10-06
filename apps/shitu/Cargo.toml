@@ -26,5 +26,8 @@ windows-future.workspace = true
 [build-dependencies]
 chrono = { version = "0.4.45", default-features = false, features = ["now"] }
 shi-ui = { path = "../../crates/shi-ui" }
+regex = "1.12.4"
+rspolib = "0.1.2"
+serde_json.workspace = true
 slint-build.workspace = true
 winresource.workspace = true

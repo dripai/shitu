@@ -66,7 +66,7 @@ export component OverlayWindow inherits Window {
     property <length> selection-width: Math.abs(root.current-x - root.start-x) * 1px;
     property <length> selection-height: Math.abs(root.current-y - root.start-y) * 1px;
     property <float> annotation-brush-radius: root.active-tool == 6
-        ? (root.stroke-radius == 1 ? 10 : root.stroke-radius == 4 ? 30 : 18)
+        ? (root.stroke-radius == 1 ? 10 : root.stroke-radius >= 4 ? 30 : 18)
         : 10;
     property <float> source-scale-x: Math.max(1, root.capture-width) / (root.width / 1px);
     property <float> source-scale-y: Math.max(1, root.capture-height) / (root.height / 1px);
@@ -127,6 +127,7 @@ export component OverlayWindow inherits Window {
     callback select-dashed(bool);
     callback select-text-size(int);
     callback select-tool(int);
+    callback delete-annotation();
     callback undo();
     callback redo();
     callback save-output();
@@ -183,6 +184,12 @@ export component OverlayWindow inherits Window {
         height: 0px;
         focus-on-click: false;
         focus-on-tab-navigation: false;
+        KeyBinding {
+            keys: @keys(Delete);
+            enabled: root.completed && root.annotation-selected && !root.text-editing
+                && !root.annotation-drawing && !root.adjusting-selection;
+            activated => { root.delete-annotation(); }
+        }
         KeyBinding {
             keys: @keys(Control + Z);
             enabled: root.completed && !root.text-editing && !root.annotation-drawing && !root.adjusting-selection;

@@ -42,7 +42,7 @@ export component PinWindow inherits Window {
     in-out property <float> text-editor-y: 0;
     in-out property <string> text-editor-value;
     property <float> annotation-brush-radius: root.active-tool == 6
-        ? (root.stroke-radius == 1 ? 10 : root.stroke-radius == 4 ? 30 : 18)
+        ? (root.stroke-radius == 1 ? 10 : root.stroke-radius >= 4 ? 30 : 18)
         : 10;
 
     callback close-pin();
@@ -71,6 +71,7 @@ export component PinWindow inherits Window {
     callback finish-annotation();
     callback cancel-annotation();
     callback add-text(float, float, string, int);
+    callback delete-annotation();
     callback undo();
     callback redo();
 
@@ -91,6 +92,11 @@ export component PinWindow inherits Window {
         height: 0px;
         focus-on-click: false;
         focus-on-tab-navigation: false;
+        KeyBinding {
+            keys: @keys(Delete);
+            enabled: root.annotation-selected && !root.text-editing && !root.drawing;
+            activated => { root.delete-annotation(); }
+        }
         KeyBinding {
             keys: @keys(Control + Z);
             enabled: !root.text-editing && !root.drawing;

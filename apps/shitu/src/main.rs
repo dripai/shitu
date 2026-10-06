@@ -4,11 +4,12 @@ mod app;
 mod capture;
 mod config;
 mod hotkey;
+mod i18n;
 mod image;
 mod output;
 mod platform;
 
-pub use shi_foundation::{i18n, logging};
+pub use shi_foundation::logging;
 
 fn main() -> Result<(), slint::PlatformError> {
     #[cfg(windows)]

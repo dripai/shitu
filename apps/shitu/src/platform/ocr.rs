@@ -8,6 +8,8 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+#[cfg(windows)]
+use crate::config::LanguageMode;
 use crate::{
     config::{OcrConfig, OcrEngineKind},
     i18n,
@@ -75,6 +77,8 @@ const AI_PREPARE_ARGUMENT: &str = "--gridstart-ai-ocr-prepare";
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 #[cfg(windows)]
 const WORKER_TIMEOUT: Duration = Duration::from_secs(30);
+#[cfg(windows)]
+const WORKER_LANGUAGE_ENV: &str = "SHITU_UI_LANGUAGE";
 
 #[cfg(windows)]
 #[derive(Deserialize, Serialize)]
@@ -94,6 +98,23 @@ pub fn worker_exit_code() -> Option<i32> {
     let _executable = arguments.next();
     let command = arguments.next()?;
 
+    if ![WORKER_ARGUMENT, AI_PROBE_ARGUMENT, AI_PREPARE_ARGUMENT]
+        .iter()
+        .any(|argument| command == std::ffi::OsStr::new(argument))
+    {
+        return None;
+    }
+    let Some(language) = std::env::var(WORKER_LANGUAGE_ENV)
+        .ok()
+        .as_deref()
+        .and_then(worker_language)
+    else {
+        return Some(2);
+    };
+    // Worker processes do not create Slint components. Prepare only the Rust
+    // catalog, using the resolved language passed by the parent process.
+    i18n::prepare(language);
+
     if command == std::ffi::OsStr::new(AI_PROBE_ARGUMENT)
         || command == std::ffi::OsStr::new(AI_PREPARE_ARGUMENT)
     {
@@ -109,10 +130,6 @@ pub fn worker_exit_code() -> Option<i32> {
             None => 2,
         });
     }
-    if command != std::ffi::OsStr::new(WORKER_ARGUMENT) {
-        return None;
-    }
-
     let engine = arguments.next();
     let input = arguments.next();
     let output = arguments.next();
@@ -134,22 +151,39 @@ pub fn worker_exit_code() -> Option<i32> {
 #[cfg(windows)]
 fn run_ai_state_isolated(argument: &str, timeout: Duration) -> Result<AiOcrState, OcrFailure> {
     let job = OcrJob::create()?;
-    let executable = std::env::current_exe()
-        .map_err(|error| OcrFailure::Failed(format!("无法定位 OCR 程序：{error}")))?;
-    let mut child = Command::new(executable)
+    let executable = std::env::current_exe().map_err(|error| {
+        OcrFailure::Failed(format!(
+            "{}: {error}",
+            crate::i18n::text("无法定位 OCR 程序")
+        ))
+    })?;
+    let mut child = worker_command(&executable, i18n::current_language())
         .arg(argument)
         .arg(&job.output)
-        .creation_flags(CREATE_NO_WINDOW)
         .spawn()
-        .map_err(|error| OcrFailure::Failed(format!("无法启动增强 OCR 检测：{error}")))?;
-    let status = wait_for_worker(&mut child, "增强 OCR 准备", timeout)?;
+        .map_err(|error| {
+            OcrFailure::Failed(format!(
+                "{}: {error}",
+                crate::i18n::text("无法启动增强 OCR 检测")
+            ))
+        })?;
+    let status = wait_for_worker(&mut child, crate::i18n::text("增强 OCR 准备"), timeout)?;
     if !status.success() {
         return Err(OcrFailure::Failed(format_worker_failure(status)));
     }
-    let response = fs::read(&job.output)
-        .map_err(|error| OcrFailure::Failed(format!("无法读取增强 OCR 检测结果：{error}")))?;
+    let response = fs::read(&job.output).map_err(|error| {
+        OcrFailure::Failed(format!(
+            "{}: {error}",
+            crate::i18n::text("无法读取增强 OCR 检测结果")
+        ))
+    })?;
     serde_json::from_slice::<AiProbeResponse>(&response)
-        .map_err(|error| OcrFailure::Failed(format!("增强 OCR 检测结果格式无效：{error}")))?
+        .map_err(|error| {
+            OcrFailure::Failed(format!(
+                "{}: {error}",
+                crate::i18n::text("增强 OCR 检测结果格式无效")
+            ))
+        })?
         .result
 }
 
@@ -168,11 +202,20 @@ fn recognize_isolated(
         image::ColorType::Rgba8,
         image::ImageFormat::Png,
     )
-    .map_err(|error| OcrFailure::Failed(format!("无法准备 OCR 图像：{error}")))?;
+    .map_err(|error| {
+        OcrFailure::Failed(format!(
+            "{}: {error}",
+            crate::i18n::text("无法准备 OCR 图像")
+        ))
+    })?;
 
-    let executable = std::env::current_exe()
-        .map_err(|error| OcrFailure::Failed(format!("无法定位 OCR 程序：{error}")))?;
-    let mut child = Command::new(executable)
+    let executable = std::env::current_exe().map_err(|error| {
+        OcrFailure::Failed(format!(
+            "{}: {error}",
+            crate::i18n::text("无法定位 OCR 程序")
+        ))
+    })?;
+    let mut child = worker_command(&executable, i18n::current_language())
         .arg(WORKER_ARGUMENT)
         .arg(match engine {
             OcrEngineKind::System => "system",
@@ -181,20 +224,56 @@ fn recognize_isolated(
         .arg(&job.input)
         .arg(&job.output)
         .arg(minimum_confidence.clamp(0, 100).to_string())
-        .creation_flags(CREATE_NO_WINDOW)
         .spawn()
-        .map_err(|error| OcrFailure::Failed(format!("无法启动 OCR 子进程：{error}")))?;
+        .map_err(|error| {
+            OcrFailure::Failed(format!(
+                "{}: {error}",
+                crate::i18n::text("无法启动 OCR 子进程")
+            ))
+        })?;
 
-    let status = wait_for_worker(&mut child, "OCR 识别", WORKER_TIMEOUT)?;
+    let status = wait_for_worker(&mut child, i18n::text("OCR 识别"), WORKER_TIMEOUT)?;
 
     if !status.success() {
         return Err(OcrFailure::Failed(format_worker_failure(status)));
     }
-    let response = fs::read(&job.output)
-        .map_err(|error| OcrFailure::Failed(format!("无法读取 OCR 结果：{error}")))?;
+    let response = fs::read(&job.output).map_err(|error| {
+        OcrFailure::Failed(format!(
+            "{}: {error}",
+            crate::i18n::text("无法读取 OCR 结果")
+        ))
+    })?;
     serde_json::from_slice::<WorkerResponse>(&response)
-        .map_err(|error| OcrFailure::Failed(format!("OCR 结果格式无效：{error}")))?
+        .map_err(|error| {
+            OcrFailure::Failed(format!(
+                "{}: {error}",
+                crate::i18n::text("OCR 结果格式无效")
+            ))
+        })?
         .result
+}
+
+#[cfg(windows)]
+fn worker_command(executable: &Path, language: LanguageMode) -> Command {
+    assert_ne!(
+        language,
+        LanguageMode::System,
+        "worker language must be resolved"
+    );
+    let mut command = Command::new(executable);
+    command.env(
+        WORKER_LANGUAGE_ENV,
+        serde_json::to_string(&language).expect("serialize OCR worker language"),
+    );
+    command.creation_flags(CREATE_NO_WINDOW);
+    command
+}
+
+#[cfg(windows)]
+fn worker_language(value: &str) -> Option<LanguageMode> {
+    serde_json::from_str(value)
+        .ok()
+        .filter(|language| *language != LanguageMode::System)
 }
 
 #[cfg(windows)]
@@ -213,13 +292,17 @@ fn wait_for_worker(
             Ok(None) => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(OcrFailure::Failed(format!("{operation}超时")));
+                return Err(OcrFailure::Failed(format!(
+                    "{operation}: {}",
+                    i18n::text("操作超时")
+                )));
             }
             Err(error) => {
                 let _ = child.kill();
                 let _ = child.wait();
                 return Err(OcrFailure::Failed(format!(
-                    "无法获取 OCR 子进程状态：{error}"
+                    "{}: {error}",
+                    crate::i18n::text("无法获取 OCR 子进程状态")
                 )));
             }
         }
@@ -238,7 +321,9 @@ fn run_worker(
         .and_then(|image| match engine.to_string_lossy().as_ref() {
             "system" => super::windows::ocr::WindowsOcrEngine.recognize(&image),
             "windows_ai" => super::windows::windows_ai_ocr::recognize(&image, minimum_confidence),
-            _ => Err(OcrFailure::Failed("未知 OCR 引擎".to_owned())),
+            _ => Err(OcrFailure::Failed(
+                crate::i18n::text("未知 OCR 引擎").to_owned(),
+            )),
         });
     let response = WorkerResponse { result };
     match serde_json::to_vec(&response)
@@ -271,8 +356,12 @@ fn run_ai_state_worker(output: &Path, prepare: bool) -> i32 {
 #[cfg(windows)]
 fn format_worker_failure(status: ExitStatus) -> String {
     match status.code() {
-        Some(code) => format!("Windows OCR 子进程异常退出（0x{:08X}）", code as u32),
-        None => "Windows OCR 子进程异常退出".to_owned(),
+        Some(code) => format!(
+            "{} (0x{:08X})",
+            i18n::text("Windows OCR 子进程异常退出"),
+            code as u32
+        ),
+        None => crate::i18n::text("Windows OCR 子进程异常退出").to_owned(),
     }
 }
 
@@ -292,8 +381,12 @@ impl OcrJob {
             .as_nanos();
         let directory =
             std::env::temp_dir().join(format!("gridstart-ocr-{}-{nonce}", std::process::id()));
-        fs::create_dir(&directory)
-            .map_err(|error| OcrFailure::Failed(format!("无法创建 OCR 临时目录：{error}")))?;
+        fs::create_dir(&directory).map_err(|error| {
+            OcrFailure::Failed(format!(
+                "{}: {error}",
+                crate::i18n::text("无法创建 OCR 临时目录")
+            ))
+        })?;
         Ok(Self {
             input: directory.join("input.png"),
             output: directory.join("result.json"),
@@ -312,19 +405,13 @@ impl Drop for OcrJob {
 impl OcrFailure {
     pub fn message(&self) -> String {
         match self {
-            Self::MissingLanguagePack => i18n::text(
-                "缺少可用的 Windows OCR 语言包",
-                "No compatible Windows OCR language pack is installed",
-            )
-            .to_owned(),
-            Self::Unsupported => i18n::text(
-                "当前系统或程序安装方式不支持 Windows 系统 OCR",
-                "Windows system OCR is not supported by this system or installation",
-            )
-            .to_owned(),
+            Self::MissingLanguagePack => i18n::text("缺少可用的 Windows OCR 语言包").to_owned(),
+            Self::Unsupported => {
+                i18n::text("当前系统或程序安装方式不支持 Windows 系统 OCR").to_owned()
+            }
             Self::AiUnavailable(state) => state.message(),
             Self::Failed(message) if message.trim().is_empty() => {
-                i18n::text("OCR 识别失败", "OCR failed").to_owned()
+                i18n::text("OCR 识别失败").to_owned()
             }
             Self::Failed(message) => message.clone(),
         }
@@ -342,45 +429,45 @@ impl AiOcrState {
 
     pub fn message(&self) -> String {
         match self {
-            Self::Ready => i18n::text(
-                "可用（Windows AI OCR）",
-                "Available (Windows AI OCR)",
-            )
-            .to_owned(),
-            Self::Checking => i18n::text(
-                "正在检测 Windows AI OCR...",
-                "Checking Windows AI OCR availability...",
-            )
-            .to_owned(),
-            Self::Preparing => i18n::text(
-                "正在下载并准备识别模型...",
-                "Downloading and preparing the recognition model...",
-            )
-            .to_owned(),
-            Self::ModelNotInstalled => i18n::text(
-                "支持，但识别模型尚未安装",
-                "Supported, but the recognition model is not installed",
-            )
-            .to_owned(),
-            Self::Unsupported => i18n::text(
-                "当前系统、硬件、驱动或策略不支持 Windows AI OCR",
-                "Windows AI OCR is not supported by the current system, hardware, driver, or policy",
-            )
-            .to_owned(),
-            Self::DisabledByUser => i18n::text(
-                "Windows AI 功能已被用户禁用",
-                "Windows AI features were disabled by the user",
-            )
-            .to_owned(),
-            Self::ComponentMissing => i18n::text(
-                "Windows AI OCR 组件或包身份不可用",
-                "The Windows AI OCR component or package identity is unavailable",
-            )
-            .to_owned(),
-            Self::Failed(message) => format!(
-                "{}: {message}",
-                i18n::text("Windows AI OCR 检测失败", "Windows AI OCR check failed")
-            ),
+            Self::Ready => i18n::text("可用（Windows AI OCR）").to_owned(),
+            Self::Checking => i18n::text("正在检测 Windows AI OCR...").to_owned(),
+            Self::Preparing => i18n::text("正在下载并准备识别模型...").to_owned(),
+            Self::ModelNotInstalled => i18n::text("支持，但识别模型尚未安装").to_owned(),
+            Self::Unsupported => {
+                i18n::text("当前系统、硬件、驱动或策略不支持 Windows AI OCR").to_owned()
+            }
+            Self::DisabledByUser => i18n::text("Windows AI 功能已被用户禁用").to_owned(),
+            Self::ComponentMissing => i18n::text("Windows AI OCR 组件或包身份不可用").to_owned(),
+            Self::Failed(message) => {
+                format!("{}: {message}", i18n::text("Windows AI OCR 检测失败"))
+            }
+        }
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::{LanguageMode, WORKER_LANGUAGE_ENV, worker_command, worker_language};
+
+    #[test]
+    fn ocr_worker_inherits_every_resolved_language() {
+        for mode in LanguageMode::ALL[1..].iter().copied() {
+            let command = worker_command(std::path::Path::new("ShiTu.exe"), mode);
+            let value = command
+                .get_envs()
+                .find(|(key, _)| *key == WORKER_LANGUAGE_ENV)
+                .and_then(|(_, value)| value)
+                .unwrap()
+                .to_str()
+                .unwrap();
+            assert_eq!(worker_language(value), Some(mode));
+        }
+    }
+
+    #[test]
+    fn invalid_or_unresolved_worker_languages_are_rejected() {
+        for value in ["", "\"system\"", "\"unknown\"", "ru"] {
+            assert_eq!(worker_language(value), None);
         }
     }
 }

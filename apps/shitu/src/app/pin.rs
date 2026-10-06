@@ -197,6 +197,7 @@ enum PinCommand {
     FinishAnnotation,
     CancelAnnotation,
     AddText(f32, f32, String, i32),
+    DeleteAnnotation,
     Undo,
     Redo,
     SetColor(i32),
@@ -316,6 +317,7 @@ impl PinController {
                 controller.dispatch(PinCommand::AddText(x, y, text.to_string(), font_size));
             });
         }
+        bind!(on_delete_annotation, PinCommand::DeleteAnnotation);
         bind!(on_undo, PinCommand::Undo);
         bind!(on_redo, PinCommand::Redo);
 
@@ -405,6 +407,7 @@ impl PinController {
             PinCommand::FinishAnnotation => self.finish_annotation(),
             PinCommand::CancelAnnotation => self.cancel_annotation(),
             PinCommand::AddText(x, y, text, font_size) => self.add_text(x, y, &text, font_size),
+            PinCommand::DeleteAnnotation => self.delete_annotation(),
             PinCommand::Undo => self.undo(),
             PinCommand::Redo => self.redo(),
             PinCommand::SetColor(index) => self.set_color(index),
@@ -472,10 +475,7 @@ impl PinController {
             toolbar.set_active_tool(0);
             logging::error(format!("Pin toolbar show failed: {error}"));
             self.status(
-                format!(
-                    "{}: {error}",
-                    i18n::text("工具栏显示失败", "Failed to show toolbar")
-                ),
+                format!("{}: {error}", i18n::text("工具栏显示失败")),
                 StatusLevel::Error,
             );
             return;
@@ -582,7 +582,7 @@ impl PinController {
             .borrow()
             .rendered_image()
             .and_then(|image| capture::copy_to_clipboard(&image));
-        self.report(result, i18n::text("已复制钉住图像", "Copied pinned image"));
+        self.report(result, i18n::text("已复制钉住图像"));
     }
 
     fn save(&self) {
@@ -607,20 +607,13 @@ impl PinController {
                 self.state.borrow_mut().source_path = Some(path.clone());
                 pin.set_has_source_file(true);
                 self.status(
-                    format!(
-                        "{} {}",
-                        i18n::text("图像已保存到", "Image saved to"),
-                        path.display()
-                    ),
+                    format!("{} {}", i18n::text("图像已保存到"), path.display()),
                     StatusLevel::Success,
                 );
             }
             Ok(None) => {}
             Err(error) => self.status(
-                format!(
-                    "{}: {error}",
-                    i18n::text("图像保存失败", "Failed to save image")
-                ),
+                format!("{}: {error}", i18n::text("图像保存失败")),
                 StatusLevel::Error,
             ),
         }
@@ -630,10 +623,7 @@ impl PinController {
         let Some(pin) = self.pin.upgrade() else {
             return;
         };
-        self.status(
-            i18n::text("正在识别文字...", "Recognizing text...").to_owned(),
-            StatusLevel::Info,
-        );
+        self.status(i18n::text("正在识别文字...").to_owned(), StatusLevel::Info);
         let (image, config) = {
             let state = self.state.borrow();
             (state.image.clone(), state.ocr_config.clone())
@@ -690,6 +680,18 @@ impl PinController {
                 .add_text(point, text, style, font_size.clamp(8, 96) as u32);
         }
         self.refresh_annotations();
+    }
+
+    fn delete_annotation(&self) {
+        if let Some(pin) = self.pin.upgrade()
+            && (pin.get_text_editing() || pin.get_drawing())
+        {
+            return;
+        }
+        let deleted = self.state.borrow_mut().annotations.delete_selected();
+        if deleted {
+            self.refresh_annotations();
+        }
     }
 
     fn undo(&self) {
@@ -790,40 +792,27 @@ impl PinController {
             0 => {
                 let Some(app) = self.app.upgrade() else {
                     self.status(
-                        i18n::text(
-                            "OCR 结果窗口已不可用",
-                            "The OCR result window is unavailable",
-                        )
-                        .to_owned(),
+                        i18n::text("OCR 结果窗口已不可用").to_owned(),
                         StatusLevel::Error,
                     );
                     return;
                 };
                 let result_window = app.borrow().ocr_result.clone();
                 match present_ocr_result(&result_window, text) {
-                    Ok(()) => self.status(
-                        i18n::text("OCR 识别完成", "OCR completed").to_owned(),
-                        StatusLevel::Success,
-                    ),
-                    Err(error) => {
-                        self.status(format!("OCR 结果窗口打开失败：{error}"), StatusLevel::Error)
+                    Ok(()) => {
+                        self.status(i18n::text("OCR 识别完成").to_owned(), StatusLevel::Success)
                     }
+                    Err(error) => self.status(
+                        format!("{}: {error}", crate::i18n::text("OCR 结果窗口打开失败")),
+                        StatusLevel::Error,
+                    ),
                 }
             }
-            1 => self.status(
-                i18n::text("未识别到文字", "No text was recognized").to_owned(),
-                StatusLevel::Info,
-            ),
-            2 => self.show_ocr_error(i18n::text(
-                "缺少可用的 Windows OCR 语言包",
-                "No compatible Windows OCR language pack is installed",
-            )),
-            3 => self.show_ocr_error(i18n::text(
-                "当前系统或程序安装方式不支持 Windows 系统 OCR",
-                "Windows system OCR is not supported by this system or installation",
-            )),
+            1 => self.status(i18n::text("未识别到文字").to_owned(), StatusLevel::Info),
+            2 => self.show_ocr_error(i18n::text("缺少可用的 Windows OCR 语言包")),
+            3 => self.show_ocr_error(i18n::text("当前系统或程序安装方式不支持 Windows 系统 OCR")),
             _ => self.show_ocr_error(if text.is_empty() {
-                i18n::text("OCR 识别失败", "OCR failed")
+                i18n::text("OCR 识别失败")
             } else {
                 text
             }),
@@ -839,7 +828,7 @@ impl PinController {
             }
         }
         self.status(
-            format!("{}: {message}", i18n::text("OCR 识别失败", "OCR failed")),
+            format!("{}: {message}", i18n::text("OCR 识别失败")),
             StatusLevel::Error,
         );
     }
@@ -915,15 +904,12 @@ impl PinController {
                 self.reset_toolbar_tool();
                 self.position_toolbar();
                 self.status(
-                    i18n::text("已从剪贴板替换图像", "Image replaced from clipboard").to_owned(),
+                    i18n::text("已从剪贴板替换图像").to_owned(),
                     StatusLevel::Success,
                 );
             }
             Err(error) => self.status(
-                format!(
-                    "{}: {error}",
-                    i18n::text("替换图像失败", "Failed to replace image")
-                ),
+                format!("{}: {error}", i18n::text("替换图像失败")),
                 StatusLevel::Error,
             ),
         }
@@ -934,7 +920,7 @@ impl PinController {
             return;
         };
         let Some(path) = rfd::FileDialog::new()
-            .add_filter("图像", &["png", "jpg", "jpeg"])
+            .add_filter(crate::i18n::text("图像"), &["png", "jpg", "jpeg"])
             .pick_file()
         else {
             return;
@@ -946,15 +932,12 @@ impl PinController {
                 self.reset_toolbar_tool();
                 self.position_toolbar();
                 self.status(
-                    i18n::text("已从文件替换图像", "Image replaced from file").to_owned(),
+                    i18n::text("已从文件替换图像").to_owned(),
                     StatusLevel::Success,
                 );
             }
             Err(error) => self.status(
-                format!(
-                    "{}: {error}",
-                    i18n::text("替换图像失败", "Failed to replace image")
-                ),
+                format!("{}: {error}", i18n::text("替换图像失败")),
                 StatusLevel::Error,
             ),
         }
@@ -964,12 +947,9 @@ impl PinController {
         match self.state.borrow().source_path.clone() {
             Some(path) => self.report(
                 shell::reveal_in_folder(&path),
-                i18n::text("已在文件夹中显示", "Shown in folder"),
+                i18n::text("已在文件夹中显示"),
             ),
-            None => self.status(
-                i18n::text("当前图像尚未保存", "The current image has not been saved").to_owned(),
-                StatusLevel::Info,
-            ),
+            None => self.status(i18n::text("当前图像尚未保存").to_owned(), StatusLevel::Info),
         }
     }
 
@@ -981,10 +961,7 @@ impl PinController {
             Ok(image) => image,
             Err(error) => {
                 self.status(
-                    format!(
-                        "{}: {error}",
-                        i18n::text("图像处理失败", "Image processing failed")
-                    ),
+                    format!("{}: {error}", i18n::text("图像处理失败")),
                     StatusLevel::Error,
                 );
                 return;
@@ -999,14 +976,10 @@ impl PinController {
                 PinTransform::FlipVertical => rendered.flip_vertical(),
             };
             let message = match transform {
-                PinTransform::RotateLeft => i18n::text("图像已向左旋转", "Image rotated left"),
-                PinTransform::RotateRight => i18n::text("图像已向右旋转", "Image rotated right"),
-                PinTransform::FlipHorizontal => {
-                    i18n::text("图像已水平翻转", "Image flipped horizontally")
-                }
-                PinTransform::FlipVertical => {
-                    i18n::text("图像已垂直翻转", "Image flipped vertically")
-                }
+                PinTransform::RotateLeft => i18n::text("图像已向左旋转"),
+                PinTransform::RotateRight => i18n::text("图像已向右旋转"),
+                PinTransform::FlipHorizontal => i18n::text("图像已水平翻转"),
+                PinTransform::FlipVertical => i18n::text("图像已垂直翻转"),
             };
             (image, state.source_path.clone(), message)
         };
@@ -1035,10 +1008,7 @@ impl PinController {
             toolbar.set_active_tool(0);
             logging::error(format!("Pin toolbar placement failed: {error}"));
             self.status(
-                format!(
-                    "{}: {error}",
-                    i18n::text("工具栏定位失败", "Toolbar placement failed")
-                ),
+                format!("{}: {error}", i18n::text("工具栏定位失败")),
                 StatusLevel::Error,
             );
         }
@@ -1048,7 +1018,7 @@ impl PinController {
         match result {
             Ok(()) => self.status(success.to_owned(), StatusLevel::Success),
             Err(error) => self.status(
-                format!("{}: {error}", i18n::text("操作失败", "Operation failed")),
+                format!("{}: {error}", i18n::text("操作失败")),
                 StatusLevel::Error,
             ),
         }

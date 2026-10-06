@@ -152,10 +152,7 @@ impl CapturedImage {
     pub fn from_rgba(left: i32, top: i32, width: u32, height: u32, rgba: &[u8]) -> Result<Self> {
         let expected = width as usize * height as usize * 4;
         if width == 0 || height == 0 || rgba.len() != expected {
-            return Err(anyhow!(i18n::text(
-                "图像像素尺寸无效",
-                "Invalid image pixel dimensions"
-            )));
+            return Err(anyhow!(i18n::text("图像像素尺寸无效")));
         }
         let mut pixels = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
         for (source, target) in rgba.chunks_exact(4).zip(pixels.make_mut_slice()) {
@@ -179,13 +176,7 @@ impl CapturedImage {
 
     pub fn from_file(path: &Path, left: i32, top: i32) -> Result<Self> {
         let image = image::open(path)
-            .with_context(|| {
-                format!(
-                    "{}: {}",
-                    i18n::text("无法读取图像", "Failed to read image"),
-                    path.display()
-                )
-            })?
+            .with_context(|| format!("{}: {}", i18n::text("无法读取图像"), path.display()))?
             .to_rgba8();
         Self::from_rgba(left, top, image.width(), image.height(), image.as_raw())
     }
@@ -243,10 +234,7 @@ impl CapturedImage {
         _font_size: u32,
         _rgba: [u8; 4],
     ) -> Result<()> {
-        Err(anyhow!(i18n::text(
-            "当前平台尚未实现文字标注",
-            "Text annotation is not implemented on this platform"
-        )))
+        Err(anyhow!(i18n::text("当前平台尚未实现文字标注")))
     }
 
     pub fn pixelate_stroke(&mut self, points: &[(u32, u32)], radius: u32, block_size: u32) {
@@ -389,23 +377,14 @@ impl CapturedImage {
     }
 
     pub fn crop(&self, left: u32, top: u32, width: u32, height: u32) -> Result<Self> {
-        let right = left.checked_add(width).ok_or_else(|| {
-            anyhow!(i18n::text(
-                "图像裁剪坐标溢出",
-                "Image crop coordinates overflow"
-            ))
-        })?;
-        let bottom = top.checked_add(height).ok_or_else(|| {
-            anyhow!(i18n::text(
-                "图像裁剪坐标溢出",
-                "Image crop coordinates overflow"
-            ))
-        })?;
+        let right = left
+            .checked_add(width)
+            .ok_or_else(|| anyhow!(i18n::text("图像裁剪坐标溢出")))?;
+        let bottom = top
+            .checked_add(height)
+            .ok_or_else(|| anyhow!(i18n::text("图像裁剪坐标溢出")))?;
         if width == 0 || height == 0 || right > self.width() || bottom > self.height() {
-            return Err(anyhow!(i18n::text(
-                "图像裁剪区域无效",
-                "Invalid image crop area"
-            )));
+            return Err(anyhow!(i18n::text("图像裁剪区域无效")));
         }
 
         let mut pixels = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);

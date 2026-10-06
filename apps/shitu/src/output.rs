@@ -22,7 +22,7 @@ pub fn save_quick(image: &CapturedImage, config: &CaptureConfig) -> Result<PathB
     fs::create_dir_all(&config.save_directory).with_context(|| {
         format!(
             "{}: {}",
-            i18n::text("创建截图保存目录失败", "Failed to create screenshot folder"),
+            i18n::text("创建截图保存目录失败"),
             config.save_directory.display()
         )
     })?;
@@ -50,8 +50,8 @@ pub fn save_as_dialog(
         .set_parent(&parent_handle)
         .set_directory(initial_directory)
         .set_file_name(default_name)
-        .add_filter(i18n::text("PNG 图像", "PNG image"), &["png"])
-        .add_filter(i18n::text("JPEG 图像", "JPEG image"), &["jpg", "jpeg"]);
+        .add_filter(i18n::text("PNG 图像"), &["png"])
+        .add_filter(i18n::text("JPEG 图像"), &["jpg", "jpeg"]);
     let Some(mut path) = dialog.save_file() else {
         return Ok(None);
     };
@@ -74,13 +74,8 @@ pub fn save_to_path(
     jpeg_quality: u8,
 ) -> Result<()> {
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).with_context(|| {
-            format!(
-                "{}: {}",
-                i18n::text("创建目录失败", "Failed to create folder"),
-                parent.display()
-            )
-        })?;
+        fs::create_dir_all(parent)
+            .with_context(|| format!("{}: {}", i18n::text("创建目录失败"), parent.display()))?;
     }
     let temp_path = temporary_path(path);
     let result = encode_to_path(image, &temp_path, format, jpeg_quality)
@@ -97,13 +92,8 @@ fn encode_to_path(
     format: ImageFormat,
     jpeg_quality: u8,
 ) -> Result<()> {
-    let file = File::create(path).with_context(|| {
-        format!(
-            "{}: {}",
-            i18n::text("创建图像文件失败", "Failed to create image file"),
-            path.display()
-        )
-    })?;
+    let file = File::create(path)
+        .with_context(|| format!("{}: {}", i18n::text("创建图像文件失败"), path.display()))?;
     let mut writer = BufWriter::new(file);
     let rgba = image.rgba_bytes();
 
@@ -115,7 +105,7 @@ fn encode_to_path(
                 image.height(),
                 ExtendedColorType::Rgba8,
             )
-            .context(i18n::text("PNG 编码失败", "PNG encoding failed"))?,
+            .context(i18n::text("PNG 编码失败"))?,
         ImageFormat::Jpeg => {
             let mut rgb = Vec::with_capacity(image.width() as usize * image.height() as usize * 3);
             for pixel in rgba.chunks_exact(4) {
@@ -127,16 +117,14 @@ fn encode_to_path(
             }
             JpegEncoder::new_with_quality(&mut writer, jpeg_quality.clamp(1, 100))
                 .encode(&rgb, image.width(), image.height(), ExtendedColorType::Rgb8)
-                .context(i18n::text("JPEG 编码失败", "JPEG encoding failed"))?;
+                .context(i18n::text("JPEG 编码失败"))?;
         }
     }
-    writer
-        .flush()
-        .context(i18n::text("写入图像文件失败", "Failed to write image file"))?;
+    writer.flush().context(i18n::text("写入图像文件失败"))?;
     writer
         .get_ref()
         .sync_all()
-        .context(i18n::text("同步图像文件失败", "Failed to flush image file"))?;
+        .context(i18n::text("同步图像文件失败"))?;
     Ok(())
 }
 

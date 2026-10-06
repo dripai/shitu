@@ -32,10 +32,13 @@ pub fn set_enabled(enabled: bool, start_minimized: bool) -> Result<()> {
             None,
         )
     };
-    status.ok().context("打开开机启动注册表失败")?;
+    status
+        .ok()
+        .context(crate::i18n::text("打开开机启动注册表失败"))?;
 
     let result = if enabled {
-        let executable = std::env::current_exe().context("无法获取当前程序路径")?;
+        let executable =
+            std::env::current_exe().context(crate::i18n::text("无法获取当前程序路径"))?;
         let command = startup_command(&executable, start_minimized);
         let wide_command: Vec<u16> = command.encode_utf16().chain(std::iter::once(0)).collect();
         let bytes = unsafe {
@@ -47,14 +50,16 @@ pub fn set_enabled(enabled: bool, start_minimized: bool) -> Result<()> {
         let name = wide(VALUE_NAME);
         unsafe { RegSetValueExW(key, PCWSTR(name.as_ptr()), None, REG_SZ, Some(bytes)) }
             .ok()
-            .context("写入开机启动设置失败")
+            .context(crate::i18n::text("写入开机启动设置失败"))
     } else {
         let name = wide(VALUE_NAME);
         let status = unsafe { RegDeleteValueW(key, PCWSTR(name.as_ptr())) };
         if status == ERROR_FILE_NOT_FOUND {
             Ok(())
         } else {
-            status.ok().context("删除开机启动设置失败")
+            status
+                .ok()
+                .context(crate::i18n::text("删除开机启动设置失败"))
         }
     };
     unsafe {

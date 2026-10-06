@@ -1,0 +1,827 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: shitu\n"
+"Language: ja\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "取消截图"
+msgstr "スクリーンショットをキャンセル"
+
+msgid "撤销上一步操作"
+msgstr "元に戻す"
+
+msgid "重做上一步操作"
+msgstr "やり直す"
+
+msgid "画笔标注"
+msgstr "ペン"
+
+msgid "选择 / 编辑标注"
+msgstr "注釈を選択 / 編集"
+
+msgid "绘制矩形"
+msgstr "長方形"
+
+msgid "绘制圆形 / 椭圆"
+msgstr "円 / 楕円"
+
+msgid "绘制箭头"
+msgstr "矢印"
+
+msgid "添加文字"
+msgstr "テキスト"
+
+msgid "擦除标注"
+msgstr "消しゴム"
+
+msgid "添加马赛克"
+msgstr "モザイク"
+
+msgid "识别选区文字"
+msgstr "選択範囲の文字を認識"
+
+msgid "识别图像文字"
+msgstr "画像の文字を認識"
+
+msgid "将截图钉在屏幕上"
+msgstr "スクリーンショットをピン留め"
+
+msgid "保存截图到文件"
+msgstr "スクリーンショットを保存"
+
+msgid "复制截图到剪贴板"
+msgstr "スクリーンショットをクリップボードにコピー"
+
+msgid "红色"
+msgstr "赤"
+
+msgid "蓝色"
+msgstr "青"
+
+msgid "绿色"
+msgstr "緑"
+
+msgid "黄色"
+msgstr "黄"
+
+msgid "橙色"
+msgstr "オレンジ"
+
+msgid "紫色"
+msgstr "紫"
+
+msgid "粉色"
+msgstr "ピンク"
+
+msgid "青色"
+msgstr "シアン"
+
+msgid "黑色"
+msgstr "黒"
+
+msgid "白色"
+msgstr "白"
+
+msgid "灰色"
+msgstr "グレー"
+
+msgid "棕色"
+msgstr "茶"
+
+msgid "线宽"
+msgstr "線の太さ"
+
+msgid "文字大小"
+msgstr "文字サイズ"
+
+msgid "马赛克大小"
+msgstr "モザイクサイズ"
+
+msgid "边框样式"
+msgstr "枠線のスタイル"
+
+msgid "拾图"
+msgstr "ShiTu"
+
+msgid "就绪"
+msgstr "準備完了"
+
+msgid "OCR 识别结果"
+msgstr "OCR 認識結果"
+
+msgid "可选择文字，或复制全部内容。"
+msgstr "文字を選択するか、すべてコピーできます。"
+
+msgid "识别结果"
+msgstr "認識結果"
+
+msgid "复制全部"
+msgstr "すべてコピー"
+
+msgid "关闭"
+msgstr "閉じる"
+
+msgid "选择截图区域"
+msgstr "スクリーンショットの範囲を選択"
+
+msgid "钉住工具栏"
+msgstr "ピン留め画像のツールバー"
+
+msgid "图像另存为..."
+msgstr "画像に名前を付けて保存..."
+
+msgid "复制图像"
+msgstr "画像をコピー"
+
+msgid "关闭钉住"
+msgstr "ピン留め画像を閉じる"
+
+msgid "钉住"
+msgstr "ピン留め"
+
+msgid "钉住图像"
+msgstr "ピン留め画像"
+
+msgid "OCR 识别"
+msgstr "OCR"
+
+msgid "显示工具栏"
+msgstr "ツールバーを表示"
+
+msgid "窗口阴影"
+msgstr "ウィンドウの影"
+
+msgid "始终置顶"
+msgstr "常に最前面"
+
+msgid "不透明度"
+msgstr "不透明度"
+
+msgid "缩放（{}%）"
+msgstr "ズーム（{}%）"
+
+msgid "适合屏幕"
+msgstr "画面に合わせる"
+
+msgid "恢复原始大小"
+msgstr "元のサイズ"
+
+msgid "图像处理"
+msgstr "画像の変換"
+
+msgid "向左旋转 90°"
+msgstr "左に 90° 回転"
+
+msgid "向右旋转 90°"
+msgstr "右に 90° 回転"
+
+msgid "水平翻转"
+msgstr "左右反転"
+
+msgid "垂直翻转"
+msgstr "上下反転"
+
+msgid "替换图像"
+msgstr "画像を置き換え"
+
+msgid "从剪贴板"
+msgstr "クリップボードから"
+
+msgid "从文件..."
+msgstr "ファイルから..."
+
+msgid "在文件夹中显示"
+msgstr "フォルダー内で表示"
+
+msgid "原始尺寸：{}"
+msgstr "元のサイズ：{}"
+
+msgid "应用"
+msgstr "アプリ"
+
+msgid "开机启动"
+msgstr "ログイン時に起動"
+
+msgid "启动最小化"
+msgstr "最小化して起動"
+
+msgid "外观模式"
+msgstr "外観"
+
+msgid "跟随系统"
+msgstr "システムに合わせる"
+
+msgid "浅色"
+msgstr "ライト"
+
+msgid "深色"
+msgstr "ダーク"
+
+msgid "界面语言"
+msgstr "表示言語"
+
+msgid "简体中文"
+msgstr "簡体字中国語"
+
+msgid "文件与诊断"
+msgstr "ファイルと診断"
+
+msgid "打开日志"
+msgstr "ログを開く"
+
+msgid "打开配置"
+msgstr "設定を開く"
+
+msgid "输出"
+msgstr "出力"
+
+msgid "图像格式"
+msgstr "画像形式"
+
+msgid "质量"
+msgstr "品質"
+
+msgid "无损"
+msgstr "ロスレス"
+
+msgid "保存目录"
+msgstr "保存先"
+
+msgid "选择..."
+msgstr "参照..."
+
+msgid "打开目录"
+msgstr "フォルダーを開く"
+
+msgid "文件名模板"
+msgstr "ファイル名テンプレート"
+
+msgid "自动保存（执行复制或钉住时同时保存）"
+msgstr "コピー・ピン留め時に自動保存"
+
+msgid "显示保存结果"
+msgstr "保存結果を表示"
+
+msgid "识别引擎"
+msgstr "認識エンジン"
+
+msgid "默认引擎"
+msgstr "既定のエンジン"
+
+msgid "兼容系统 OCR"
+msgstr "システム OCR（互換）"
+
+msgid "Windows AI OCR（增强）"
+msgstr "Windows AI OCR（拡張）"
+
+msgid "兼容 OCR"
+msgstr "システム OCR"
+
+msgid "增强 OCR"
+msgstr "拡張 OCR"
+
+msgid "安装模型"
+msgstr "モデルをインストール"
+
+msgid "增强 OCR 输出"
+msgstr "拡張 OCR の出力"
+
+msgid "最低置信度"
+msgstr "最低信頼度"
+
+msgid "仅过滤 Windows AI OCR 返回的低置信度词语。"
+msgstr "Windows AI OCR が返した信頼度の低い単語のみ除外します。"
+
+msgid "新建钉住窗口"
+msgstr "新しいピン留め画像"
+
+msgid "默认不透明度"
+msgstr "既定の不透明度"
+
+msgid "启用滚轮缩放"
+msgstr "ホイールでズーム"
+
+msgid "缩放步长"
+msgstr "ズームの刻み"
+
+msgid "双击关闭"
+msgstr "ダブルクリックで閉じる"
+
+msgid "全局快捷键"
+msgstr "グローバルホットキー"
+
+msgid "区域截图"
+msgstr "範囲を指定して撮影"
+
+msgid "默认 Ctrl+Alt+C；留空则关闭"
+msgstr "既定：Ctrl+Alt+C、空欄で無効"
+
+msgid "清除"
+msgstr "クリア"
+
+msgid "未设置时不会注册任何全局快捷键。"
+msgstr "空欄の場合、グローバルホットキーは登録されません。"
+
+msgid "一款轻量、便捷的截图、标注与钉图工具。"
+msgstr "スクリーンショット・注釈・ピン留めを手軽に行える軽量ツール。"
+
+msgid "作者："
+msgstr "作者："
+
+msgid "使用 Rust 与 Slint 构建 · © 2026"
+msgstr "Rust と Slint で開発 · © 2026"
+
+msgid "常规"
+msgstr "一般"
+
+msgid "截图"
+msgstr "撮影"
+
+msgid "快捷键"
+msgstr "ホットキー"
+
+msgid "关于"
+msgstr "情報"
+
+msgid "开始截图"
+msgstr "スクリーンショットを撮影"
+
+msgid "恢复默认"
+msgstr "既定に戻す"
+
+msgid "保存"
+msgstr "保存"
+
+msgid "显示控制面板"
+msgstr "コントロールパネルを表示"
+
+msgid "隐藏控制面板"
+msgstr "コントロールパネルを非表示"
+
+msgid "退出"
+msgstr "終了"
+
+msgid "标注颜色无效"
+msgstr "注釈の色が無効です"
+
+msgid "就绪。右键托盘图标可打开菜单。"
+msgstr "準備完了。トレイアイコンを右クリックするとメニューが開きます。"
+
+msgid "配置加载失败，已使用默认值"
+msgstr "設定を読み込めなかったため、既定値を使用しています"
+
+msgid "语言初始化失败"
+msgstr "言語の初期化に失敗しました"
+
+msgid "已复制全部文字"
+msgstr "すべての文字をコピーしました"
+
+msgid "已复制 OCR 文字"
+msgstr "OCR の文字をコピーしました"
+
+msgid "复制失败"
+msgstr "コピーに失敗しました"
+
+msgid "OCR 文字复制失败"
+msgstr "OCR の文字をコピーできませんでした"
+
+msgid "OCR 识别失败，错误详情已写入日志。"
+msgstr "OCR に失敗しました。詳細はログに記録されています。"
+
+msgid "OCR 识别已完成。"
+msgstr "OCR が完了しました。"
+
+msgid "OCR 结果窗口已不可用"
+msgstr "OCR 結果ウィンドウを利用できません"
+
+msgid "启动快捷键异常"
+msgstr "起動時のホットキーエラー"
+
+msgid "可用（Windows 系统 OCR）"
+msgstr "利用可能（Windows システム OCR）"
+
+msgid "不可用"
+msgstr "利用不可"
+
+msgid "读取配置失败"
+msgstr "設定の読み込みに失敗しました"
+
+msgid "配置文件格式无效"
+msgstr "設定ファイルの形式が無効です"
+
+msgid "配置路径没有父目录"
+msgstr "設定パスに親フォルダーがありません"
+
+msgid "创建配置目录失败"
+msgstr "設定フォルダーの作成に失敗しました"
+
+msgid "创建临时配置失败"
+msgstr "一時設定ファイルの作成に失敗しました"
+
+msgid "写入临时配置失败"
+msgstr "一時設定ファイルの書き込みに失敗しました"
+
+msgid "同步临时配置失败"
+msgstr "一時設定ファイルの同期に失敗しました"
+
+msgid "文件名模板不能为空"
+msgstr "ファイル名テンプレートを空にはできません"
+
+msgid "文件名模板包含 Windows 不允许的字符"
+msgstr "ファイル名テンプレートに Windows で使えない文字が含まれています"
+
+msgid "组合键无效"
+msgstr "キーの組み合わせが無効です"
+
+msgid "已被占用"
+msgstr "すでに使用されています"
+
+msgid "系统拒绝注册"
+msgstr "システムに登録を拒否されました"
+
+msgid "图像像素尺寸无效"
+msgstr "画像のピクセルサイズが無効です"
+
+msgid "无法读取图像"
+msgstr "画像の読み込みに失敗しました"
+
+msgid "当前平台尚未实现文字标注"
+msgstr "このプラットフォームでは文字注釈は未実装です"
+
+msgid "图像裁剪坐标溢出"
+msgstr "画像の切り抜き座標が範囲を超えています"
+
+msgid "图像裁剪区域无效"
+msgstr "画像の切り抜き範囲が無効です"
+
+msgid "创建截图保存目录失败"
+msgstr "スクリーンショット保存フォルダーの作成に失敗しました"
+
+msgid "PNG 图像"
+msgstr "PNG 画像"
+
+msgid "JPEG 图像"
+msgstr "JPEG 画像"
+
+msgid "创建目录失败"
+msgstr "フォルダーの作成に失敗しました"
+
+msgid "创建图像文件失败"
+msgstr "画像ファイルの作成に失敗しました"
+
+msgid "PNG 编码失败"
+msgstr "PNG エンコードに失敗しました"
+
+msgid "JPEG 编码失败"
+msgstr "JPEG エンコードに失敗しました"
+
+msgid "写入图像文件失败"
+msgstr "画像ファイルの書き込みに失敗しました"
+
+msgid "同步图像文件失败"
+msgstr "画像ファイルの同期に失敗しました"
+
+msgid "已有截图任务正在进行，请先完成或取消"
+msgstr "撮影中です。先に完了するかキャンセルしてください"
+
+msgid "正在准备截图..."
+msgstr "スクリーンショットを準備中..."
+
+msgid "截图窗口打开失败"
+msgstr "スクリーンショットウィンドウを開けませんでした"
+
+msgid "选区无效"
+msgstr "選択範囲が無効です"
+
+msgid "已保存到"
+msgstr "保存先"
+
+msgid "保存失败"
+msgstr "保存に失敗しました"
+
+msgid "正在识别文字..."
+msgstr "文字を認識中..."
+
+msgid "OCR 失败"
+msgstr "OCR に失敗しました"
+
+msgid "钉住失败"
+msgstr "ピン留めに失敗しました"
+
+msgid "已钉住，但自动保存失败"
+msgstr "ピン留めしましたが、自動保存に失敗しました"
+
+msgid "已将截图钉在屏幕上"
+msgstr "スクリーンショットをピン留めしました"
+
+msgid "已取消截图"
+msgstr "スクリーンショットをキャンセルしました"
+
+msgid "工具栏定位失败"
+msgstr "ツールバーの配置に失敗しました"
+
+msgid "OCR 识别完成"
+msgstr "OCR が完了しました"
+
+msgid "未识别到文字"
+msgstr "文字が認識されませんでした"
+
+msgid "缺少可用的 Windows OCR 语言包"
+msgstr "対応する Windows OCR 言語パックがインストールされていません"
+
+msgid "当前系统或程序安装方式不支持 Windows 系统 OCR"
+msgstr "このシステムまたはインストール構成では Windows システム OCR を利用できません"
+
+msgid "OCR 识别失败"
+msgstr "OCR に失敗しました"
+
+msgid "已复制并保存到"
+msgstr "コピーして保存しました："
+
+msgid "已复制到剪贴板"
+msgstr "クリップボードにコピーしました"
+
+msgid "工具栏显示失败"
+msgstr "ツールバーの表示に失敗しました"
+
+msgid "已复制钉住图像"
+msgstr "ピン留め画像をコピーしました"
+
+msgid "图像已保存到"
+msgstr "画像の保存先："
+
+msgid "图像保存失败"
+msgstr "画像の保存に失敗しました"
+
+msgid "已从剪贴板替换图像"
+msgstr "クリップボードの画像に置き換えました"
+
+msgid "替换图像失败"
+msgstr "画像の置き換えに失敗しました"
+
+msgid "已从文件替换图像"
+msgstr "ファイルの画像に置き換えました"
+
+msgid "已在文件夹中显示"
+msgstr "フォルダー内で表示しました"
+
+msgid "当前图像尚未保存"
+msgstr "現在の画像は保存されていません"
+
+msgid "图像处理失败"
+msgstr "画像処理に失敗しました"
+
+msgid "图像已向左旋转"
+msgstr "画像を左に回転しました"
+
+msgid "图像已向右旋转"
+msgstr "画像を右に回転しました"
+
+msgid "图像已水平翻转"
+msgstr "画像を左右反転しました"
+
+msgid "图像已垂直翻转"
+msgstr "画像を上下反転しました"
+
+msgid "操作失败"
+msgstr "操作に失敗しました"
+
+msgid "界面语言已预览，点击保存后生效"
+msgstr "表示言語をプレビュー中です。保存をクリックすると設定が保存されます"
+
+msgid "语言切换失败"
+msgstr "言語の切り替えに失敗しました"
+
+msgid "正在准备 Windows AI OCR 模型..."
+msgstr "Windows AI OCR モデルを準備中..."
+
+msgid "已恢复当前页默认值，点击保存后生效"
+msgstr "このページを既定値に戻しました。保存をクリックすると適用されます"
+
+msgid "已打开保存目录"
+msgstr "保存先フォルダーを開きました"
+
+msgid "已打开日志文件夹"
+msgstr "ログフォルダーを開きました"
+
+msgid "已打开配置文件夹"
+msgstr "設定フォルダーを開きました"
+
+msgid "手动修改配置后需要重启应用。"
+msgstr "設定ファイルを手動で編集した後は、アプリを再起動してください。"
+
+msgid "快捷键已注销，点击保存后永久生效"
+msgstr "ホットキーの登録を解除しました。保存をクリックすると設定が保存されます"
+
+msgid "快捷键注销失败"
+msgstr "ホットキーの登録解除に失敗しました"
+
+msgid "设置无效"
+msgstr "設定が無効です"
+
+msgid "快捷键无效"
+msgstr "ホットキーが無効です"
+
+msgid "设置已保存"
+msgstr "設定を保存しました"
+
+msgid "开机启动设置失败"
+msgstr "自動起動設定の更新に失敗しました"
+
+msgid "快捷键设置失败"
+msgstr "ホットキー設定の更新に失敗しました"
+
+msgid "恢复开机启动失败"
+msgstr "自動起動設定の復元に失敗しました"
+
+msgid "恢复快捷键失败"
+msgstr "ホットキーの復元に失敗しました"
+
+msgid "配置保存失败"
+msgstr "設定の保存に失敗しました"
+
+msgid "；回滚失败："
+msgstr "；ロールバック失敗："
+
+msgid "快捷键已注册"
+msgstr "ホットキーを登録しました"
+
+msgid "可用（Windows AI OCR）"
+msgstr "利用可能（Windows AI OCR）"
+
+msgid "正在检测 Windows AI OCR..."
+msgstr "Windows AI OCR の利用可否を確認中..."
+
+msgid "正在下载并准备识别模型..."
+msgstr "認識モデルをダウンロードして準備中..."
+
+msgid "支持，但识别模型尚未安装"
+msgstr "対応していますが、認識モデルが未インストールです"
+
+msgid "当前系统、硬件、驱动或策略不支持 Windows AI OCR"
+msgstr "現在のシステム、ハードウェア、ドライバーまたはポリシーでは Windows AI OCR を利用できません"
+
+msgid "Windows AI 功能已被用户禁用"
+msgstr "ユーザーが Windows AI 機能を無効にしています"
+
+msgid "Windows AI OCR 组件或包身份不可用"
+msgstr "Windows AI OCR コンポーネントまたはパッケージ ID を利用できません"
+
+msgid "Windows AI OCR 检测失败"
+msgstr "Windows AI OCR の確認に失敗しました"
+
+msgid "文字标注参数无效"
+msgstr "文字注釈のパラメーターが無効です"
+
+msgid "创建文字绘制上下文失败"
+msgstr "文字描画コンテキストの作成に失敗しました"
+
+msgid "创建文字字体失败"
+msgstr "注釈用フォントの作成に失敗しました"
+
+msgid "绘制文字标注失败"
+msgstr "文字注釈の描画に失敗しました"
+
+msgid "当前平台尚未实现屏幕截图"
+msgstr "このプラットフォームでは画面撮影は未実装です"
+
+msgid "当前平台尚未实现图像剪贴板"
+msgstr "このプラットフォームでは画像クリップボードは未実装です"
+
+msgid "当前平台尚未实现文字剪贴板"
+msgstr "このプラットフォームでは文字クリップボードは未実装です"
+
+msgid "OCR 结果窗口打开失败"
+msgstr "OCR 結果ウィンドウを開けませんでした"
+
+msgid "没有活动截图"
+msgstr "撮影中のスクリーンショットがありません"
+
+msgid "选区过小"
+msgstr "選択範囲が小さすぎます"
+
+msgid "尚未选择截图区域"
+msgstr "撮影範囲が選択されていません"
+
+msgid "图像"
+msgstr "画像"
+
+msgid "替换文件失败"
+msgstr "ファイルの置き換えに失敗しました"
+
+msgid "无法定位 OCR 程序"
+msgstr "OCR プログラムの場所を取得できませんでした"
+
+msgid "无法启动增强 OCR 检测"
+msgstr "拡張 OCR の確認を開始できませんでした"
+
+msgid "增强 OCR 准备"
+msgstr "拡張 OCR の準備"
+
+msgid "无法读取增强 OCR 检测结果"
+msgstr "拡張 OCR の確認結果を読み込めませんでした"
+
+msgid "增强 OCR 检测结果格式无效"
+msgstr "拡張 OCR の確認結果が無効です"
+
+msgid "无法准备 OCR 图像"
+msgstr "OCR 用画像の準備に失敗しました"
+
+msgid "无法启动 OCR 子进程"
+msgstr "OCR 子プロセスの起動に失敗しました"
+
+msgid "无法读取 OCR 结果"
+msgstr "OCR 結果を読み込めませんでした"
+
+msgid "OCR 结果格式无效"
+msgstr "OCR 結果の形式が無効です"
+
+msgid "操作超时"
+msgstr "操作がタイムアウトしました"
+
+msgid "无法获取 OCR 子进程状态"
+msgstr "OCR 子プロセスの状態を取得できませんでした"
+
+msgid "未知 OCR 引擎"
+msgstr "不明な OCR エンジン"
+
+msgid "Windows OCR 子进程异常退出"
+msgstr "Windows OCR 子プロセスが異常終了しました"
+
+msgid "无法创建 OCR 临时目录"
+msgstr "OCR 一時フォルダーの作成に失敗しました"
+
+msgid "GlobalLock 失败"
+msgstr "GlobalLock に失敗しました"
+
+msgid "剪贴板中没有可用图像"
+msgstr "クリップボードに画像がありません"
+
+msgid "剪贴板图像数据无效"
+msgstr "クリップボードの画像データが無効です"
+
+msgid "暂不支持该剪贴板图像格式"
+msgstr "クリップボードの画像形式は未対応です"
+
+msgid "剪贴板图像数据不完整"
+msgstr "クリップボードの画像データが不完全です"
+
+msgid "虚拟桌面没有可见像素"
+msgstr "仮想デスクトップに表示可能なピクセルがありません"
+
+msgid "截图区域没有可见像素"
+msgstr "撮影範囲に表示可能なピクセルがありません"
+
+msgid "截图区域坐标溢出"
+msgstr "撮影範囲の座標が範囲を超えています"
+
+msgid "截图区域超出虚拟桌面"
+msgstr "撮影範囲が仮想デスクトップの外にあります"
+
+msgid "GetDC 失败"
+msgstr "GetDC に失敗しました"
+
+msgid "CreateCompatibleDC 失败"
+msgstr "CreateCompatibleDC に失敗しました"
+
+msgid "BitBlt 失败"
+msgstr "BitBlt に失敗しました"
+
+msgid "无法在文件夹中显示该文件"
+msgstr "フォルダー内でファイルを表示できませんでした"
+
+msgid "打开目标失败，系统返回代码"
+msgstr "対象を開けませんでした。システムコード"
+
+msgid "打开开机启动注册表失败"
+msgstr "自動起動のレジストリキーを開けませんでした"
+
+msgid "无法获取当前程序路径"
+msgstr "アプリのパスを取得できませんでした"
+
+msgid "写入开机启动设置失败"
+msgstr "自動起動設定の書き込みに失敗しました"
+
+msgid "删除开机启动设置失败"
+msgstr "自動起動設定の削除に失敗しました"
+
+msgid "未知 Windows AI 状态"
+msgstr "不明な Windows AI 状態"
+
+msgid "Windows AI OCR 模型准备失败"
+msgstr "Windows AI OCR モデルの準備に失敗しました"
+
+msgid "Cut"
+msgstr "切り取り"
+
+msgid "Copy"
+msgstr "コピー"
+
+msgid "Paste"
+msgstr "貼り付け"
+
+msgid "Select All"
+msgstr "すべて選択"

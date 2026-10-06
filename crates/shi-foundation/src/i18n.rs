@@ -1,50 +1,102 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU8, Ordering};
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[repr(u8)]
 pub enum LanguageMode {
     #[default]
     System,
     Chinese,
     English,
+    Japanese,
+    Korean,
+    French,
+    German,
+    Spanish,
+    Portuguese,
+    Russian,
+    Hindi,
 }
 
-static ENGLISH: AtomicBool = AtomicBool::new(false);
+impl LanguageMode {
+    pub const ALL: [Self; 11] = [
+        Self::System,
+        Self::Chinese,
+        Self::English,
+        Self::Japanese,
+        Self::Korean,
+        Self::French,
+        Self::German,
+        Self::Spanish,
+        Self::Portuguese,
+        Self::Russian,
+        Self::Hindi,
+    ];
+
+    pub fn bundle_code(self) -> &'static str {
+        match self {
+            Self::System => panic!("resolve the system language before selecting a catalog"),
+            Self::Chinese => "zh",
+            Self::English => "en",
+            Self::Japanese => "ja",
+            Self::Korean => "ko",
+            Self::French => "fr",
+            Self::German => "de",
+            Self::Spanish => "es",
+            Self::Portuguese => "pt",
+            Self::Russian => "ru",
+            Self::Hindi => "hi",
+        }
+    }
+
+    pub fn from_locale(locale: &str) -> Self {
+        let language = locale
+            .split(['-', '_', '.', '@'])
+            .next()
+            .unwrap_or_default();
+        match language.to_ascii_lowercase().as_str() {
+            "zh" => Self::Chinese,
+            "ja" => Self::Japanese,
+            "ko" => Self::Korean,
+            "fr" => Self::French,
+            "de" => Self::German,
+            "es" => Self::Spanish,
+            "pt" => Self::Portuguese,
+            "ru" => Self::Russian,
+            "hi" => Self::Hindi,
+            // Keep the existing product rule: unsupported system languages use English.
+            _ => Self::English,
+        }
+    }
+}
+
+static LANGUAGE: AtomicU8 = AtomicU8::new(LanguageMode::Chinese as u8);
 
 pub fn apply(mode: LanguageMode) -> Result<(), slint::SelectBundledTranslationError> {
-    let english = uses_english(mode);
-    slint::select_bundled_translation(if english { "en" } else { "" })?;
-    ENGLISH.store(english, Ordering::Relaxed);
+    let language = resolve(mode);
+    slint::select_bundled_translation(language.bundle_code())?;
+    LANGUAGE.store(language as u8, Ordering::Relaxed);
     Ok(())
 }
 
 pub fn prepare(mode: LanguageMode) {
-    ENGLISH.store(uses_english(mode), Ordering::Relaxed);
+    LANGUAGE.store(resolve(mode) as u8, Ordering::Relaxed);
 }
 
-fn uses_english(mode: LanguageMode) -> bool {
+fn resolve(mode: LanguageMode) -> LanguageMode {
     match mode {
-        LanguageMode::Chinese => false,
-        LanguageMode::English => true,
-        LanguageMode::System => !system_locale().is_some_and(|locale| is_chinese_locale(&locale)),
+        LanguageMode::System => system_locale()
+            .as_deref()
+            .map(LanguageMode::from_locale)
+            .unwrap_or(LanguageMode::English),
+        language => language,
     }
 }
 
-fn is_chinese_locale(locale: &str) -> bool {
-    locale.eq_ignore_ascii_case("zh")
-        || locale.get(..3).is_some_and(|prefix| {
-            prefix.eq_ignore_ascii_case("zh-") || prefix.eq_ignore_ascii_case("zh_")
-        })
-}
-
-pub fn text<'a>(chinese: &'a str, english: &'a str) -> &'a str {
-    if ENGLISH.load(Ordering::Relaxed) {
-        english
-    } else {
-        chinese
-    }
+pub fn current_language() -> LanguageMode {
+    LanguageMode::ALL[LANGUAGE.load(Ordering::Relaxed) as usize]
 }
 
 #[cfg(windows)]
@@ -65,14 +117,42 @@ fn system_locale() -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::is_chinese_locale;
+    use super::LanguageMode;
 
     #[test]
-    fn chinese_locale_detection_accepts_common_windows_and_posix_forms() {
-        assert!(is_chinese_locale("zh-CN"));
-        assert!(is_chinese_locale("zh_TW.UTF-8"));
-        assert!(is_chinese_locale("ZH"));
-        assert!(!is_chinese_locale("en-US"));
-        assert!(!is_chinese_locale("ja-JP"));
+    fn system_language_detection_accepts_regional_windows_and_posix_forms() {
+        let cases = [
+            ("zh-CN", LanguageMode::Chinese),
+            ("zh_TW.UTF-8", LanguageMode::Chinese),
+            ("ZH", LanguageMode::Chinese),
+            ("en-US", LanguageMode::English),
+            ("ja-JP", LanguageMode::Japanese),
+            ("ko_KR.UTF-8", LanguageMode::Korean),
+            ("fr-CA", LanguageMode::French),
+            ("de_DE@euro", LanguageMode::German),
+            ("es-MX", LanguageMode::Spanish),
+            ("pt-BR", LanguageMode::Portuguese),
+            ("pt_PT.UTF-8", LanguageMode::Portuguese),
+            ("ru-RU", LanguageMode::Russian),
+            ("HI_IN.UTF-8", LanguageMode::Hindi),
+        ];
+        for (locale, expected) in cases {
+            assert_eq!(LanguageMode::from_locale(locale), expected, "{locale}");
+        }
+    }
+
+    #[test]
+    fn unsupported_system_languages_keep_the_english_default() {
+        for locale in ["", "C", "C.UTF-8", "it-IT", "japanese", "zhong", "rupee"] {
+            assert_eq!(LanguageMode::from_locale(locale), LanguageMode::English);
+        }
+    }
+
+    #[test]
+    fn catalog_codes_match_the_selected_language() {
+        let codes = ["zh", "en", "ja", "ko", "fr", "de", "es", "pt", "ru", "hi"];
+        for (mode, code) in LanguageMode::ALL[1..].iter().zip(codes) {
+            assert_eq!(mode.bundle_code(), code);
+        }
     }
 }
