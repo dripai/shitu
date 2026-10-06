@@ -1,15 +1,8 @@
-# ShiTu & ShiPing
+# ShiTu
 
 [简体中文](README.zh-CN.md)
 
-Two focused, offline-first Windows tools for capturing what matters and sharing it without slowing down your workflow.
-
-- **ShiTu** turns screenshots into useful working material with capture, annotation, OCR, and pinned-image tools.
-- **ShiPing** keeps screen recording direct: choose a screen, window, or region, confirm your settings, and start recording.
-
-No account is required. Your captures, recordings, and OCR results stay on your device.
-
-## ShiTu — capture, annotate, and keep it in view
+A local Windows screenshot, annotation, OCR, and pinning tool. No account is required.
 
 ![ShiTu application settings](images/shitu_01.jpg)
 
@@ -23,78 +16,29 @@ ShiTu is built for the small screenshot tasks that happen all day: copying part 
 - Start a capture from the system tray or the default `Ctrl+Alt+C` shortcut.
 - Use the system theme with English or Simplified Chinese.
 
-## ShiPing — recording without a production studio
-
-![ShiPing recording toolbar](images/shiping_01.jpg)
-
-ShiPing is designed for product walkthroughs, tutorials, meeting demonstrations, and reproducible bug reports. Its compact toolbar keeps the active recording state and the controls you need in one place.
-
-![ShiPing preferences](images/shiping_02.jpg)
-
-- Record one screen, a visible window, or a fixed desktop region.
-- Save as MP4 with optional system audio and microphone input, or as a silent animated GIF.
-- Pause and resume without advancing the recording timeline.
-- Choose automatic, 720p, 1080p, or original resolution.
-- Use 30/60 FPS for MP4 and 10/20 FPS for GIF.
-- Include the pointer and optionally highlight mouse clicks.
-- Configure the countdown, save folder, tray behavior, and global shortcuts.
-- Keep a visible recording boundary around the selected window or region until recording stops.
-
-> **Current status:** ShiPing has Windows, macOS, and Linux recording backends. Windows has been exercised on the current development device; macOS and Linux currently have CI compilation and unit-test coverage but still require real-device validation.
-
-## What's new in v0.1.8
-
-### ShiTu
-
-- Eliminated the black-screen flicker that could appear when starting a capture.
-- Made the selected content refresh continuously while an existing selection is dragged.
-- Fixed the Save As flow that could appear to freeze when the dialog was not associated with the active application window.
-
-### ShiPing
-
-- Added the complete first-release flow for screen, visible-window, and region recording.
-- Added MP4 recording, silent GIF output, system audio, microphone input, pause/resume, countdown, and configurable shortcuts.
-- Added a persistent recording boundary, clearer recording states, muted speaker/microphone icons, and automatic restoration of the main toolbar after stopping from a shortcut.
-- Added a dedicated `ShiPing.exe` release artifact alongside `ShiTu.exe`.
-
 ## Download and support
 
 - [Download the latest release](https://github.com/dripai/shitu/releases)
-- [Report a problem or request a feature](https://github.com/dripai/shitu/issues)
-- [Read the privacy policy](PRIVACY.en.md)
+- [Report a problem](https://github.com/dripai/shitu/issues)
+- [Privacy policy](PRIVACY.en.md)
 
-## Privacy by design
-
-ShiTu and ShiPing do not require an account or upload your work to a service operated by this project. Basic OCR uses Windows-provided local system capabilities. Screenshots, recordings, audio, and recognized text remain under your control.
+ShiPing is maintained independently at [dripai/ShiPing](https://github.com/dripai/ShiPing).
 
 ## Build locally
 
-Windows 10/11, Git Bash, and a stable Rust toolchain are required for the project script below. ShiPing can also be built natively on macOS 15 or Linux after installing the platform dependencies documented in [its architecture notes](apps/shiping/ARCHITECTURE.md).
+Windows 10/11, Git Bash, and Rust are required. The workspace defaults to ShiTu:
 
 ```bash
-# Run in development mode
-./start.sh dev shitu
-./start.sh dev shiping
-
-# Build optimized executables
-./start.sh build shitu
-./start.sh build shiping
+./start.sh dev
+./start.sh build
+cargo test --workspace --locked
 ```
 
-Tagged releases provide Windows packages for ShiTu and ShiPing, plus ShiPing Linux x64 and macOS ARM64/x64 test packages.
+Version tags publish only ShiTu Windows x64 packages.
 
-## Current platform boundaries
+## Current boundaries
 
-- ShiTu currently supports Windows 10/11 only.
-- ShiPing builds for Windows 10/11, macOS 15 or later, and Linux Wayland desktops with XDG Desktop Portal and PipeWire. macOS and Linux real-device recording behavior is not yet verified.
-- ShiPing records the pixels currently visible in the selected window area. Covered or off-screen window content is not captured as an independent window surface.
-- ShiPing supports one selected display at a time; it does not combine multiple displays into one recording.
-- Enhanced Windows AI OCR exists as an experimental path, but it has not been verified on a supported NPU device and is not presented as a verified product feature.
-
-## For contributors
-
-- `apps/shitu`: ShiTu screenshot, annotation, OCR, and pinning application.
-- `apps/shiping`: ShiPing cross-platform screen recorder.
-- `apps/shiyin`: planned ShiYin audio recorder; recording is not implemented.
-- `crates/shi-foundation`: shared language, internationalization, configuration, and logging infrastructure.
-- `crates/shi-ui`: shared Slint components.
+- ShiTu supports Windows 10/11; this migration does not add platform support.
+- Enhanced Windows AI OCR remains experimental and unverified on supported NPU hardware.
+- `apps/shitu` contains the application; `crates/shi-foundation` and `crates/shi-ui` are internal modules.
+- `apps/shiyin` remains a planned audio recorder; recording is not implemented.

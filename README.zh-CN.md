@@ -1,15 +1,8 @@
-# 拾图（ShiTu）与拾屏（ShiPing）
+# 拾图（ShiTu）
 
 [English](README.md)
 
-两款轻量、离线优先的 Windows 工具，让截图和录屏回到一件简单的事。
-
-- **拾图**：完成截图、标注、OCR 与钉住，把屏幕内容快速变成可使用的工作素材。
-- **拾屏**：选择屏幕、窗口或区域，确认参数，即可开始录制。
-
-无需注册账号。截图、录屏和 OCR 结果都保留在你的设备上。
-
-## 拾图——截图、标注、钉住，一气呵成
+本地 Windows 截图工具，提供标注、OCR 与钉住功能，无需账号。
 
 ![拾图应用设置界面](images/shitu_01.jpg)
 
@@ -23,78 +16,29 @@
 - 通过系统托盘或默认 `Ctrl+Alt+C` 快捷键立即开始截图。
 - 支持跟随系统主题、English 与简体中文界面。
 
-## 拾屏——不需要复杂制作，也能清楚地录下来
-
-![拾屏录制控制条](images/shiping_01.jpg)
-
-拾屏面向产品演示、操作教程、会议讲解和问题复现。紧凑控制条把录制状态和真正需要的操作集中在一起，不让设置打断表达。
-
-![拾屏首选项](images/shiping_02.jpg)
-
-- 录制单个屏幕、可见窗口或固定桌面区域。
-- 保存为 MP4，可独立控制系统声音和麦克风；也可输出无声 GIF 动图。
-- 支持暂停和继续，暂停期间录制时间线同步冻结。
-- 可选自动、720p、1080p 或原始分辨率。
-- MP4 支持 30/60 FPS，GIF 支持 10/20 FPS。
-- 可录入鼠标指针，并可选择突出鼠标点击。
-- 可设置开始倒计时、保存目录、托盘行为和全局快捷键。
-- 录制窗口或区域时持续显示录制边界，直到停止或取消。
-
-> **当前状态：** 拾屏已经实现 Windows、macOS 和 Linux 录制后端。Windows 已在当前开发设备验证；macOS 和 Linux 目前通过了 CI 编译与单元测试，仍需真实设备验证。
-
-## v0.1.8 更新亮点
-
-### 拾图
-
-- 修复开始截图时可能出现的黑屏闪烁。
-- 拖动已有选区时，选区内容现在会持续实时更新。
-- 修复“另存为”对话框未正确关联当前应用窗口时可能表现为卡死的问题。
-
-### 拾屏
-
-- 完成屏幕、可见窗口和区域录制的首版完整流程。
-- 新增 MP4 录制、无声 GIF、系统声音、麦克风、暂停/继续、倒计时和可配置快捷键。
-- 新增持续录制边界、更清晰的录制状态、声音关闭图标，以及通过快捷键停止后自动恢复主控制条。
-- GitHub Release 现在会与 `ShiTu.exe` 一同提供独立的 `ShiPing.exe` 发布产物。
-
-## 下载与支持
+## 下载与反馈
 
 - [下载最新版本](https://github.com/dripai/shitu/releases)
-- [反馈问题或提出功能建议](https://github.com/dripai/shitu/issues)
-- [查看隐私政策](PRIVACY.md)
+- [反馈问题](https://github.com/dripai/shitu/issues)
+- [隐私政策](PRIVACY.md)
 
-## 隐私设计
-
-拾图和拾屏无需账号，也不会把你的工作内容上传到本项目运营的服务。基础 OCR 使用 Windows 提供的本地系统能力；截图、录屏、音频和识别文字始终由你掌控。
+拾屏已迁入独立项目 [dripai/ShiPing](https://github.com/dripai/ShiPing)。
 
 ## 本地构建
 
-下面的项目脚本需要 Windows 10/11、Git Bash 与 Rust 稳定版工具链。安装[架构说明](apps/shiping/ARCHITECTURE.md)列出的平台依赖后，也可以在 macOS 15 或 Linux 上原生构建拾屏。
+需要 Windows 10/11、Git Bash 和 Rust，工作区默认运行拾图：
 
 ```bash
-# 开发模式运行
-./start.sh dev shitu
-./start.sh dev shiping
-
-# 构建优化版本
-./start.sh build shitu
-./start.sh build shiping
+./start.sh dev
+./start.sh build
+cargo test --workspace --locked
 ```
 
-版本标签发布时会提供拾图和拾屏的 Windows 包，以及拾屏的 Linux x64、macOS ARM64 和 macOS x64 测试包。
+版本标签只发布拾图 Windows x64 包。
 
-## 当前平台边界
+## 当前边界
 
-- 拾图目前只支持 Windows 10/11。
-- 拾屏可构建到 Windows 10/11、macOS 15 或更高版本，以及具备 XDG Desktop Portal 和 PipeWire 的 Linux Wayland 桌面；macOS 和 Linux 的真实设备录制行为尚未验证。
-- 拾屏录制窗口时采集的是窗口区域当前可见的屏幕像素；被其他窗口遮挡或位于屏幕外的内容，不会作为独立窗口表面被采集。
-- 拾屏每次选择一个显示器，不会把多个显示器合并为一段录屏。
-- 项目包含实验性的 Windows AI OCR 增强路径，但尚未在受支持的 NPU 设备上完成验证，因此不作为已经验证的产品功能介绍。
-
-## 参与开发
-
-- `apps/shitu`：拾图截图、标注、OCR 与钉住应用。
-- `apps/shiping`：拾屏跨平台录屏应用。
-- `apps/shiyin`：规划中的拾音录音应用，目前尚未实现录音能力。
-- `crates/shi-foundation`：共用语言、国际化、配置与日志基础设施。
-- `crates/shi-ui`：共用 Slint 组件。
+- 拾图支持 Windows 10/11，本次迁移不增加平台支持。
+- Windows AI OCR 增强路径仍为实验能力，尚未在受支持的 NPU 设备上验证。
+- 应用位于 `apps/shitu`；`crates/shi-foundation`、`crates/shi-ui` 是内部模块。
+- `apps/shiyin` 保留为规划中的录音工具，录音尚未实现。

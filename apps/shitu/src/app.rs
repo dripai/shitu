@@ -2,6 +2,7 @@ mod annotation;
 mod capture_controller;
 mod pin;
 mod settings;
+mod toolbar_layout;
 
 use std::{
     cell::RefCell,
@@ -42,7 +43,39 @@ enum StatusLevel {
     Error = 2,
 }
 
+const ANNOTATION_COLORS: [[u8; 4]; 12] = [
+    [236, 92, 102, 255],
+    [74, 144, 226, 255],
+    [49, 163, 107, 255],
+    [245, 197, 66, 255],
+    [242, 153, 74, 255],
+    [155, 81, 224, 255],
+    [235, 101, 160, 255],
+    [25, 181, 197, 255],
+    [32, 33, 36, 255],
+    [255, 255, 255, 255],
+    [139, 149, 165, 255],
+    [155, 107, 67, 255],
+];
+
+fn annotation_color(index: i32) -> Result<[u8; 4]> {
+    usize::try_from(index)
+        .ok()
+        .and_then(|index| ANNOTATION_COLORS.get(index))
+        .copied()
+        .ok_or_else(|| anyhow!(i18n::text("标注颜色无效", "Invalid annotation color")))
+}
+
+fn annotation_color_index(rgba: [u8; 4]) -> Result<i32> {
+    ANNOTATION_COLORS
+        .iter()
+        .position(|color| *color == rgba)
+        .map(|index| index as i32)
+        .ok_or_else(|| anyhow!(i18n::text("标注颜色无效", "Invalid annotation color")))
+}
+
 pub fn run(start_minimized: bool) -> Result<(), slint::PlatformError> {
+    window::initialize_backend()?;
     logging::initialize(Config::log_directory(), "gridstart.log");
     i18n::prepare(Default::default());
     let config_result = Config::load();
@@ -394,6 +427,7 @@ struct AppController {
     system_ocr_failure: Option<OcrFailure>,
     ai_ocr_state: AiOcrState,
     draw_style: DrawStyle,
+    annotation_text_size: i32,
 }
 
 struct OcrCapabilities {
@@ -449,7 +483,9 @@ impl AppController {
             draw_style: DrawStyle {
                 rgba: [236, 92, 102, 255],
                 radius: 2,
+                dashed: false,
             },
+            annotation_text_size: 20,
         }
     }
 

@@ -1,12 +1,15 @@
 import { Palette } from "std-widgets.slint";
 import { AnnotationView } from "annotation-view.slint";
 import { CaptureToolbar } from "capture-toolbar.slint";
+import { AnnotationPalette } from "annotation-palette.slint";
+import { AnnotationSelection } from "annotation-selection.slint";
 
 export component OverlayWindow inherits Window {
     title: @tr("选择截图区域");
     background: transparent;
     no-frame: true;
     always-on-top: true;
+    forward-focus: canvas-keys;
 
     in property <int> capture-width: 1;
     in property <int> capture-height: 1;
@@ -30,6 +33,14 @@ export component OverlayWindow inherits Window {
     in-out property <int> active-tool: 0;
     in-out property <int> color-index: 0;
     in-out property <int> stroke-radius: 2;
+    in-out property <bool> dashed: false;
+    in-out property <int> text-size: 20;
+    in property <bool> annotation-selected: false;
+    in property <float> annotation-left;
+    in property <float> annotation-top;
+    in property <float> annotation-width;
+    in property <float> annotation-height;
+    property <bool> annotation-drawing: false;
     in-out property <float> drag-start-x: 0;
     in-out property <float> drag-start-y: 0;
     in-out property <float> drag-current-x: 0;
@@ -38,7 +49,13 @@ export component OverlayWindow inherits Window {
     in-out property <float> press-y: 0;
     in-out property <bool> manual-drag: false;
     in-out property <bool> adjusting-selection: false;
-    property <float> toolbar-anchor-ratio: 1;
+    in property <float> toolbar-x;
+    in property <float> toolbar-y;
+    in property <bool> toolbar-properties-above: false;
+    out property <float> toolbar-width: toolbar.width / 1px;
+    out property <float> toolbar-height: toolbar.height / 1px;
+    out property <float> toolbar-main-row-height: toolbar.main-row-height / 1px;
+    out property <float> toolbar-expanded-height: toolbar.expanded-height / 1px;
     in-out property <bool> text-editing: false;
     in-out property <float> text-editor-x: 0;
     in-out property <float> text-editor-y: 0;
@@ -95,30 +112,21 @@ export component OverlayWindow inherits Window {
         root.capture-height - root.focus-source-top,
         Math.max(1, Math.round(root.focus-height / 1px * root.source-scale-y))
     );
-    property <length> toolbar-anchor-x: root.selection-left
-        + root.selection-width * root.toolbar-anchor-ratio;
-    property <length> toolbar-x: Math.max(
-        8px,
-        Math.min(
-            root.width - root.toolbar-width - 8px,
-            root.toolbar-anchor-x - root.toolbar-width + 18px
-        )
-    );
-    property <length> toolbar-width: 372px + (root.ocr-available ? 30px : 0px);
-    property <length> toolbar-height: ((root.active-tool > 0 && root.active-tool < 5)
-        || root.active-tool == 6) ? 68px : 38px;
-    property <length> toolbar-y: root.selection-top + root.selection-height + root.toolbar-height + 12px <= root.height
-        ? root.selection-top + root.selection-height + 12px
-        : Math.max(8px, root.selection-top - root.toolbar-height - 12px);
-
+    callback initialize-toolbar(float);
+    callback reposition-toolbar();
     callback probe-window(float, float);
     callback selected(float, float, float, float);
     callback begin-annotation(float, float, int);
-    callback update-annotation(float, float);
+    callback begin-annotation-edit(float, float, int);
+    callback update-annotation(float, float, bool);
     callback finish-annotation();
+    callback cancel-annotation();
     callback add-text(float, float, string, int);
     callback select-color(int);
     callback select-width(int);
+    callback select-dashed(bool);
+    callback select-text-size(int);
+    callback select-tool(int);
     callback undo();
     callback redo();
     callback save-output();
@@ -128,11 +136,10 @@ export component OverlayWindow inherits Window {
     callback pin-selection();
     callback cancel-selection();
 
-    function set-toolbar-anchor(pointer-x: float) {
-        let left = Math.min(root.start-x, root.current-x);
-        let width = Math.max(1, Math.abs(root.current-x - root.start-x));
-        root.toolbar-anchor-ratio = Math.max(0, Math.min(1, (pointer-x - left) / width));
-    }
+    changed width => { if root.completed { root.reposition-toolbar(); } }
+    changed height => { if root.completed { root.reposition-toolbar(); } }
+    changed toolbar-width => { if root.completed { root.reposition-toolbar(); } }
+    changed toolbar-height => { if root.completed { root.reposition-toolbar(); } }
 
     function commit-selection() {
         let left = Math.max(0, Math.min(root.start-x, root.current-x));
@@ -149,14 +156,14 @@ export component OverlayWindow inherits Window {
             root.source-left + root.source-width,
             root.source-top + root.source-height
         );
+        if root.completed { root.reposition-toolbar(); }
     }
 
     public function commit-text-editor() {
         if root.text-editing && root.text-editor-value != "" {
             let image-x = root.text-editor-x / (root.selection-width / 1px) * root.selected-image.width;
             let image-y = root.text-editor-y / (root.selection-height / 1px) * root.selected-image.height;
-            let font-size = root.stroke-radius == 1 ? 16 : root.stroke-radius == 4 ? 28 : 20;
-            root.add-text(image-x, image-y, root.text-editor-value, font-size);
+            root.add-text(image-x, image-y, root.text-editor-value, root.text-size);
         }
         root.text-editor-value = "";
         root.text-editing = false;
@@ -169,7 +176,33 @@ export component OverlayWindow inherits Window {
         image-fit: fill;
     }
 
-    FocusScope {
+    // Slint 1.17 native KeyBinding runs only in the focused canvas scope.
+    // TextInput and toolbar widgets retain their own native editing shortcuts.
+    canvas-keys := FocusScope {
+        width: 0px;
+        height: 0px;
+        focus-on-click: false;
+        focus-on-tab-navigation: false;
+        KeyBinding {
+            keys: @keys(Control + Z);
+            enabled: root.completed && !root.text-editing && !root.annotation-drawing && !root.adjusting-selection;
+            activated => { root.undo(); }
+        }
+        KeyBinding {
+            keys: @keys(Control + Y);
+            enabled: root.completed && !root.text-editing && !root.annotation-drawing && !root.adjusting-selection;
+            activated => { root.redo(); }
+        }
+        KeyBinding {
+            keys: @keys(Control + Shift + Z);
+            enabled: root.completed && !root.text-editing && !root.annotation-drawing && !root.adjusting-selection;
+            activated => { root.redo(); }
+        }
+        KeyBinding {
+            keys: @keys(Return);
+            enabled: root.completed && !root.text-editing && !root.annotation-drawing && !root.adjusting-selection;
+            activated => { root.copy-output(); }
+        }
         key-pressed(event) => {
             if event.text == Key.Escape {
                 root.cancel-selection();
@@ -233,6 +266,7 @@ export component OverlayWindow inherits Window {
             if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
                 root.cancel-selection();
             } else if !root.completed && event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                canvas-keys.focus();
                 root.press-x = self.mouse-x / 1px;
                 root.press-y = self.mouse-y / 1px;
                 root.start-x = root.press-x;
@@ -254,7 +288,7 @@ export component OverlayWindow inherits Window {
                     root.current-y = (root.hover-view-top + root.hover-view-height) / 1px;
                 }
                 if root.selection-width >= 3px && root.selection-height >= 3px {
-                    root.set-toolbar-anchor(self.mouse-x / 1px);
+                    root.initialize-toolbar(self.mouse-x / 1px);
                     root.completed = true;
                     root.commit-selection();
                 }
@@ -309,6 +343,7 @@ export component OverlayWindow inherits Window {
                 annotation.stroke-width * parent.width / 1px / root.selected-image.width
             ) * 1px;
             stroke-line-cap: round;
+            stroke-line-join: round;
         }
 
         for annotation in root.annotations: Text {
@@ -328,7 +363,8 @@ export component OverlayWindow inherits Window {
             visible: root.completed && root.active-tool > 0;
             width: parent.width;
             height: parent.height;
-            mouse-cursor: root.active-tool == 5 || root.active-tool == 6 ? none : crosshair;
+            mouse-cursor: root.active-tool == 8 ? move
+                : root.active-tool == 5 || root.active-tool == 6 ? none : crosshair;
 
             pointer-event(event) => {
                 let image-x = self.mouse-x / self.width * root.selected-image.width;
@@ -344,23 +380,46 @@ export component OverlayWindow inherits Window {
                         root.text-editing = true;
                         text-editor.focus();
                     } else {
+                        canvas-keys.focus();
+                        root.annotation-drawing = true;
                         root.begin-annotation(image-x, image-y, root.active-tool);
                     }
                 } else if event.kind == PointerEventKind.move && self.pressed {
                     if root.active-tool != 4 {
-                        root.update-annotation(image-x, image-y);
+                        root.update-annotation(image-x, image-y, event.modifiers.shift);
                     }
                 } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
                     if root.active-tool != 4 {
-                        root.update-annotation(image-x, image-y);
+                        root.update-annotation(image-x, image-y, event.modifiers.shift);
                         root.finish-annotation();
+                        root.annotation-drawing = false;
                     }
                 } else if event.kind == PointerEventKind.cancel {
                     if root.active-tool != 4 {
-                        root.finish-annotation();
+                        root.cancel-annotation();
+                        root.annotation-drawing = false;
                     }
                 }
             }
+        }
+
+        if root.active-tool == 8 && root.annotation-selected && !root.adjusting-selection: AnnotationSelection {
+            width: parent.width;
+            height: parent.height;
+            selected-left: root.annotation-left;
+            selected-top: root.annotation-top;
+            selected-width: root.annotation-width;
+            selected-height: root.annotation-height;
+            image-width: root.selected-image.width;
+            image-height: root.selected-image.height;
+            focus-canvas => { canvas-keys.focus(); }
+            begin-edit(x, y, handle) => {
+                root.annotation-drawing = true;
+                root.begin-annotation-edit(x, y, handle);
+            }
+            update-edit(x, y, constrained) => { root.update-annotation(x, y, constrained); }
+            finish-edit => { root.finish-annotation(); root.annotation-drawing = false; }
+            cancel-edit => { root.cancel-annotation(); root.annotation-drawing = false; }
         }
 
         if (root.active-tool == 5 || root.active-tool == 6) && annotation-touch.has-hover: Rectangle {
@@ -394,7 +453,7 @@ export component OverlayWindow inherits Window {
             x: root.text-editor-x * 1px;
             y: root.text-editor-y * 1px;
             width: Math.max(80px, Math.min(240px, parent.width - self.x));
-            height: 30px;
+            height: Math.max(30px, root.text-size / Math.max(1, root.selected-image.width) * parent.width + 8px);
             border-width: 1px;
             border-color: #54a5ff;
             background: #ffffffee;
@@ -405,18 +464,16 @@ export component OverlayWindow inherits Window {
                 width: parent.width - 8px;
                 height: parent.height - 4px;
                 text <=> root.text-editor-value;
-                color: root.color-index == 0 ? #ec5c66
-                    : root.color-index == 1 ? #4a90e2
-                    : root.color-index == 2 ? #31a36b : #c59b00;
+                color: AnnotationPalette.colors[root.color-index];
                 font-family: "Microsoft YaHei UI";
-                font-size: root.stroke-radius == 1 ? 16px
-                    : root.stroke-radius == 4 ? 28px : 20px;
+                font-size: Math.max(1px, root.text-size / Math.max(1, root.selected-image.width) * root.selection-width);
                 single-line: true;
-                accepted => { root.commit-text-editor(); }
+                accepted => { root.commit-text-editor(); canvas-keys.focus(); }
                 key-pressed(event) => {
                     if event.text == Key.Escape {
                         root.text-editor-value = "";
                         root.text-editing = false;
+                        canvas-keys.focus();
                         accept
                     } else {
                         reject
@@ -434,6 +491,7 @@ export component OverlayWindow inherits Window {
                 if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
                     root.cancel-selection();
                 } else if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                    canvas-keys.focus();
                     root.drag-start-x = root.start-x;
                     root.drag-start-y = root.start-y;
                     root.drag-current-x = root.current-x;
@@ -460,10 +518,9 @@ export component OverlayWindow inherits Window {
                     root.start-y = next-top;
                     root.current-x = next-left + selected-width;
                     root.current-y = next-top + selected-height;
+                    root.reposition-toolbar();
                 } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
-                    let pointer-x = root.selection-left / 1px + self.mouse-x / 1px;
                     root.adjusting-selection = false;
-                    root.set-toolbar-anchor(pointer-x);
                     root.commit-selection();
                 } else if event.kind == PointerEventKind.cancel {
                     root.adjusting-selection = false;
@@ -499,10 +556,9 @@ export component OverlayWindow inherits Window {
                     root.current-y - 3,
                     root.drag-start-y + delta-y
                 ));
+                root.reposition-toolbar();
             } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
-                let pointer-x = (self.x + self.mouse-x) / 1px;
                 root.adjusting-selection = false;
-                root.set-toolbar-anchor(pointer-x);
                 root.commit-selection();
             } else if event.kind == PointerEventKind.cancel {
                 root.adjusting-selection = false;
@@ -537,10 +593,9 @@ export component OverlayWindow inherits Window {
                     root.current-y - 3,
                     root.drag-start-y + delta-y
                 ));
+                root.reposition-toolbar();
             } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
-                let pointer-x = (self.x + self.mouse-x) / 1px;
                 root.adjusting-selection = false;
-                root.set-toolbar-anchor(pointer-x);
                 root.commit-selection();
             } else if event.kind == PointerEventKind.cancel {
                 root.adjusting-selection = false;
@@ -575,10 +630,9 @@ export component OverlayWindow inherits Window {
                     root.start-y + 3,
                     root.drag-current-y + delta-y
                 ));
+                root.reposition-toolbar();
             } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
-                let pointer-x = (self.x + self.mouse-x) / 1px;
                 root.adjusting-selection = false;
-                root.set-toolbar-anchor(pointer-x);
                 root.commit-selection();
             } else if event.kind == PointerEventKind.cancel {
                 root.adjusting-selection = false;
@@ -613,10 +667,9 @@ export component OverlayWindow inherits Window {
                     root.start-y + 3,
                     root.drag-current-y + delta-y
                 ));
+                root.reposition-toolbar();
             } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
-                let pointer-x = (self.x + self.mouse-x) / 1px;
                 root.adjusting-selection = false;
-                root.set-toolbar-anchor(pointer-x);
                 root.commit-selection();
             } else if event.kind == PointerEventKind.cancel {
                 root.adjusting-selection = false;
@@ -641,15 +694,19 @@ export component OverlayWindow inherits Window {
         }
     }
 
-    if root.completed: CaptureToolbar {
-        x: root.toolbar-x;
-        y: root.toolbar-y;
+    toolbar := CaptureToolbar {
+        visible: root.completed;
+        x: root.toolbar-x * 1px;
+        y: root.toolbar-y * 1px;
+        properties-above: root.toolbar-properties-above;
         annotation-tools-visible: true;
         ocr-available: root.ocr-available;
         pin-action-visible: true;
         active-tool <=> root.active-tool;
         color-index <=> root.color-index;
         stroke-radius <=> root.stroke-radius;
+        dashed <=> root.dashed;
+        text-size <=> root.text-size;
         undo => { root.undo(); }
         redo => { root.redo(); }
         save-output => { root.commit-text-editor(); root.save-output(); }
@@ -659,8 +716,13 @@ export component OverlayWindow inherits Window {
         cancel-action => { root.cancel-selection(); }
         select-tool(tool) => {
             if tool != 4 { root.commit-text-editor(); }
+            root.select-tool(tool);
+            root.reposition-toolbar();
+            canvas-keys.focus();
         }
         select-color(index) => { root.select-color(index); }
         select-width(width) => { root.select-width(width); }
+        select-dashed(dashed) => { root.select-dashed(dashed); }
+        select-text-size(size) => { root.select-text-size(size); }
     }
 }

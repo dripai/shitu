@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
     "apps/shitu",
-    "apps/shiping",
     "apps/shiyin",
     "crates/shi-foundation",
     "crates/shi-ui",
@@ -16,7 +15,6 @@ edition = "2024"
 
 [workspace.dependencies]
 anyhow = "1.0"
-gif = "0.14.2"
 global-hotkey = "0.8"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
 raw-window-handle = "0.6"

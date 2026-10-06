@@ -5,7 +5,7 @@ use slint::Color;
 use anyhow::Result;
 
 use super::AnnotationView;
-use crate::image::{CapturedImage, DrawStyle, arrow_head};
+use crate::image::{CapturedImage, DrawStyle, OutlineShape, arrow_head, outline_polylines};
 
 #[derive(Default)]
 pub struct AnnotationHistory {
@@ -15,6 +15,66 @@ pub struct AnnotationHistory {
     active: bool,
     active_tool: i32,
     active_before: Option<Vec<AnnotationCommand>>,
+    selected: Option<usize>,
+    edit: Option<EditDrag>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AnnotationBounds {
+    pub left: u32,
+    pub top: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl AnnotationBounds {
+    fn from_points(start: (u32, u32), end: (u32, u32)) -> Self {
+        Self {
+            left: start.0.min(end.0),
+            top: start.1.min(end.1),
+            width: start.0.abs_diff(end.0),
+            height: start.1.abs_diff(end.1),
+        }
+    }
+
+    fn right(self) -> u32 {
+        self.left.saturating_add(self.width)
+    }
+
+    fn bottom(self) -> u32 {
+        self.top.saturating_add(self.height)
+    }
+
+    fn expanded(self, padding: u32) -> Self {
+        Self::from_points(
+            (
+                self.left.saturating_sub(padding),
+                self.top.saturating_sub(padding),
+            ),
+            (
+                self.right().saturating_add(padding),
+                self.bottom().saturating_add(padding),
+            ),
+        )
+    }
+
+    fn corner(self, handle: i32) -> (u32, u32) {
+        (
+            if handle % 2 == 0 {
+                self.left
+            } else {
+                self.right()
+            },
+            if handle < 2 { self.top } else { self.bottom() },
+        )
+    }
+}
+
+struct EditDrag {
+    index: usize,
+    original: AnnotationCommand,
+    point: (u32, u32),
+    handle: i32,
 }
 
 impl AnnotationHistory {
@@ -25,10 +85,21 @@ impl AnnotationHistory {
         self.active = false;
         self.active_tool = 0;
         self.active_before = None;
+        self.selected = None;
+        self.edit = None;
     }
 
     pub fn begin(&mut self, tool: i32, point: (u32, u32), style: DrawStyle) {
         self.finish();
+        if tool == 8 {
+            self.selected = self
+                .commands
+                .iter()
+                .rposition(|command| command.selection_hit_test(point));
+            self.begin_edit(point, -1);
+            return;
+        }
+        self.clear_selection();
         self.active_before = Some(self.commands.clone());
         let command = match tool {
             1 => AnnotationCommand::Pen {
@@ -41,6 +112,11 @@ impl AnnotationHistory {
                 style,
             },
             3 => AnnotationCommand::Arrow {
+                start: point,
+                end: point,
+                style,
+            },
+            7 => AnnotationCommand::Ellipse {
                 start: point,
                 end: point,
                 style,
@@ -69,8 +145,56 @@ impl AnnotationHistory {
         self.active_tool = tool;
     }
 
-    pub fn update(&mut self, point: (u32, u32)) {
+    pub fn update(&mut self, point: (u32, u32), constrained: bool, bounds: (u32, u32)) {
         if !self.active {
+            return;
+        }
+        let point = clamp_point(point, bounds);
+        if let Some(edit) = &self.edit {
+            let mut command = edit.original.clone();
+            let original_bounds = command.bounds();
+            let delta = (
+                point.0 as i64 - edit.point.0 as i64,
+                point.1 as i64 - edit.point.1 as i64,
+            );
+            if delta == (0, 0) {
+                self.commands[edit.index] = command;
+                return;
+            }
+            if edit.handle == -1 {
+                command.translate(
+                    clamp_translation(
+                        delta.0,
+                        original_bounds.left,
+                        original_bounds.right(),
+                        bounds.0,
+                    ),
+                    clamp_translation(
+                        delta.1,
+                        original_bounds.top,
+                        original_bounds.bottom(),
+                        bounds.1,
+                    ),
+                );
+            } else {
+                let anchor = original_bounds.corner(3 - edit.handle);
+                let corner = original_bounds.corner(edit.handle);
+                let corner = clamp_point(
+                    (
+                        shift_coordinate(corner.0, delta.0),
+                        shift_coordinate(corner.1, delta.1),
+                    ),
+                    bounds,
+                );
+                let corner = if constrained && command.is_outline() {
+                    constrained_endpoint(anchor, corner, bounds)
+                } else {
+                    corner
+                };
+                command.resize_to(AnnotationBounds::from_points(anchor, corner), edit.handle);
+            }
+            command.fit_within(bounds);
+            self.commands[edit.index] = command;
             return;
         }
         if self.active_tool == 5 {
@@ -84,8 +208,15 @@ impl AnnotationHistory {
                     points.push(point);
                 }
             }
-            Some(AnnotationCommand::Rectangle { end, .. })
-            | Some(AnnotationCommand::Arrow { end, .. }) => {
+            Some(AnnotationCommand::Rectangle { start, end, .. })
+            | Some(AnnotationCommand::Ellipse { start, end, .. }) => {
+                *end = if constrained {
+                    constrained_endpoint(*start, point, bounds)
+                } else {
+                    point
+                };
+            }
+            Some(AnnotationCommand::Arrow { end, .. }) => {
                 *end = point;
             }
             Some(AnnotationCommand::Text { .. }) => {}
@@ -104,10 +235,59 @@ impl AnnotationHistory {
         self.active = false;
         self.active_tool = 0;
         self.active_before = None;
+        self.edit = None;
+    }
+
+    pub fn selection_bounds(&self) -> Option<AnnotationBounds> {
+        self.selected
+            .and_then(|index| self.commands.get(index))
+            .map(AnnotationCommand::bounds)
+    }
+
+    pub fn clear_selection(&mut self) {
+        self.finish();
+        self.selected = None;
+    }
+
+    pub fn begin_edit(&mut self, point: (u32, u32), handle: i32) {
+        self.finish();
+        if !(-1..=3).contains(&handle) {
+            return;
+        }
+        let Some(index) = self.selected.filter(|index| *index < self.commands.len()) else {
+            self.selected = None;
+            return;
+        };
+        self.active_before = Some(self.commands.clone());
+        self.edit = Some(EditDrag {
+            index,
+            original: self.commands[index].clone(),
+            point,
+            handle,
+        });
+        self.active = true;
+        self.active_tool = 8;
+    }
+
+    /// Cancel a drawing, erasing, or editing gesture without recording an undo step.
+    pub fn cancel_edit(&mut self) {
+        if let Some(before) = self.active_before.take() {
+            self.commands = before;
+        }
+        self.active = false;
+        self.active_tool = 0;
+        self.edit = None;
+        if self
+            .selected
+            .is_some_and(|index| index >= self.commands.len())
+        {
+            self.selected = None;
+        }
     }
 
     pub fn add_text(&mut self, position: (u32, u32), text: &str, style: DrawStyle, font_size: u32) {
         self.finish();
+        self.selected = None;
         let text = text.trim();
         if text.is_empty() {
             return;
@@ -124,6 +304,7 @@ impl AnnotationHistory {
 
     pub fn undo(&mut self) {
         self.finish();
+        self.selected = None;
         if let Some(previous) = self.undo.pop() {
             self.redo
                 .push(std::mem::replace(&mut self.commands, previous));
@@ -132,6 +313,7 @@ impl AnnotationHistory {
 
     pub fn redo(&mut self) {
         self.finish();
+        self.selected = None;
         if let Some(next) = self.redo.pop() {
             self.undo.push(std::mem::replace(&mut self.commands, next));
         }
@@ -179,6 +361,11 @@ enum AnnotationCommand {
         end: (u32, u32),
         style: DrawStyle,
     },
+    Ellipse {
+        start: (u32, u32),
+        end: (u32, u32),
+        style: DrawStyle,
+    },
     Arrow {
         start: (u32, u32),
         end: (u32, u32),
@@ -198,12 +385,195 @@ enum AnnotationCommand {
 }
 
 impl AnnotationCommand {
+    fn is_outline(&self) -> bool {
+        matches!(self, Self::Rectangle { .. } | Self::Ellipse { .. })
+    }
+
+    fn geometry_bounds(&self) -> AnnotationBounds {
+        match self {
+            Self::Pen { points, .. } | Self::Mosaic { points, .. } => points_bounds(points),
+            Self::Rectangle { start, end, .. } | Self::Ellipse { start, end, .. } => {
+                AnnotationBounds::from_points(*start, *end)
+            }
+            Self::Arrow { start, end, .. } => {
+                let mut points = vec![*start, *end];
+                if let Some((left, right)) = arrow_head(*start, *end) {
+                    points.extend([left, right]);
+                }
+                points_bounds(&points)
+            }
+            Self::Text {
+                position,
+                text,
+                font_size,
+                ..
+            } => {
+                let (width, height) = estimated_text_size(text, *font_size);
+                AnnotationBounds {
+                    left: position.0,
+                    top: position.1,
+                    width: width.ceil() as u32,
+                    height: height.ceil() as u32,
+                }
+            }
+        }
+    }
+
+    fn padding(&self) -> u32 {
+        match self {
+            Self::Pen { style, .. }
+            | Self::Rectangle { style, .. }
+            | Self::Ellipse { style, .. }
+            | Self::Arrow { style, .. } => style.radius.max(1) as u32,
+            Self::Mosaic { radius, .. } => *radius,
+            Self::Text { .. } => 0,
+        }
+    }
+
+    fn bounds(&self) -> AnnotationBounds {
+        self.geometry_bounds().expanded(self.padding())
+    }
+
+    fn selection_hit_test(&self, point: (u32, u32)) -> bool {
+        match self {
+            Self::Rectangle { .. } => point_in_bounds(point, self.bounds(), 4),
+            Self::Ellipse { .. } => {
+                let bounds = self.geometry_bounds();
+                let radius_x = bounds.width as f64 / 2.0;
+                let radius_y = bounds.height as f64 / 2.0;
+                if radius_x == 0.0 || radius_y == 0.0 {
+                    return self.hit_test(point, 4.0);
+                }
+                let tolerance = self.padding() as f64 + 4.0;
+                let x = (point.0 as f64 - bounds.left as f64 - radius_x) / (radius_x + tolerance);
+                let y = (point.1 as f64 - bounds.top as f64 - radius_y) / (radius_y + tolerance);
+                x * x + y * y <= 1.0
+            }
+            _ => self.hit_test(point, 4.0),
+        }
+    }
+
+    fn translate(&mut self, dx: i64, dy: i64) {
+        let translate = |point: &mut (u32, u32)| {
+            point.0 = shift_coordinate(point.0, dx);
+            point.1 = shift_coordinate(point.1, dy);
+        };
+        match self {
+            Self::Pen { points, .. } | Self::Mosaic { points, .. } => {
+                for point in points {
+                    translate(point);
+                }
+            }
+            Self::Rectangle { start, end, .. }
+            | Self::Ellipse { start, end, .. }
+            | Self::Arrow { start, end, .. } => {
+                translate(start);
+                translate(end);
+            }
+            Self::Text { position, .. } => translate(position),
+        }
+    }
+
+    fn resize_to(&mut self, target: AnnotationBounds, handle: i32) {
+        let source = self.bounds();
+        let geometry = self.geometry_bounds();
+        let scale = (target.width as f64 / source.width.max(1) as f64)
+            .min(target.height as f64 / source.height.max(1) as f64);
+        match self {
+            Self::Text {
+                position,
+                text,
+                font_size,
+                ..
+            } => {
+                *font_size = (*font_size as f64 * scale).floor().max(1.0) as u32;
+                let (width, height) = estimated_text_size(text, *font_size);
+                // Text preserves its aspect ratio; the opposite corner stays fixed.
+                position.0 = if handle % 2 == 0 {
+                    target.right().saturating_sub(width.ceil() as u32)
+                } else {
+                    target.left
+                };
+                position.1 = if handle < 2 {
+                    target.bottom().saturating_sub(height.ceil() as u32)
+                } else {
+                    target.top
+                };
+            }
+            Self::Pen { points, style } => {
+                style.radius = (style.radius as f64 * scale).round().max(1.0) as i32;
+                let destination = inset_bounds(target, style.radius as u32);
+                for point in points {
+                    *point = map_point(*point, geometry, destination);
+                }
+            }
+            Self::Mosaic {
+                points,
+                radius,
+                block_size,
+            } => {
+                *radius = (*radius as f64 * scale).round().max(1.0) as u32;
+                *block_size = (*block_size as f64 * scale).round().max(1.0) as u32;
+                let destination = inset_bounds(target, *radius);
+                for point in points {
+                    *point = map_point(*point, geometry, destination);
+                }
+            }
+            Self::Rectangle { start, end, style }
+            | Self::Ellipse { start, end, style }
+            | Self::Arrow { start, end, style } => {
+                let destination = inset_bounds(target, style.radius.max(1) as u32);
+                let original_start = *start;
+                let original_end = *end;
+                *start = map_point(original_start, geometry, destination);
+                *end = map_point(original_end, geometry, destination);
+                // A zero-length axis cannot be expanded by multiplication alone.
+                if geometry.width == 0 {
+                    start.0 = destination.left;
+                    end.0 = destination.right();
+                }
+                if geometry.height == 0 {
+                    start.1 = destination.top;
+                    end.1 = destination.bottom();
+                }
+            }
+        }
+    }
+
+    fn fit_within(&mut self, image: (u32, u32)) {
+        let max_x = image.0.saturating_sub(1);
+        let max_y = image.1.saturating_sub(1);
+        let bounds = self.bounds();
+        if bounds.width > max_x || bounds.height > max_y {
+            self.resize_to(
+                AnnotationBounds {
+                    left: 0,
+                    top: 0,
+                    width: max_x,
+                    height: max_y,
+                },
+                3,
+            );
+        }
+        // Arrow heads are derived from endpoints, so check their final extent as well.
+        let bounds = self.bounds();
+        self.translate(
+            -(bounds.right().saturating_sub(max_x) as i64),
+            -(bounds.bottom().saturating_sub(max_y) as i64),
+        );
+    }
+
     fn view(&self) -> Option<AnnotationView> {
         match self {
             Self::Pen { points, style } => Some(path_view(pen_path(points), *style)),
-            Self::Rectangle { start, end, style } => {
-                Some(path_view(rectangle_path(*start, *end), *style))
-            }
+            Self::Rectangle { start, end, style } => Some(path_view(
+                outline_path(OutlineShape::Rectangle, *start, *end, *style),
+                *style,
+            )),
+            Self::Ellipse { start, end, style } => Some(path_view(
+                outline_path(OutlineShape::Ellipse, *start, *end, *style),
+                *style,
+            )),
             Self::Arrow { start, end, style } => Some(path_view(arrow_path(*start, *end), *style)),
             Self::Text {
                 position,
@@ -249,6 +619,9 @@ impl AnnotationCommand {
             Self::Rectangle { start, end, style } => {
                 image.draw_rectangle(*start, *end, *style);
             }
+            Self::Ellipse { start, end, style } => {
+                image.draw_ellipse(*start, *end, *style);
+            }
             Self::Arrow { start, end, style } => {
                 image.draw_arrow(*start, *end, *style);
             }
@@ -276,18 +649,25 @@ impl AnnotationCommand {
             }
             Self::Rectangle { start, end, style } => {
                 let tolerance = tolerance + style.radius.max(1) as f64;
-                let left = start.0.min(end.0);
-                let right = start.0.max(end.0);
-                let top = start.1.min(end.1);
-                let bottom = start.1.max(end.1);
-                [
-                    ((left, top), (right, top)),
-                    ((right, top), (right, bottom)),
-                    ((right, bottom), (left, bottom)),
-                    ((left, bottom), (left, top)),
-                ]
-                .into_iter()
-                .any(|(a, b)| distance_to_segment(point, a, b) <= tolerance)
+                outline_hit_test(
+                    OutlineShape::Rectangle,
+                    *start,
+                    *end,
+                    *style,
+                    point,
+                    tolerance,
+                )
+            }
+            Self::Ellipse { start, end, style } => {
+                let tolerance = tolerance + style.radius.max(1) as f64;
+                outline_hit_test(
+                    OutlineShape::Ellipse,
+                    *start,
+                    *end,
+                    *style,
+                    point,
+                    tolerance,
+                )
             }
             Self::Arrow { start, end, style } => {
                 let tolerance = tolerance + style.radius.max(1) as f64;
@@ -322,6 +702,126 @@ impl AnnotationCommand {
             }
         }
     }
+}
+
+fn clamp_point(point: (u32, u32), bounds: (u32, u32)) -> (u32, u32) {
+    (
+        point.0.min(bounds.0.saturating_sub(1)),
+        point.1.min(bounds.1.saturating_sub(1)),
+    )
+}
+
+fn constrained_endpoint(start: (u32, u32), point: (u32, u32), bounds: (u32, u32)) -> (u32, u32) {
+    let start = clamp_point(start, bounds);
+    let positive_x = point.0 >= start.0;
+    let positive_y = point.1 >= start.1;
+    let available_x = if positive_x {
+        bounds.0.saturating_sub(1).saturating_sub(start.0)
+    } else {
+        start.0
+    };
+    let available_y = if positive_y {
+        bounds.1.saturating_sub(1).saturating_sub(start.1)
+    } else {
+        start.1
+    };
+    let side = start
+        .0
+        .abs_diff(point.0)
+        .max(start.1.abs_diff(point.1))
+        .min(available_x)
+        .min(available_y);
+    (
+        if positive_x {
+            start.0 + side
+        } else {
+            start.0 - side
+        },
+        if positive_y {
+            start.1 + side
+        } else {
+            start.1 - side
+        },
+    )
+}
+
+fn shift_coordinate(value: u32, delta: i64) -> u32 {
+    (value as i64 + delta).clamp(0, u32::MAX as i64) as u32
+}
+
+fn clamp_translation(delta: i64, start: u32, end: u32, size: u32) -> i64 {
+    let minimum = -(start as i64);
+    let maximum = size.saturating_sub(1) as i64 - end as i64;
+    if minimum > maximum {
+        return minimum;
+    }
+    delta.clamp(minimum, maximum)
+}
+
+fn points_bounds(points: &[(u32, u32)]) -> AnnotationBounds {
+    let Some(first) = points.first() else {
+        return AnnotationBounds {
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+        };
+    };
+    let (mut left, mut top, mut right, mut bottom) = (first.0, first.1, first.0, first.1);
+    for point in &points[1..] {
+        left = left.min(point.0);
+        top = top.min(point.1);
+        right = right.max(point.0);
+        bottom = bottom.max(point.1);
+    }
+    AnnotationBounds::from_points((left, top), (right, bottom))
+}
+
+fn point_in_bounds(point: (u32, u32), bounds: AnnotationBounds, tolerance: u32) -> bool {
+    point.0 >= bounds.left.saturating_sub(tolerance)
+        && point.0 <= bounds.right().saturating_add(tolerance)
+        && point.1 >= bounds.top.saturating_sub(tolerance)
+        && point.1 <= bounds.bottom().saturating_add(tolerance)
+}
+
+fn inset_bounds(bounds: AnnotationBounds, padding: u32) -> AnnotationBounds {
+    let x_padding = padding.min(bounds.width / 2);
+    let y_padding = padding.min(bounds.height / 2);
+    AnnotationBounds {
+        left: bounds.left + x_padding,
+        top: bounds.top + y_padding,
+        width: bounds.width - x_padding * 2,
+        height: bounds.height - y_padding * 2,
+    }
+}
+
+fn map_point(point: (u32, u32), source: AnnotationBounds, target: AnnotationBounds) -> (u32, u32) {
+    let map = |value: u32, origin: u32, size: u32, destination: u32, destination_size: u32| {
+        let proportion = if size == 0 {
+            0.5
+        } else {
+            (value as f64 - origin as f64) / size as f64
+        };
+        (destination as f64 + proportion * destination_size as f64)
+            .round()
+            .clamp(0.0, u32::MAX as f64) as u32
+    };
+    (
+        map(
+            point.0,
+            source.left,
+            source.width,
+            target.left,
+            target.width,
+        ),
+        map(
+            point.1,
+            source.top,
+            source.height,
+            target.top,
+            target.height,
+        ),
+    )
 }
 
 fn mosaic_parameters(size: i32) -> (u32, u32) {
@@ -394,12 +894,36 @@ fn pen_path(points: &[(u32, u32)]) -> String {
     path
 }
 
-fn rectangle_path(start: (u32, u32), end: (u32, u32)) -> String {
-    let left = start.0.min(end.0);
-    let right = start.0.max(end.0);
-    let top = start.1.min(end.1);
-    let bottom = start.1.max(end.1);
-    format!("M {left} {top} L {right} {top} L {right} {bottom} L {left} {bottom} Z")
+fn outline_path(
+    shape: OutlineShape,
+    start: (u32, u32),
+    end: (u32, u32),
+    style: DrawStyle,
+) -> String {
+    outline_polylines(shape, start, end, style)
+        .iter()
+        .map(|points| pen_path(points))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn outline_hit_test(
+    shape: OutlineShape,
+    start: (u32, u32),
+    end: (u32, u32),
+    style: DrawStyle,
+    point: (u32, u32),
+    tolerance: f64,
+) -> bool {
+    outline_polylines(shape, start, end, style)
+        .iter()
+        .any(|path| {
+            path.windows(2)
+                .any(|pair| distance_to_segment(point, pair[0], pair[1]) <= tolerance)
+                || path
+                    .first()
+                    .is_some_and(|candidate| distance(*candidate, point) <= tolerance)
+        })
 }
 
 fn arrow_path(start: (u32, u32), end: (u32, u32)) -> String {
@@ -416,8 +940,348 @@ fn arrow_path(start: (u32, u32), end: (u32, u32)) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{AnnotationHistory, DrawStyle, arrow_path, rectangle_path};
-    use crate::image::CapturedImage;
+    use super::{AnnotationCommand, AnnotationHistory, DrawStyle, arrow_path, outline_path};
+    use crate::image::{CapturedImage, OutlineShape};
+
+    fn style() -> DrawStyle {
+        DrawStyle {
+            rgba: [255, 0, 0, 255],
+            radius: 2,
+            dashed: false,
+        }
+    }
+
+    fn rectangle(history: &mut AnnotationHistory, start: (u32, u32), end: (u32, u32)) {
+        history.begin(2, start, style());
+        history.update(end, false, (200, 200));
+        history.finish();
+    }
+
+    #[test]
+    fn shift_constrains_rectangles_and_ellipses_in_all_four_directions() {
+        for tool in [2, 7] {
+            for (point, expected) in [
+                ((80, 65), (80, 80)),
+                ((20, 65), (20, 80)),
+                ((80, 35), (80, 20)),
+                ((20, 35), (20, 20)),
+            ] {
+                let mut history = AnnotationHistory::default();
+                history.begin(tool, (50, 50), style());
+                history.update(point, true, (100, 100));
+                let bounds = history.commands[0].geometry_bounds();
+                assert_eq!(bounds.width, 30);
+                assert_eq!(bounds.height, 30);
+                match history.commands[0] {
+                    AnnotationCommand::Rectangle { end, .. }
+                    | AnnotationCommand::Ellipse { end, .. } => assert_eq!(end, expected),
+                    _ => panic!("expected an outline"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn shift_clamps_both_axes_at_image_edges_without_losing_equal_sides() {
+        for (start, point, expected) in [
+            ((95, 10), (99, 40), (99, 14)),
+            ((5, 90), (0, 60), (0, 85)),
+            ((10, 95), (40, 99), (14, 99)),
+            ((90, 5), (60, 0), (85, 0)),
+        ] {
+            let mut history = AnnotationHistory::default();
+            history.begin(2, start, style());
+            history.update(point, true, (100, 100));
+            match history.commands[0] {
+                AnnotationCommand::Rectangle { end, .. } => assert_eq!(end, expected),
+                _ => unreachable!(),
+            }
+            let bounds = history.commands[0].geometry_bounds();
+            assert_eq!(bounds.width, bounds.height);
+        }
+    }
+
+    #[test]
+    fn selection_hits_shape_interiors_and_edits_only_the_topmost_annotation() {
+        let mut history = AnnotationHistory::default();
+        rectangle(&mut history, (10, 10), (50, 50));
+        rectangle(&mut history, (20, 20), (60, 60));
+        let before = history.commands.clone();
+        history.begin(8, (30, 30), style());
+        assert_eq!(history.selected, Some(1));
+        history.update((35, 40), false, (100, 100));
+        history.finish();
+        assert!(history.commands[0] == before[0]);
+        assert!(history.commands[1] != before[1]);
+        let edited = history.commands.clone();
+        history.undo();
+        assert!(history.commands == before);
+        assert_eq!(history.selection_bounds(), None);
+        history.redo();
+        assert!(history.commands == edited);
+        assert_eq!(history.selection_bounds(), None);
+    }
+
+    #[test]
+    fn move_clamps_visible_stroke_to_image_and_records_one_undo_step() {
+        let mut history = AnnotationHistory::default();
+        rectangle(&mut history, (10, 10), (30, 30));
+        let before = history.commands.clone();
+        history.begin(8, (20, 20), style());
+        history.update((0, 0), false, (100, 100));
+        let bounds = history.selection_bounds().unwrap();
+        assert_eq!((bounds.left, bounds.top), (0, 0));
+        history.update((200, 200), false, (100, 100));
+        let bounds = history.selection_bounds().unwrap();
+        assert_eq!((bounds.right(), bounds.bottom()), (99, 99));
+        history.finish();
+        assert_eq!(history.undo.len(), 2, "creation plus one complete drag");
+        history.undo();
+        assert!(history.commands == before);
+    }
+
+    #[test]
+    fn each_resize_handle_keeps_its_opposite_corner_and_is_undoable() {
+        for handle in 0..4 {
+            let mut history = AnnotationHistory::default();
+            rectangle(&mut history, (20, 20), (60, 40));
+            let before = history.commands.clone();
+            history.begin(8, (30, 30), style());
+            history.finish();
+            let original = history.selection_bounds().unwrap();
+            let corner = original.corner(handle);
+            let next = (
+                if handle % 2 == 0 {
+                    corner.0 - 10
+                } else {
+                    corner.0 + 10
+                },
+                if handle < 2 {
+                    corner.1 - 10
+                } else {
+                    corner.1 + 10
+                },
+            );
+            history.begin_edit(corner, handle);
+            history.update(next, false, (100, 100));
+            history.finish();
+            assert_eq!(
+                history.selection_bounds().unwrap().corner(3 - handle),
+                original.corner(3 - handle)
+            );
+            let edited = history.commands.clone();
+            assert!(edited != before);
+            history.undo();
+            assert!(history.commands == before);
+            history.redo();
+            assert!(history.commands == edited);
+        }
+    }
+
+    #[test]
+    fn selection_and_returning_to_drag_origin_do_not_add_undo_steps() {
+        let mut history = AnnotationHistory::default();
+        rectangle(&mut history, (10, 10), (50, 50));
+        let before = history.commands.clone();
+        history.begin(8, (30, 30), style());
+        history.finish();
+        assert_eq!(history.undo.len(), 1);
+        let corner = history.selection_bounds().unwrap().corner(3);
+        history.begin_edit(corner, 3);
+        history.update(corner, false, (100, 100));
+        history.finish();
+        assert_eq!(history.undo.len(), 1);
+        history.begin_edit((30, 30), -1);
+        history.update((40, 40), false, (100, 100));
+        history.update((30, 30), false, (100, 100));
+        history.finish();
+        assert!(history.commands == before);
+        assert_eq!(history.undo.len(), 1);
+    }
+
+    #[test]
+    fn cancellation_rolls_back_drawing_erasing_and_editing_gestures() {
+        let mut history = AnnotationHistory::default();
+        rectangle(&mut history, (10, 10), (50, 50));
+        let before = history.commands.clone();
+        history.begin(7, (20, 20), style());
+        history.update((80, 80), false, (100, 100));
+        history.cancel_edit();
+        assert!(history.commands == before);
+        history.begin(5, (30, 10), style());
+        assert!(history.commands.is_empty());
+        history.cancel_edit();
+        assert!(history.commands == before);
+        history.begin(8, (30, 30), style());
+        history.update((40, 40), false, (100, 100));
+        history.cancel_edit();
+        assert!(history.commands == before);
+        assert!(history.selection_bounds().is_some());
+        assert_eq!(history.undo.len(), 1);
+        history.clear_selection();
+        assert_eq!(history.selection_bounds(), None);
+    }
+
+    #[test]
+    fn all_annotation_kinds_resize_and_text_uses_a_scaled_font_size() {
+        for command in [
+            AnnotationCommand::Pen {
+                points: vec![(20, 20), (40, 40)],
+                style: style(),
+            },
+            AnnotationCommand::Arrow {
+                start: (20, 20),
+                end: (40, 40),
+                style: style(),
+            },
+            AnnotationCommand::Ellipse {
+                start: (20, 20),
+                end: (40, 40),
+                style: style(),
+            },
+            AnnotationCommand::Text {
+                position: (20, 20),
+                text: "Test".into(),
+                style: style(),
+                font_size: 12,
+            },
+            AnnotationCommand::Mosaic {
+                points: vec![(20, 20), (40, 40)],
+                radius: 5,
+                block_size: 6,
+            },
+        ] {
+            let mut history = AnnotationHistory::default();
+            history.commands.push(command.clone());
+            history.selected = Some(0);
+            let corner = history.selection_bounds().unwrap().corner(3);
+            history.begin_edit(corner, 3);
+            history.update((corner.0 + 20, corner.1 + 20), false, (100, 100));
+            history.finish();
+            assert!(history.commands[0] != command);
+            let bounds = history.selection_bounds().unwrap();
+            assert!(bounds.right() < 100 && bounds.bottom() < 100);
+            if let AnnotationCommand::Text { font_size, .. } = history.commands[0] {
+                assert!(font_size > 12);
+            }
+            let edited = history.commands.clone();
+            history.undo();
+            assert!(history.commands[0] == command);
+            history.redo();
+            assert!(history.commands == edited);
+        }
+    }
+
+    #[test]
+    fn edge_annotations_are_unchanged_when_an_edit_has_no_pointer_movement() {
+        for command in [
+            AnnotationCommand::Rectangle {
+                start: (0, 0),
+                end: (30, 20),
+                style: style(),
+            },
+            AnnotationCommand::Ellipse {
+                start: (30, 20),
+                end: (0, 0),
+                style: style(),
+            },
+            AnnotationCommand::Arrow {
+                start: (0, 0),
+                end: (30, 0),
+                style: style(),
+            },
+            AnnotationCommand::Pen {
+                points: vec![(0, 0)],
+                style: style(),
+            },
+            AnnotationCommand::Text {
+                position: (0, 0),
+                text: "Test".into(),
+                style: style(),
+                font_size: 12,
+            },
+            AnnotationCommand::Mosaic {
+                points: vec![(0, 0)],
+                radius: 5,
+                block_size: 6,
+            },
+        ] {
+            for handle in -1..4 {
+                let mut history = AnnotationHistory::default();
+                history.commands.push(command.clone());
+                history.selected = Some(0);
+                let point = if handle < 0 {
+                    (0, 0)
+                } else {
+                    command.bounds().corner(handle)
+                };
+                history.begin_edit(point, handle);
+                history.update(point, false, (100, 100));
+                history.finish();
+                assert!(history.commands[0] == command);
+                assert!(history.undo.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn resizing_can_expand_point_and_line_outlines_without_changing_drag_direction() {
+        for command in [
+            AnnotationCommand::Rectangle {
+                start: (20, 20),
+                end: (20, 20),
+                style: style(),
+            },
+            AnnotationCommand::Ellipse {
+                start: (20, 20),
+                end: (40, 20),
+                style: style(),
+            },
+            AnnotationCommand::Rectangle {
+                start: (40, 40),
+                end: (20, 20),
+                style: style(),
+            },
+        ] {
+            let mut history = AnnotationHistory::default();
+            let reversed = match command {
+                AnnotationCommand::Rectangle { start, end, .. } => start.0 > end.0,
+                _ => false,
+            };
+            history.commands.push(command);
+            history.selected = Some(0);
+            let corner = history.selection_bounds().unwrap().corner(3);
+            history.begin_edit(corner, 3);
+            history.update((corner.0 + 20, corner.1 + 20), false, (100, 100));
+            let geometry = history.commands[0].geometry_bounds();
+            assert!(geometry.width > 0 && geometry.height > 0);
+            if reversed && let AnnotationCommand::Rectangle { start, end, .. } = history.commands[0]
+            {
+                assert!(start.0 > end.0 && start.1 > end.1);
+            }
+        }
+    }
+
+    #[test]
+    fn crossing_a_resize_anchor_is_stable_and_returning_restores_original_geometry() {
+        let mut history = AnnotationHistory::default();
+        rectangle(&mut history, (20, 20), (40, 40));
+        let before = history.commands.clone();
+        history.begin(8, (30, 30), style());
+        history.finish();
+        let corner = history.selection_bounds().unwrap().corner(3);
+        history.begin_edit(corner, 3);
+        history.update((10, 10), true, (100, 100));
+        let first = history.commands.clone();
+        history.update((10, 10), true, (100, 100));
+        assert!(history.commands == first);
+        let bounds = history.selection_bounds().unwrap();
+        assert_eq!(bounds.width, bounds.height);
+        history.update(corner, false, (100, 100));
+        history.finish();
+        assert!(history.commands == before);
+        assert_eq!(history.undo.len(), 1);
+    }
 
     #[test]
     fn undo_and_redo_preserve_commands() {
@@ -428,9 +1292,10 @@ mod tests {
             DrawStyle {
                 rgba: [255, 0, 0, 255],
                 radius: 2,
+                dashed: false,
             },
         );
-        history.update((30, 40));
+        history.update((30, 40), false, (100, 100));
         history.finish();
         assert_eq!(history.commands.len(), 1);
         history.undo();
@@ -442,10 +1307,91 @@ mod tests {
     #[test]
     fn shape_paths_use_image_coordinates() {
         assert_eq!(
-            rectangle_path((30, 40), (10, 20)),
-            "M 10 20 L 30 20 L 30 40 L 10 40 Z"
+            outline_path(
+                OutlineShape::Rectangle,
+                (30, 40),
+                (10, 20),
+                DrawStyle {
+                    rgba: [255, 0, 0, 255],
+                    radius: 1,
+                    dashed: false,
+                }
+            ),
+            "M 10 20 L 30 20 L 30 40 L 10 40 L 10 20"
         );
         assert!(arrow_path((10, 10), (30, 20)).starts_with("M 10 10 L 30 20"));
+    }
+
+    #[test]
+    fn preview_and_output_preserve_dash_gaps() {
+        let base = CapturedImage::from_rgba(0, 0, 64, 48, &[0; 64 * 48 * 4]).unwrap();
+        let mut history = AnnotationHistory::default();
+        history.begin(
+            2,
+            (8, 8),
+            DrawStyle {
+                rgba: [255, 0, 0, 255],
+                radius: 1,
+                dashed: true,
+            },
+        );
+        history.update((60, 36), false, (64, 48));
+        history.finish();
+
+        let preview = history.views();
+        assert!(
+            preview[0]
+                .commands
+                .starts_with("M 8 8 L 14 8 M 18 8 L 24 8")
+        );
+        let output = history.render(&base).unwrap().rgba_bytes();
+        let offset = |x: usize, y: usize| (y * 64 + x) * 4;
+        assert_eq!(&output[offset(11, 8)..offset(11, 8) + 4], &[255, 0, 0, 255]);
+        assert_eq!(&output[offset(16, 8)..offset(16, 8) + 4], &[0; 4]);
+    }
+
+    #[test]
+    fn ellipse_styles_survive_undo_redo_and_outline_erasure() {
+        let base = CapturedImage::from_rgba(0, 0, 64, 64, &[0; 64 * 64 * 4]).unwrap();
+        let mut history = AnnotationHistory::default();
+        let style = DrawStyle {
+            rgba: [0, 128, 255, 255],
+            radius: 1,
+            dashed: true,
+        };
+        history.begin(7, (56, 48), style);
+        history.update((8, 8), false, (64, 64));
+        history.finish();
+        assert!(matches!(
+            history.commands[0],
+            AnnotationCommand::Ellipse { .. }
+        ));
+        let preview = history.views()[0].commands.clone();
+        let pixels = history.render(&base).unwrap().rgba_bytes();
+
+        history.undo();
+        assert!(history.views().is_empty());
+        assert_eq!(
+            history.render(&base).unwrap().rgba_bytes(),
+            base.rgba_bytes()
+        );
+        history.redo();
+        assert_eq!(history.views()[0].commands, preview);
+        assert_eq!(history.render(&base).unwrap().rgba_bytes(), pixels);
+
+        history.begin(5, (32, 28), style);
+        history.finish();
+        assert_eq!(
+            history.commands.len(),
+            1,
+            "ellipse center is not its outline"
+        );
+        history.begin(5, (32, 8), style);
+        history.finish();
+        assert!(history.commands.is_empty());
+        history.undo();
+        assert_eq!(history.views()[0].commands, preview);
+        assert_eq!(history.render(&base).unwrap().rgba_bytes(), pixels);
     }
 
     #[test]
@@ -459,9 +1405,10 @@ mod tests {
             DrawStyle {
                 rgba: [255, 0, 0, 255],
                 radius: 1,
+                dashed: false,
             },
         );
-        history.update((2, 2));
+        history.update((2, 2), false, (4, 4));
         history.finish();
 
         let rendered = history.render(&base).unwrap();
@@ -475,9 +1422,10 @@ mod tests {
         let style = DrawStyle {
             rgba: [255, 0, 0, 255],
             radius: 2,
+            dashed: false,
         };
         history.begin(1, (1, 1), style);
-        history.update((20, 1));
+        history.update((20, 1), false, (100, 100));
         history.finish();
         history.begin(5, (10, 1), style);
         history.finish();
@@ -500,9 +1448,10 @@ mod tests {
             DrawStyle {
                 rgba: [0, 0, 0, 255],
                 radius: 1,
+                dashed: false,
             },
         );
-        history.update((9, 2));
+        history.update((9, 2), false, (12, 4));
         history.finish();
 
         assert!(history.views().is_empty());

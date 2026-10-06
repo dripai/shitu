@@ -4,18 +4,28 @@ import { CaptureToolbar } from "capture-toolbar.slint";
 // A top-level Slint window keeps the pinned-image toolbar independent and interactive.
 export component PinToolbarWindow inherits Window {
     title: @tr("钉住工具栏");
-    width: root.ocr-available ? 372px : 342px;
-    // Slint 1.17 Tooltip has no public placement property and is clipped by a
-    // top-level window's bounds. Reserve transparent space below this toolbar.
-    height: (((root.active-tool > 0 && root.active-tool < 5) || root.active-tool == 6)
-        ? 68px : 38px) + 34px;
+    width: root.content-width * 1px;
+    // Slint 1.17 winit renders native popups inside the parent. Preserve the
+    // 34px reserve for the Fluent three-option ComboBox (3 * 40px + 8px),
+    // placing it on the expansion side so the main row stays anchored.
+    height: root.window-height * 1px;
     background: transparent;
     no-frame: true;
+    forward-focus: keyboard;
 
     in-out property <int> active-tool: 0;
     in-out property <int> color-index: 0;
     in-out property <int> stroke-radius: 2;
+    in-out property <int> text-size: 20;
+    in-out property <bool> dashed: false;
     in property <bool> ocr-available: false;
+    in property <bool> properties-above: false;
+    out property <float> content-width: toolbar.width / 1px;
+    out property <float> content-height: toolbar.height / 1px;
+    out property <float> main-row-height: toolbar.main-row-height / 1px;
+    out property <float> expanded-height: toolbar.expanded-height / 1px;
+    out property <float> popup-padding: 34;
+    out property <float> window-height: root.content-height + root.popup-padding;
 
     callback close-pin();
     callback copy-image();
@@ -26,28 +36,67 @@ export component PinToolbarWindow inherits Window {
     callback set-tool(int);
     callback select-color(int);
     callback select-width(int);
+    callback select-text-size(int);
+    callback select-dashed(bool);
+    callback reposition-toolbar();
 
-    CaptureToolbar {
-        x: 0px;
-        y: 0px;
-        annotation-tools-visible: true;
-        ocr-available: root.ocr-available;
-        pin-action-visible: false;
-        save-tip-override: @tr("图像另存为...");
-        copy-tip-override: @tr("复制图像");
-        ocr-tip-override: @tr("识别图像文字");
-        cancel-tip: @tr("关闭钉住");
-        active-tool <=> root.active-tool;
-        color-index <=> root.color-index;
-        stroke-radius <=> root.stroke-radius;
-        undo => { root.undo(); }
-        redo => { root.redo(); }
-        save-output => { root.save-image(); }
-        copy-output => { root.copy-image(); }
-        recognize-text => { root.recognize-text(); }
-        cancel-action => { root.close-pin(); }
-        select-tool(tool) => { root.set-tool(tool); }
-        select-color(index) => { root.select-color(index); }
-        select-width(width) => { root.select-width(width); }
+    changed width => { root.reposition-toolbar(); }
+    changed height => { root.reposition-toolbar(); }
+
+    // Native FocusScope/KeyBinding leave input widgets' keyboard handling intact.
+    // Shortcuts are enabled only while this scope itself has focus, not a child.
+    keyboard := FocusScope {
+        KeyBinding {
+            keys: @keys(Control + Z);
+            enabled: keyboard.has-focus;
+            activated => { root.undo(); }
+        }
+        KeyBinding {
+            keys: @keys(Control + Y);
+            enabled: keyboard.has-focus;
+            activated => { root.redo(); }
+        }
+        KeyBinding {
+            keys: @keys(Control + Shift + Z);
+            enabled: keyboard.has-focus;
+            activated => { root.redo(); }
+        }
+        KeyBinding {
+            keys: @keys(Return);
+            enabled: keyboard.has-focus;
+            activated => { root.copy-image(); }
+        }
+
+        toolbar := CaptureToolbar {
+            x: 0px;
+            y: root.properties-above ? root.popup-padding * 1px : 0px;
+            properties-above: root.properties-above;
+            annotation-tools-visible: true;
+            ocr-available: root.ocr-available;
+            pin-action-visible: false;
+            save-tip-override: @tr("图像另存为...");
+            copy-tip-override: @tr("复制图像");
+            ocr-tip-override: @tr("识别图像文字");
+            cancel-tip: @tr("关闭钉住");
+            active-tool <=> root.active-tool;
+            color-index <=> root.color-index;
+            stroke-radius <=> root.stroke-radius;
+            text-size <=> root.text-size;
+            dashed <=> root.dashed;
+            undo => { root.undo(); }
+            redo => { root.redo(); }
+            save-output => { root.save-image(); }
+            copy-output => { root.copy-image(); }
+            recognize-text => { root.recognize-text(); }
+            cancel-action => { root.close-pin(); }
+            select-tool(tool) => {
+                keyboard.focus();
+                root.set-tool(tool);
+            }
+            select-color(index) => { root.select-color(index); }
+            select-width(width) => { root.select-width(width); }
+            select-text-size(size) => { root.select-text-size(size); }
+            select-dashed(dashed) => { root.select-dashed(dashed); }
+        }
     }
 }

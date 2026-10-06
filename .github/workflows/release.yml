@@ -1,4 +1,4 @@
-name: Publish cross-platform validated release
+name: Publish ShiTu release
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
       - name: Verify tag matches package versions
         shell: pwsh
         run: |
-          $packageNames = @('shitu', 'shiping')
+          $packageNames = @('shitu')
           $packages = @(
             (cargo metadata --locked --format-version 1 | ConvertFrom-Json).packages |
               Where-Object { $_.name -in $packageNames }
@@ -51,25 +51,8 @@ jobs:
             os: windows-latest
             kind: windows
             architecture: x86_64
-            artifact_name: windows-x86_64
-          - name: Linux x64
-            os: ubuntu-24.04
-            kind: linux
-            architecture: x86_64
-            artifact_name: shiping-linux-x86_64
-          - name: ShiPing macOS ARM64
-            os: macos-15
-            kind: macos
-            architecture: arm64
-            artifact_name: shiping-macos-arm64
-          - name: ShiPing macOS x64
-            os: macos-15-intel
-            kind: macos
-            architecture: x86_64
-            artifact_name: shiping-macos-x86_64
+            artifact_name: shitu-windows-x86_64
     runs-on: ${{ matrix.os }}
-    env:
-      MACOSX_DEPLOYMENT_TARGET: '15.0'
     steps:
       - uses: actions/checkout@v6
 
@@ -79,34 +62,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: release-shiping-${{ matrix.artifact_name }}
-
-      - name: Install Linux build dependencies
-        if: matrix.kind == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes \
-            libdbus-1-dev \
-            libfontconfig1-dev \
-            libpipewire-0.3-dev \
-            libwayland-dev \
-            libx11-dev \
-            libxcb1-dev \
-            libxkbcommon-dev \
-            libxkbcommon-x11-dev \
-            libxrandr-dev \
-            pkg-config
-
-      - name: Test ShiPing
-        if: matrix.kind != 'windows'
-        run: cargo test --locked --package shiping
+          shared-key: release-shitu-${{ matrix.artifact_name }}
 
       - name: Test Windows workspace
         if: matrix.kind == 'windows'
         run: cargo test --workspace --locked
-
-      - name: Build ShiPing release binary
-        run: cargo build --release --locked --package shiping --bin ShiPing
 
       - name: Build ShiTu release binary
         if: matrix.kind == 'windows'
@@ -122,11 +82,6 @@ jobs:
               Product = 'ShiTu'
               PackageName = 'shitu'
               Executable = '.\target\release\ShiTu.exe'
-            },
-            @{
-              Product = 'ShiPing'
-              PackageName = 'shiping'
-              Executable = '.\target\release\ShiPing.exe'
             }
           )
 
@@ -155,10 +110,6 @@ jobs:
             @{
               Name = 'ShiTu'
               Executable = 'target\release\ShiTu.exe'
-            },
-            @{
-              Name = 'ShiPing'
-              Executable = 'target\release\ShiPing.exe'
             }
           )
 
@@ -174,24 +125,6 @@ jobs:
             $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash *$archiveName" | Set-Content -LiteralPath "$archivePath.sha256" -Encoding ascii -NoNewline
           }
-
-      - name: Package ShiPing Linux release
-        if: matrix.kind == 'linux'
-        shell: bash
-        run: |
-          bash ./tools/package-shiping-linux.sh \
-            ./target/release/ShiPing \
-            "$GITHUB_REF_NAME" \
-            "${{ matrix.architecture }}"
-
-      - name: Package ShiPing macOS release
-        if: matrix.kind == 'macos'
-        shell: bash
-        run: |
-          bash ./tools/package-shiping-macos.sh \
-            ./target/release/ShiPing \
-            "$GITHUB_REF_NAME" \
-            "${{ matrix.architecture }}"
 
       - uses: actions/upload-artifact@v4
         with:

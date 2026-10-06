@@ -1,0 +1,65 @@
+// Slint 1.17 has native TouchArea pointer capture and PointerEvent.modifiers.
+// The application supplies only annotation geometry and resize handles; no
+// custom window, popup, focus lifecycle, or platform event handling is needed.
+export component AnnotationSelection inherits Rectangle {
+    in property <float> selected-left;
+    in property <float> selected-top;
+    in property <float> selected-width;
+    in property <float> selected-height;
+    in property <int> image-width: 1;
+    in property <int> image-height: 1;
+    callback begin-edit(float, float, int);
+    callback update-edit(float, float, bool);
+    callback finish-edit();
+    callback cancel-edit();
+    callback focus-canvas();
+    background: transparent;
+
+    Rectangle {
+        x: root.selected-left / Math.max(1, root.image-width) * root.width;
+        y: root.selected-top / Math.max(1, root.image-height) * root.height;
+        width: Math.max(1px, root.selected-width / Math.max(1, root.image-width) * root.width);
+        height: Math.max(1px, root.selected-height / Math.max(1, root.image-height) * root.height);
+        border-width: 1px;
+        border-color: #54a5ff;
+        background: transparent;
+    }
+
+    for handle in [0, 1, 2, 3]: Rectangle {
+        property <float> corner-x: root.selected-left
+            + ((handle == 1 || handle == 3) ? root.selected-width : 0);
+        property <float> corner-y: root.selected-top
+            + (handle >= 2 ? root.selected-height : 0);
+        x: Math.max(0px, Math.min(root.width - self.width,
+            self.corner-x / Math.max(1, root.image-width) * root.width - self.width / 2));
+        y: Math.max(0px, Math.min(root.height - self.height,
+            self.corner-y / Math.max(1, root.image-height) * root.height - self.height / 2));
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        border-width: 1px;
+        border-color: #54a5ff;
+        background: #ffffff;
+
+        TouchArea {
+            width: parent.width;
+            height: parent.height;
+            mouse-cursor: handle == 0 || handle == 3 ? nwse-resize : nesw-resize;
+            pointer-event(event) => {
+                let image-x = (parent.x + self.mouse-x) / root.width * root.image-width;
+                let image-y = (parent.y + self.mouse-y) / root.height * root.image-height;
+                if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                    root.focus-canvas();
+                    root.begin-edit(image-x, image-y, handle);
+                } else if event.kind == PointerEventKind.move && self.pressed {
+                    root.update-edit(image-x, image-y, event.modifiers.shift);
+                } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                    root.update-edit(image-x, image-y, event.modifiers.shift);
+                    root.finish-edit();
+                } else if event.kind == PointerEventKind.cancel {
+                    root.cancel-edit();
+                }
+            }
+        }
+    }
+}

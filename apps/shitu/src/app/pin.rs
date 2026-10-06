@@ -7,11 +7,15 @@ use std::{
 
 use anyhow::Result;
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, PhysicalSize, VecModel};
+use windows::Win32::Foundation::RECT;
 
 use super::{
     AnnotationView, AppController, MainWindow, PinToolbarWindow, PinWindow, StatusLevel,
-    annotation::AnnotationHistory, capture_controller::ocr_result_payload, present_ocr_error,
-    present_ocr_result, set_status_level,
+    annotation::AnnotationHistory,
+    annotation_color,
+    capture_controller::ocr_result_payload,
+    present_ocr_error, present_ocr_result, set_status_level,
+    toolbar_layout::{Metrics, Rect, ToolbarLayout},
 };
 use crate::{
     capture,
@@ -71,9 +75,11 @@ impl PinRegistry {
         pin.set_ocr_available(ocr_available);
         pin.set_color_index(0);
         pin.set_stroke_radius(2);
+        pin.set_text_size(20);
         toolbar.set_active_tool(0);
         toolbar.set_color_index(0);
         toolbar.set_stroke_radius(2);
+        toolbar.set_text_size(20);
         toolbar.set_ocr_available(ocr_available);
         pin.window()
             .set_position(PhysicalPosition::new(image.bounds.left, image.bounds.top));
@@ -100,7 +106,10 @@ impl PinRegistry {
             draw_style: DrawStyle {
                 rgba: [236, 92, 102, 255],
                 radius: 2,
+                dashed: false,
             },
+            text_size: 20,
+            toolbar_layout: ToolbarLayout::default(),
         }));
         let controller = PinController {
             id,
@@ -112,6 +121,14 @@ impl PinRegistry {
             app,
         };
         controller.bind(&pin, &toolbar);
+        {
+            let weak = toolbar.as_weak();
+            window::on_scale_factor_changed(toolbar.window(), move || {
+                if let Some(toolbar) = weak.upgrade() {
+                    toolbar.invoke_reposition_toolbar();
+                }
+            });
+        }
 
         pin.show()?;
         window::set_opacity(pin.window(), pin_config.default_opacity);
@@ -162,13 +179,17 @@ enum PinCommand {
     SetToolbar(bool),
     SetTool(i32),
     BeginAnnotation(f32, f32, i32),
-    UpdateAnnotation(f32, f32),
+    BeginAnnotationEdit(f32, f32, i32),
+    UpdateAnnotation(f32, f32, bool),
     FinishAnnotation,
+    CancelAnnotation,
     AddText(f32, f32, String, i32),
     Undo,
     Redo,
     SetColor(i32),
     SetWidth(i32),
+    SetTextSize(i32),
+    SetDashed(bool),
     ReplaceClipboard,
     ReplaceFile,
     RevealFile,
@@ -177,6 +198,10 @@ enum PinCommand {
 
 impl PinController {
     fn bind(&self, pin: &PinWindow, toolbar: &PinToolbarWindow) {
+        {
+            let controller = self.clone();
+            toolbar.on_reposition_toolbar(move || controller.position_toolbar());
+        }
         macro_rules! bind {
             ($method:ident, $command:expr) => {{
                 let controller = self.clone();
@@ -260,11 +285,18 @@ impl PinController {
         }
         {
             let controller = self.clone();
-            pin.on_update_annotation(move |x, y| {
-                controller.dispatch(PinCommand::UpdateAnnotation(x, y));
+            pin.on_update_annotation(move |x, y, constrained| {
+                controller.dispatch(PinCommand::UpdateAnnotation(x, y, constrained));
+            });
+        }
+        {
+            let controller = self.clone();
+            pin.on_begin_annotation_edit(move |x, y, handle| {
+                controller.dispatch(PinCommand::BeginAnnotationEdit(x, y, handle));
             });
         }
         bind!(on_finish_annotation, PinCommand::FinishAnnotation);
+        bind!(on_cancel_annotation, PinCommand::CancelAnnotation);
         {
             let controller = self.clone();
             pin.on_add_text(move |x, y, text, font_size| {
@@ -316,6 +348,18 @@ impl PinController {
                 controller.dispatch(PinCommand::SetWidth(radius));
             });
         }
+        {
+            let controller = self.clone();
+            toolbar.on_select_text_size(move |size| {
+                controller.dispatch(PinCommand::SetTextSize(size));
+            });
+        }
+        {
+            let controller = self.clone();
+            toolbar.on_select_dashed(move |dashed| {
+                controller.dispatch(PinCommand::SetDashed(dashed));
+            });
+        }
     }
 
     fn dispatch(&self, command: PinCommand) {
@@ -339,13 +383,21 @@ impl PinController {
             PinCommand::SetToolbar(enabled) => self.set_toolbar(enabled),
             PinCommand::SetTool(tool) => self.set_tool(tool),
             PinCommand::BeginAnnotation(x, y, tool) => self.begin_annotation(x, y, tool),
-            PinCommand::UpdateAnnotation(x, y) => self.update_annotation(x, y),
+            PinCommand::BeginAnnotationEdit(x, y, handle) => {
+                self.begin_annotation_edit(x, y, handle)
+            }
+            PinCommand::UpdateAnnotation(x, y, constrained) => {
+                self.update_annotation(x, y, constrained)
+            }
             PinCommand::FinishAnnotation => self.finish_annotation(),
+            PinCommand::CancelAnnotation => self.cancel_annotation(),
             PinCommand::AddText(x, y, text, font_size) => self.add_text(x, y, &text, font_size),
             PinCommand::Undo => self.undo(),
             PinCommand::Redo => self.redo(),
             PinCommand::SetColor(index) => self.set_color(index),
             PinCommand::SetWidth(radius) => self.set_width(radius),
+            PinCommand::SetTextSize(size) => self.set_text_size(size),
+            PinCommand::SetDashed(dashed) => self.set_dashed(dashed),
             PinCommand::ReplaceClipboard => self.replace_clipboard(),
             PinCommand::ReplaceFile => self.replace_file(),
             PinCommand::RevealFile => self.reveal_file(),
@@ -397,8 +449,15 @@ impl PinController {
     }
 
     fn show_toolbar(&self, pin: &PinWindow, toolbar: &PinToolbarWindow) {
-        if let Err(error) = toolbar.show() {
+        let result = self
+            .layout_toolbar(pin, toolbar)
+            .and_then(|_| toolbar.show().map_err(Into::into));
+        if let Err(error) = result {
+            let _ = toolbar.hide();
             pin.set_toolbar_visible(false);
+            pin.set_active_tool(0);
+            toolbar.set_active_tool(0);
+            logging::error(format!("Pin toolbar show failed: {error}"));
             self.status(
                 format!(
                     "{}: {error}",
@@ -408,51 +467,101 @@ impl PinController {
             );
             return;
         }
-        self.resize_toolbar(toolbar);
         window::set_owner(toolbar.window(), pin.window());
         window::set_always_on_top(toolbar.window(), self.state.borrow().always_on_top);
-        window::position_below(pin.window(), toolbar.window(), 6);
     }
 
     fn set_tool(&self, tool: i32) {
-        let tool = tool.clamp(0, 6);
+        let tool = tool.clamp(0, 8);
         if let Some(pin) = self.pin.upgrade() {
             if tool != 4 {
                 pin.invoke_commit_text_editor();
             }
             pin.set_active_tool(tool);
         }
-        if let Some(toolbar) = self.toolbar.upgrade() {
-            toolbar.set_active_tool(tool);
-            self.resize_toolbar(&toolbar);
-            if let Some(pin) = self.pin.upgrade() {
-                window::position_below(pin.window(), toolbar.window(), 6);
+        {
+            let mut state = self.state.borrow_mut();
+            state.annotations.finish();
+            if tool != 8 {
+                state.annotations.clear_selection();
             }
         }
+        self.refresh_annotations();
+        if let Some(toolbar) = self.toolbar.upgrade() {
+            toolbar.set_active_tool(tool);
+        }
+        self.position_toolbar();
     }
 
-    fn resize_toolbar(&self, toolbar: &PinToolbarWindow) {
-        let scale = toolbar.window().scale_factor();
-        let logical_width = if toolbar.get_ocr_available() {
-            372.0
-        } else {
-            342.0
+    fn layout_toolbar(&self, pin: &PinWindow, toolbar: &PinToolbarWindow) -> Result<()> {
+        let position = pin.window().position();
+        let size = pin.window().size();
+        let physical = RECT {
+            left: position.x,
+            top: position.y,
+            right: position.x.saturating_add(i32::try_from(size.width)?),
+            bottom: position.y.saturating_add(i32::try_from(size.height)?),
         };
-        let width = (logical_width * scale).round().max(1.0) as u32;
-        let toolbar_height = if (toolbar.get_active_tool() > 0 && toolbar.get_active_tool() < 5)
-            || toolbar.get_active_tool() == 6
-        {
-            68.0
-        } else {
-            38.0
+        let work = window::work_area_for_rect(physical)?;
+        let scale = toolbar.window().scale_factor() as f64;
+        let selection = Rect {
+            left: physical.left as f64,
+            top: physical.top as f64,
+            right: physical.right as f64,
+            bottom: physical.bottom as f64,
+        }
+        .to_logical(0.0, 0.0, scale);
+        let work = Rect {
+            left: work.left as f64,
+            top: work.top as f64,
+            right: work.right as f64,
+            bottom: work.bottom as f64,
+        }
+        .to_logical(0.0, 0.0, scale);
+        let metrics = Metrics {
+            width: toolbar.get_content_width() as f64,
+            height: toolbar.get_content_height() as f64,
+            main_height: toolbar.get_main_row_height() as f64,
+            expanded_height: toolbar.get_expanded_height() as f64,
+            popup_padding: toolbar.get_popup_padding() as f64,
         };
-        let logical_height = toolbar_height + 34.0;
-        let height = (logical_height * scale).round().max(1.0) as u32;
-        toolbar.window().set_size(PhysicalSize::new(width, height));
+        // Read the pointer only on first show; reopening after a drag or a
+        // tool change must not replace the selection-relative anchor.
+        if !self.state.borrow().toolbar_layout.is_initialized() {
+            let cursor = window::cursor_position()?;
+            self.state
+                .borrow_mut()
+                .toolbar_layout
+                .initialize(selection, cursor.x as f64 / scale)?;
+        }
+        let placement = self
+            .state
+            .borrow_mut()
+            .toolbar_layout
+            .place(selection, work, metrics)?;
+        toolbar.set_properties_above(placement.properties_above);
+        let toolbar_size = PhysicalSize::new(
+            (metrics.width * scale).round() as u32,
+            (toolbar.get_window_height() as f64 * scale).round() as u32,
+        );
+        if toolbar.window().size() != toolbar_size {
+            toolbar.window().set_size(toolbar_size);
+        }
+        let toolbar_position = PhysicalPosition::new(
+            (placement.x * scale).round() as i32,
+            (placement.y * scale).round() as i32,
+        );
+        if toolbar.window().position() != toolbar_position {
+            toolbar.window().set_position(toolbar_position);
+        }
+        Ok(())
     }
 
     fn copy(&self) {
         if let Some(pin) = self.pin.upgrade() {
+            if pin.get_drawing() {
+                return;
+            }
             pin.invoke_commit_text_editor();
         }
         let result = self
@@ -529,17 +638,33 @@ impl PinController {
         self.refresh_annotations();
     }
 
-    fn update_annotation(&self, x: f32, y: f32) {
+    fn begin_annotation_edit(&self, x: f32, y: f32, handle: i32) {
         {
             let mut state = self.state.borrow_mut();
             let point = annotation_point(x, y, &state.image);
-            state.annotations.update(point);
+            state.annotations.begin_edit(point, handle);
+        }
+        self.refresh_annotations();
+    }
+
+    fn update_annotation(&self, x: f32, y: f32, constrained: bool) {
+        {
+            let mut state = self.state.borrow_mut();
+            let point = annotation_point(x, y, &state.image);
+            let bounds = (state.image.width(), state.image.height());
+            state.annotations.update(point, constrained, bounds);
         }
         self.refresh_annotations();
     }
 
     fn finish_annotation(&self) {
         self.state.borrow_mut().annotations.finish();
+        self.refresh_annotations();
+    }
+
+    fn cancel_annotation(&self) {
+        self.state.borrow_mut().annotations.cancel_edit();
+        self.refresh_annotations();
     }
 
     fn add_text(&self, x: f32, y: f32, text: &str, font_size: i32) {
@@ -555,30 +680,41 @@ impl PinController {
     }
 
     fn undo(&self) {
+        if let Some(pin) = self.pin.upgrade() {
+            if pin.get_drawing() {
+                return;
+            }
+            pin.invoke_commit_text_editor();
+        }
         self.state.borrow_mut().annotations.undo();
         self.refresh_annotations();
     }
 
     fn redo(&self) {
+        if let Some(pin) = self.pin.upgrade() {
+            if pin.get_drawing() {
+                return;
+            }
+            pin.invoke_commit_text_editor();
+        }
         self.state.borrow_mut().annotations.redo();
         self.refresh_annotations();
     }
 
     fn set_color(&self, index: i32) {
-        let mut state = self.state.borrow_mut();
-        state.draw_style.rgba = match index {
-            0 => [236, 92, 102, 255],
-            1 => [74, 144, 226, 255],
-            2 => [49, 163, 107, 255],
-            3 => [245, 197, 66, 255],
-            _ => state.draw_style.rgba,
+        let rgba = match annotation_color(index) {
+            Ok(rgba) => rgba,
+            Err(error) => {
+                self.status(error.to_string(), StatusLevel::Error);
+                return;
+            }
         };
-        drop(state);
+        self.state.borrow_mut().draw_style.rgba = rgba;
         if let Some(toolbar) = self.toolbar.upgrade() {
-            toolbar.set_color_index(index.clamp(0, 3));
+            toolbar.set_color_index(index);
         }
         if let Some(pin) = self.pin.upgrade() {
-            pin.set_color_index(index.clamp(0, 3));
+            pin.set_color_index(index);
         }
     }
 
@@ -593,19 +729,47 @@ impl PinController {
         }
     }
 
+    fn set_dashed(&self, dashed: bool) {
+        self.state.borrow_mut().draw_style.dashed = dashed;
+        if let Some(toolbar) = self.toolbar.upgrade() {
+            toolbar.set_dashed(dashed);
+        }
+    }
+
+    fn set_text_size(&self, size: i32) {
+        let size = size.clamp(8, 96);
+        self.state.borrow_mut().text_size = size;
+        if let Some(toolbar) = self.toolbar.upgrade() {
+            toolbar.set_text_size(size);
+        }
+        if let Some(pin) = self.pin.upgrade() {
+            pin.set_text_size(size);
+        }
+    }
+
     fn refresh_annotations(&self) {
         let Some(pin) = self.pin.upgrade() else {
             return;
         };
-        let (views, preview) = {
+        let (views, preview, selection, text_size) = {
             let state = self.state.borrow();
             (
                 state.annotations.views(),
                 state.annotations.preview_base(&state.image),
+                state.annotations.selection_bounds(),
+                state.text_size,
             )
         };
         pin.set_screenshot(preview.slint_image());
+        pin.set_text_size(text_size);
         pin.set_annotations(ModelRc::new(VecModel::from(views)));
+        pin.set_annotation_selected(selection.is_some());
+        if let Some(selection) = selection {
+            pin.set_annotation_left(selection.left as f32);
+            pin.set_annotation_top(selection.top as f32);
+            pin.set_annotation_width(selection.width as f32);
+            pin.set_annotation_height(selection.height as f32);
+        }
     }
 
     fn handle_ocr_result(&self, code: i32, text: &str) {
@@ -842,7 +1006,6 @@ impl PinController {
     fn reset_toolbar_tool(&self) {
         if let Some(toolbar) = self.toolbar.upgrade() {
             toolbar.set_active_tool(0);
-            self.resize_toolbar(&toolbar);
         }
     }
 
@@ -851,7 +1014,20 @@ impl PinController {
             return;
         };
         if pin.get_toolbar_visible() {
-            window::position_below(pin.window(), toolbar.window(), 6);
+            if let Err(error) = self.layout_toolbar(&pin, &toolbar) {
+                let _ = toolbar.hide();
+                pin.set_toolbar_visible(false);
+                pin.set_active_tool(0);
+                toolbar.set_active_tool(0);
+                logging::error(format!("Pin toolbar placement failed: {error}"));
+                self.status(
+                    format!(
+                        "{}: {error}",
+                        i18n::text("工具栏定位失败", "Toolbar placement failed")
+                    ),
+                    StatusLevel::Error,
+                );
+            }
         }
     }
 
@@ -894,6 +1070,7 @@ fn replace_pin_image(
     }
     pin.set_screenshot(image.slint_image());
     pin.set_annotations(empty_annotation_model());
+    pin.set_annotation_selected(false);
     pin.set_active_tool(0);
     pin.set_original_size_text(format!("{width} × {height}").into());
     pin.set_scale_percent(100);
@@ -938,6 +1115,8 @@ struct PinnedWindowState {
     ocr_config: OcrConfig,
     annotations: AnnotationHistory,
     draw_style: DrawStyle,
+    text_size: i32,
+    toolbar_layout: ToolbarLayout,
 }
 
 impl PinnedWindowState {

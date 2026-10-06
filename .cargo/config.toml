@@ -1,0 +1,3 @@
+[build]
+# Build artifacts embed workspace paths; keep them local to this repository.
+target-dir = "target"

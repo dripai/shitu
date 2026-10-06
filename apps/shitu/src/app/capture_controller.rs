@@ -2,13 +2,16 @@ use std::{cell::RefCell, rc::Rc, thread, time::Duration};
 
 use anyhow::{Result, anyhow};
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, PhysicalSize, Timer, VecModel};
+use windows::Win32::Foundation::RECT;
 
 use super::{
     AnnotationView, AppController, MainWindow, OverlayWindow, StatusLevel,
     annotation::AnnotationHistory,
+    annotation_color_index,
     pin::{PinRegistry, PinRequest},
     present_ocr_error, present_ocr_notice, present_ocr_result, set_error_status, set_status,
     set_status_level, show_main_window,
+    toolbar_layout::{Metrics, Rect, ToolbarLayout},
 };
 use crate::{
     capture,
@@ -18,7 +21,7 @@ use crate::{
     logging, output,
     platform::{
         ocr::{OcrFailure, recognize},
-        windows::window_target::WindowTargets,
+        windows::{window, window_target::WindowTargets},
     },
 };
 
@@ -42,7 +45,8 @@ pub(super) fn start_capture(main: slint::Weak<MainWindow>, state: Rc<RefCell<App
             return;
         }
         state.capturing = true;
-        state.restore_main_after_capture = main_window.window().is_visible();
+        state.restore_main_after_capture =
+            main_window.window().is_visible() && !main_window.window().is_minimized();
         set_status(
             &main,
             &mut state,
@@ -94,7 +98,12 @@ fn open_overlay(
     targets: WindowTargets,
     desktop_snapshot: CapturedImage,
 ) -> Result<()> {
-    let overlay = OverlayWindow::new()?;
+    let overlay = crate::platform::windows::window::create_without_taskbar(OverlayWindow::new)?;
+    let style = state.borrow().draw_style;
+    overlay.set_color_index(annotation_color_index(style.rgba)?);
+    overlay.set_stroke_radius(style.radius);
+    overlay.set_dashed(style.dashed);
+    overlay.set_text_size(state.borrow().annotation_text_size);
     let initial_target = targets.target_at_cursor();
     overlay.set_capture_width(bounds.width);
     overlay.set_capture_height(bounds.height);
@@ -114,12 +123,21 @@ fn open_overlay(
         .set_size(PhysicalSize::new(bounds.width as u32, bounds.height as u32));
 
     bind_overlay(&overlay, main.clone(), Rc::clone(&state));
+    {
+        let weak = overlay.as_weak();
+        window::on_scale_factor_changed(overlay.window(), move || {
+            if let Some(overlay) = weak.upgrade() {
+                overlay.invoke_reposition_toolbar();
+            }
+        });
+    }
     state.borrow_mut().session = Some(CaptureSession {
         desktop_bounds: bounds,
         window_targets: targets,
         desktop_snapshot,
         selected: None,
         annotations: AnnotationHistory::default(),
+        toolbar_layout: ToolbarLayout::default(),
         _overlay: overlay.clone_strong(),
     });
 
@@ -136,6 +154,41 @@ fn bind_overlay(
     main: slint::Weak<MainWindow>,
     state: Rc<RefCell<AppController>>,
 ) {
+    {
+        let overlay = overlay.as_weak();
+        let main = main.clone();
+        let state = Rc::clone(&state);
+        overlay.unwrap().on_initialize_toolbar(move |pointer_x| {
+            let Some(overlay) = overlay.upgrade() else {
+                return;
+            };
+            let result = {
+                let mut state = state.borrow_mut();
+                let Some(session) = state.session.as_mut() else {
+                    return;
+                };
+                session
+                    .toolbar_layout
+                    .initialize(overlay_selection_rect(&overlay), pointer_x as f64)
+            };
+            if let Err(error) = result {
+                report_toolbar_error(&overlay, &main, &state, error);
+            }
+        });
+    }
+    {
+        let overlay = overlay.as_weak();
+        let main = main.clone();
+        let state = Rc::clone(&state);
+        overlay.unwrap().on_reposition_toolbar(move || {
+            let Some(overlay) = overlay.upgrade() else {
+                return;
+            };
+            if let Err(error) = position_overlay_toolbar(&overlay, &state) {
+                report_toolbar_error(&overlay, &main, &state, error);
+            }
+        });
+    }
     {
         let overlay = overlay.as_weak();
         let state = Rc::clone(&state);
@@ -162,6 +215,9 @@ fn bind_overlay(
                         }
                     }
                     Err(error) => {
+                        if let Some(session) = state.borrow_mut().session.as_mut() {
+                            session.toolbar_layout = ToolbarLayout::default();
+                        }
                         if let Some(overlay) = overlay.upgrade() {
                             overlay.set_completed(false);
                             overlay.set_selection_info(
@@ -184,14 +240,53 @@ fn bind_overlay(
     {
         let overlay = overlay.as_weak();
         let state = Rc::clone(&state);
-        overlay.unwrap().on_update_annotation(move |x, y| {
-            state.borrow_mut().update_annotation(x, y);
+        overlay
+            .unwrap()
+            .on_update_annotation(move |x, y, constrained| {
+                state.borrow_mut().update_annotation(x, y, constrained);
+                refresh_annotations(&overlay, &state);
+            });
+    }
+    {
+        let overlay = overlay.as_weak();
+        let state = Rc::clone(&state);
+        overlay.unwrap().on_finish_annotation(move || {
+            state.borrow_mut().finish_annotation();
             refresh_annotations(&overlay, &state);
         });
     }
     {
+        let overlay = overlay.as_weak();
         let state = Rc::clone(&state);
-        overlay.on_finish_annotation(move || state.borrow_mut().finish_annotation());
+        overlay
+            .unwrap()
+            .on_begin_annotation_edit(move |x, y, handle| {
+                state.borrow_mut().begin_annotation_edit(x, y, handle);
+                refresh_annotations(&overlay, &state);
+            });
+    }
+    {
+        let overlay = overlay.as_weak();
+        let state = Rc::clone(&state);
+        overlay.unwrap().on_cancel_annotation(move || {
+            if let Some(session) = state.borrow_mut().session.as_mut() {
+                session.annotations.cancel_edit();
+            }
+            refresh_annotations(&overlay, &state);
+        });
+    }
+    {
+        let overlay = overlay.as_weak();
+        let state = Rc::clone(&state);
+        overlay.unwrap().on_select_tool(move |tool| {
+            if let Some(session) = state.borrow_mut().session.as_mut() {
+                session.annotations.finish();
+                if tool != 8 {
+                    session.annotations.clear_selection();
+                }
+            }
+            refresh_annotations(&overlay, &state);
+        });
     }
     {
         let overlay = overlay.as_weak();
@@ -202,17 +297,36 @@ fn bind_overlay(
         });
     }
     {
+        let main = main.clone();
         let state = Rc::clone(&state);
-        overlay.on_select_color(move |index| state.borrow_mut().set_color(index));
+        overlay.on_select_color(move |index| {
+            let mut state = state.borrow_mut();
+            if let Err(error) = state.set_color(index) {
+                set_error_status(&main, &mut state, error.to_string());
+            }
+        });
     }
     {
         let state = Rc::clone(&state);
         overlay.on_select_width(move |radius| state.borrow_mut().set_width(radius));
     }
     {
+        let state = Rc::clone(&state);
+        overlay.on_select_text_size(move |size| {
+            state.borrow_mut().annotation_text_size = size.clamp(8, 96);
+        });
+    }
+    {
+        let state = Rc::clone(&state);
+        overlay.on_select_dashed(move |dashed| state.borrow_mut().draw_style.dashed = dashed);
+    }
+    {
         let overlay = overlay.as_weak();
         let state = Rc::clone(&state);
         overlay.unwrap().on_undo(move || {
+            if let Some(overlay) = overlay.upgrade() {
+                overlay.invoke_commit_text_editor();
+            }
             state.borrow_mut().undo();
             refresh_annotations(&overlay, &state);
         });
@@ -221,6 +335,9 @@ fn bind_overlay(
         let overlay = overlay.as_weak();
         let state = Rc::clone(&state);
         overlay.unwrap().on_redo(move || {
+            if let Some(overlay) = overlay.upgrade() {
+                overlay.invoke_commit_text_editor();
+            }
             state.borrow_mut().redo();
             refresh_annotations(&overlay, &state);
         });
@@ -423,6 +540,81 @@ fn bind_overlay(
     }
 }
 
+fn overlay_selection_rect(overlay: &OverlayWindow) -> Rect {
+    Rect {
+        left: overlay.get_start_x().min(overlay.get_current_x()) as f64,
+        top: overlay.get_start_y().min(overlay.get_current_y()) as f64,
+        right: overlay.get_start_x().max(overlay.get_current_x()) as f64,
+        bottom: overlay.get_start_y().max(overlay.get_current_y()) as f64,
+    }
+}
+
+fn position_overlay_toolbar(
+    overlay: &OverlayWindow,
+    state: &Rc<RefCell<AppController>>,
+) -> Result<()> {
+    if !overlay.get_completed() || state.borrow().session.is_none() {
+        return Ok(());
+    }
+    let selection = overlay_selection_rect(overlay);
+    let scale = overlay.window().scale_factor() as f64;
+    let origin = overlay.window().position();
+    let physical = RECT {
+        left: (origin.x as f64 + selection.left * scale).floor() as i32,
+        top: (origin.y as f64 + selection.top * scale).floor() as i32,
+        right: (origin.x as f64 + selection.right * scale).ceil() as i32,
+        bottom: (origin.y as f64 + selection.bottom * scale).ceil() as i32,
+    };
+    let work = window::work_area_for_rect(physical)?;
+    let work = Rect {
+        left: work.left as f64,
+        top: work.top as f64,
+        right: work.right as f64,
+        bottom: work.bottom as f64,
+    }
+    .to_logical(origin.x as f64, origin.y as f64, scale);
+    let metrics = Metrics {
+        width: overlay.get_toolbar_width() as f64,
+        height: overlay.get_toolbar_height() as f64,
+        main_height: overlay.get_toolbar_main_row_height() as f64,
+        expanded_height: overlay.get_toolbar_expanded_height() as f64,
+        popup_padding: 0.0,
+    };
+    let placement = state
+        .borrow_mut()
+        .session
+        .as_mut()
+        .ok_or_else(|| anyhow!("Screenshot session is not active"))?
+        .toolbar_layout
+        .place(selection, work, metrics)?;
+    overlay.set_toolbar_properties_above(placement.properties_above);
+    overlay.set_toolbar_x(placement.x as f32);
+    overlay.set_toolbar_y(placement.y as f32);
+    Ok(())
+}
+
+fn report_toolbar_error(
+    overlay: &OverlayWindow,
+    main: &slint::Weak<MainWindow>,
+    state: &Rc<RefCell<AppController>>,
+    error: anyhow::Error,
+) {
+    logging::error(format!("Toolbar placement failed: {error}"));
+    overlay.set_completed(false);
+    let mut state = state.borrow_mut();
+    if let Some(session) = state.session.as_mut() {
+        session.toolbar_layout = ToolbarLayout::default();
+    }
+    set_error_status(
+        main,
+        &mut state,
+        format!(
+            "{}: {error}",
+            i18n::text("工具栏定位失败", "Toolbar placement failed")
+        ),
+    );
+}
+
 fn spawn_overlay_ocr(overlay: slint::Weak<OverlayWindow>, image: CapturedImage, config: OcrConfig) {
     let width = image.width();
     let height = image.height();
@@ -586,12 +778,26 @@ fn copy_output(image: &CapturedImage, config: &CaptureConfig) -> Result<String> 
 }
 
 fn refresh_annotations(overlay: &slint::Weak<OverlayWindow>, state: &Rc<RefCell<AppController>>) {
-    let (views, preview) = {
+    let (views, preview, selection) = {
         let state = state.borrow();
-        (state.annotation_views(), state.annotation_preview_image())
+        (
+            state.annotation_views(),
+            state.annotation_preview_image(),
+            state
+                .session
+                .as_ref()
+                .and_then(|session| session.annotations.selection_bounds()),
+        )
     };
     if let Some(overlay) = overlay.upgrade() {
         overlay.set_annotations(ModelRc::new(VecModel::from(views)));
+        overlay.set_annotation_selected(selection.is_some());
+        if let Some(selection) = selection {
+            overlay.set_annotation_left(selection.left as f32);
+            overlay.set_annotation_top(selection.top as f32);
+            overlay.set_annotation_width(selection.width as f32);
+            overlay.set_annotation_height(selection.height as f32);
+        }
         if let Some(preview) = preview {
             overlay.set_selected_image(preview.slint_image());
         }
@@ -685,7 +891,19 @@ impl AppController {
         session.annotations.begin(tool, point, style);
     }
 
-    fn update_annotation(&mut self, x: f32, y: f32) {
+    fn begin_annotation_edit(&mut self, x: f32, y: f32, handle: i32) {
+        let Some(session) = self.session.as_mut() else {
+            return;
+        };
+        let Some(selected) = session.selected.as_ref() else {
+            return;
+        };
+        session
+            .annotations
+            .begin_edit(clamp_point(x, y, selected), handle);
+    }
+
+    fn update_annotation(&mut self, x: f32, y: f32, constrained: bool) {
         let Some(session) = self.session.as_mut() else {
             return;
         };
@@ -693,7 +911,9 @@ impl AppController {
             return;
         };
         let point = clamp_point(x, y, selected);
-        session.annotations.update(point);
+        session
+            .annotations
+            .update(point, constrained, (selected.width(), selected.height()));
     }
 
     fn finish_annotation(&mut self) {
@@ -716,14 +936,9 @@ impl AppController {
             .add_text(point, text, style, font_size.clamp(8, 96) as u32);
     }
 
-    fn set_color(&mut self, index: i32) {
-        self.draw_style.rgba = match index {
-            0 => [236, 92, 102, 255],
-            1 => [74, 144, 226, 255],
-            2 => [49, 163, 107, 255],
-            3 => [245, 197, 66, 255],
-            _ => self.draw_style.rgba,
-        };
+    fn set_color(&mut self, index: i32) -> Result<()> {
+        self.draw_style.rgba = super::annotation_color(index)?;
+        Ok(())
     }
 
     fn set_width(&mut self, radius: i32) {
@@ -805,6 +1020,7 @@ pub(super) struct CaptureSession {
     desktop_snapshot: CapturedImage,
     selected: Option<CapturedImage>,
     annotations: AnnotationHistory,
+    toolbar_layout: ToolbarLayout,
     _overlay: OverlayWindow,
 }
 

@@ -18,8 +18,14 @@ msgstr "Redo last action"
 msgid "画笔标注"
 msgstr "Pen"
 
+msgid "选择 / 编辑标注"
+msgstr "Select / edit annotation"
+
 msgid "绘制矩形"
 msgstr "Rectangle"
+
+msgid "绘制圆形 / 椭圆"
+msgstr "Circle / ellipse"
 
 msgid "绘制箭头"
 msgstr "Arrow"
@@ -59,6 +65,48 @@ msgstr "Green"
 
 msgid "黄色"
 msgstr "Yellow"
+
+msgid "橙色"
+msgstr "Orange"
+
+msgid "紫色"
+msgstr "Purple"
+
+msgid "粉色"
+msgstr "Pink"
+
+msgid "青色"
+msgstr "Cyan"
+
+msgid "黑色"
+msgstr "Black"
+
+msgid "白色"
+msgstr "White"
+
+msgid "灰色"
+msgstr "Gray"
+
+msgid "棕色"
+msgstr "Brown"
+
+msgid "线宽"
+msgstr "Line width"
+
+msgid "文字大小"
+msgstr "Text size"
+
+msgid "马赛克大小"
+msgstr "Mosaic brush size"
+
+msgid "实线"
+msgstr "Solid"
+
+msgid "虚线"
+msgstr "Dashed"
+
+msgid "边框样式"
+msgstr "Border style"
 
 msgid "小号文字"
 msgstr "Small text"

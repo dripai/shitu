@@ -1,39 +1,21 @@
-# ShiTu and ShiPing Privacy Policy
+# ShiTu Privacy Policy
 
 [简体中文](PRIVACY.md)
 
-Effective date: July 30, 2026
+Effective date: October 1, 2026
 
-ShiTu is a local Windows screenshot tool. ShiPing is a local screen-recording tool for Windows, macOS, and Linux. This policy explains how the applications process screenshots, recordings, audio, OCR results, and configuration data.
+ShiTu is a local Windows screenshot tool. This policy covers screenshots, OCR, and settings. Splitting the recording project preserves ShiTu's existing data-handling behavior.
 
-## Data we process
+## Data handling
 
-- When you start a screenshot, pinned image, or OCR action, ShiTu reads the screen region you select and any text or images that may appear in it.
-- When you start a recording, ShiPing reads the display, visible window, or region you select. If you enable system audio or microphone input, it also reads the corresponding audio.
-- The applications save the screenshots or recordings you choose to keep and local settings such as formats, folders, shortcuts, recording preferences, and OCR preferences.
-- The applications do not require an account and do not collect your name, email address, phone number, precise location, contacts, payment information, or advertising identifiers.
+- Screen pixels and text are read only when you start a screenshot, pinning, or OCR action.
+- Screenshots are used only for the annotation, copy, save, pinning, and OCR actions you request. OCR is processed locally through Windows capabilities.
+- Screenshots stay in the local folder you select; settings stay in the operating system's application-data directory.
+- No account is required. ShiTu does not collect identity, contacts, payment data, or advertising identifiers, and has no advertising, behavioral analytics, or telemetry uploads.
+- Screenshots, OCR results, and settings are not uploaded to developer servers or third-party analytics services. You control any file sharing or GitHub feedback you initiate.
 
-## How data is used
+## Your choices and contact
 
-- Screenshot content is used only to perform the screenshot, annotation, copy, save, pinning, and OCR actions you request.
-- Recording pixels, system audio, and microphone audio are used only to produce the local MP4 file you request. GIF recordings do not contain audio.
-- OCR is processed locally through Windows capabilities. ShiTu does not upload screenshots or OCR results to developer servers or third-party analytics services.
-- ShiPing captures and encodes recordings locally. It does not upload recording pixels, system audio, or microphone audio to developer servers or third-party analytics services.
-- The applications do not include advertising, behavioral analytics, or telemetry uploads.
+You can cancel capture or OCR, change settings, and delete local files or settings. Do not include private content in public GitHub feedback; feedback is subject to GitHub's privacy policy and terms.
 
-## Storage and sharing
-
-- Screenshots and recordings you save are managed at the local location you select.
-- Application settings are stored in your local operating system's application-data directory.
-- Unless you actively share, copy, save, or submit content in a GitHub issue, ShiTu and ShiPing do not send screenshots, recordings, audio, OCR results, or settings to the developer or other third parties.
-
-## Your choices
-
-- You can cancel screenshot, OCR, or recording operations at any time.
-- You can record without system audio or microphone input.
-- You can change application preferences and delete saved screenshots, recordings, and local settings yourself.
-- When reporting an issue through GitHub, do not include information in the issue, screenshots, recordings, or attachments that you do not want to make public. Feedback submitted to GitHub is governed by GitHub's privacy policy and terms.
-
-## Policy updates and contact
-
-This policy may be updated when application features change. The updated version will be published on this page. For privacy questions, contact us through [GitHub Issues](https://github.com/dripai/shitu/issues).
+Updates will be published on this page. For privacy questions, contact [GitHub Issues](https://github.com/dripai/shitu/issues).

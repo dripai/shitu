@@ -23,6 +23,129 @@ pub struct CapturedImage {
 pub struct DrawStyle {
     pub rgba: [u8; 4],
     pub radius: i32,
+    pub dashed: bool,
+}
+
+#[derive(Clone, Copy)]
+pub enum OutlineShape {
+    Rectangle,
+    Ellipse,
+}
+
+/// Image-space outlines shared by the UI preview, exported pixels, and eraser.
+/// Slint 1.17's Path has no dash-array property, so dashed outlines are emitted
+/// as open subpaths instead of relying on separate renderer-specific rules.
+pub fn outline_polylines(
+    shape: OutlineShape,
+    start: (u32, u32),
+    end: (u32, u32),
+    style: DrawStyle,
+) -> Vec<Vec<(u32, u32)>> {
+    let left = start.0.min(end.0);
+    let right = start.0.max(end.0);
+    let top = start.1.min(end.1);
+    let bottom = start.1.max(end.1);
+    let points = if left == right || top == bottom {
+        if left == right && top == bottom {
+            vec![(left, top)]
+        } else {
+            vec![(left, top), (right, bottom)]
+        }
+    } else {
+        match shape {
+            OutlineShape::Rectangle => vec![
+                (left, top),
+                (right, top),
+                (right, bottom),
+                (left, bottom),
+                (left, top),
+            ],
+            OutlineShape::Ellipse => ellipse_points(left, top, right, bottom),
+        }
+    };
+    if style.dashed {
+        dashed_polylines(&points, style.radius)
+    } else {
+        vec![points]
+    }
+}
+
+fn ellipse_points(left: u32, top: u32, right: u32, bottom: u32) -> Vec<(u32, u32)> {
+    let radius_x = (right - left) as f64 / 2.0;
+    let radius_y = (bottom - top) as f64 / 2.0;
+    let center_x = left as f64 + radius_x;
+    let center_y = top as f64 + radius_y;
+    // At most one image pixel of arc travel per sample, with cardinal points.
+    let samples = (std::f64::consts::TAU * radius_x.max(radius_y))
+        .ceil()
+        .max(16.0) as usize;
+    let samples = samples.div_ceil(4) * 4;
+    let mut points = Vec::with_capacity(samples + 1);
+    for index in 0..=samples {
+        let angle = std::f64::consts::TAU * index as f64 / samples as f64;
+        let point = (
+            (center_x + radius_x * angle.cos()).round() as u32,
+            (center_y + radius_y * angle.sin()).round() as u32,
+        );
+        push_distinct(&mut points, point);
+    }
+    points
+}
+
+fn dashed_polylines(points: &[(u32, u32)], radius: i32) -> Vec<Vec<(u32, u32)>> {
+    if points.len() < 2 {
+        return vec![points.to_vec()];
+    }
+
+    let width = radius.max(1) as f64 * 2.0;
+    let dash_length = width * 3.0;
+    let gap_length = width * 2.0;
+    let mut drawing = true;
+    let mut remaining = dash_length;
+    let mut current = Vec::new();
+    let mut paths = Vec::new();
+    for edge in points.windows(2) {
+        let start = edge[0];
+        let dx = edge[1].0 as f64 - start.0 as f64;
+        let dy = edge[1].1 as f64 - start.1 as f64;
+        let length = dx.hypot(dy);
+        if length == 0.0 {
+            continue;
+        }
+        let point_at = |travel: f64| {
+            (
+                (start.0 as f64 + dx * travel / length).round() as u32,
+                (start.1 as f64 + dy * travel / length).round() as u32,
+            )
+        };
+        let mut traveled = 0.0;
+        while traveled < length - 1e-9 {
+            let step = remaining.min(length - traveled);
+            if drawing {
+                push_distinct(&mut current, point_at(traveled));
+                push_distinct(&mut current, point_at(traveled + step));
+            }
+            traveled += step;
+            remaining -= step;
+            if remaining < 1e-9 {
+                if drawing && !current.is_empty() {
+                    paths.push(std::mem::take(&mut current));
+                }
+                drawing = !drawing;
+                remaining = if drawing { dash_length } else { gap_length };
+            }
+        }
+    }
+    if !current.is_empty() {
+        paths.push(current);
+    }
+    paths
+}
+
+fn push_distinct(points: &mut Vec<(u32, u32)>, point: (u32, u32)) {
+    if points.last().copied() != Some(point) {
+        points.push(point);
+    }
 }
 
 impl CapturedImage {
@@ -423,14 +546,29 @@ impl CapturedImage {
     }
 
     pub fn draw_rectangle(&mut self, start: (u32, u32), end: (u32, u32), style: DrawStyle) {
-        let left = start.0.min(end.0);
-        let right = start.0.max(end.0);
-        let top = start.1.min(end.1);
-        let bottom = start.1.max(end.1);
-        self.draw_line((left, top), (right, top), style);
-        self.draw_line((right, top), (right, bottom), style);
-        self.draw_line((right, bottom), (left, bottom), style);
-        self.draw_line((left, bottom), (left, top), style);
+        self.draw_outline(OutlineShape::Rectangle, start, end, style);
+    }
+
+    pub fn draw_ellipse(&mut self, start: (u32, u32), end: (u32, u32), style: DrawStyle) {
+        self.draw_outline(OutlineShape::Ellipse, start, end, style);
+    }
+
+    fn draw_outline(
+        &mut self,
+        shape: OutlineShape,
+        start: (u32, u32),
+        end: (u32, u32),
+        style: DrawStyle,
+    ) {
+        for path in outline_polylines(shape, start, end, style) {
+            if let [point] = path.as_slice() {
+                self.draw_line(*point, *point, style);
+            } else {
+                for pair in path.windows(2) {
+                    self.draw_line(pair[0], pair[1], style);
+                }
+            }
+        }
     }
 
     pub fn draw_arrow(&mut self, start: (u32, u32), end: (u32, u32), style: DrawStyle) {
@@ -518,7 +656,87 @@ pub fn arrow_head(start: (u32, u32), end: (u32, u32)) -> Option<((u32, u32), (u3
 
 #[cfg(test)]
 mod tests {
-    use super::{CapturedImage, arrow_head};
+    use super::{CapturedImage, DrawStyle, OutlineShape, arrow_head, outline_polylines};
+
+    fn outline_style(dashed: bool) -> DrawStyle {
+        DrawStyle {
+            rgba: [255, 0, 0, 255],
+            radius: 1,
+            dashed,
+        }
+    }
+
+    fn pixel(image: &CapturedImage, x: u32, y: u32) -> [u8; 4] {
+        let offset = ((y * image.width() + x) * 4) as usize;
+        image.rgba_bytes()[offset..offset + 4].try_into().unwrap()
+    }
+
+    #[test]
+    fn dashed_rectangle_has_visible_gaps_and_preserves_corner_phase() {
+        let mut image = CapturedImage::from_rgba(0, 0, 64, 48, &[0; 64 * 48 * 4]).unwrap();
+        image.draw_rectangle((8, 8), (60, 36), outline_style(true));
+
+        assert_eq!(pixel(&image, 11, 8), [255, 0, 0, 255]);
+        assert_eq!(pixel(&image, 16, 8), [0; 4]);
+        assert_eq!(pixel(&image, 21, 8), [255, 0, 0, 255]);
+        assert_eq!(pixel(&image, 32, 20), [0; 4]);
+
+        let paths = outline_polylines(
+            OutlineShape::Rectangle,
+            (8, 8),
+            (60, 36),
+            outline_style(true),
+        );
+        assert!(
+            paths
+                .iter()
+                .any(|path| { path == &vec![(58, 8), (60, 8), (60, 12)] })
+        );
+    }
+
+    #[test]
+    fn ellipses_are_outlines_and_independent_of_drag_direction() {
+        for dashed in [false, true] {
+            let style = outline_style(dashed);
+            let mut forward = CapturedImage::from_rgba(0, 0, 64, 64, &[0; 64 * 64 * 4]).unwrap();
+            let mut reverse = forward.clone();
+            forward.draw_ellipse((8, 8), (56, 48), style);
+            reverse.draw_ellipse((56, 48), (8, 8), style);
+            assert_eq!(forward.rgba_bytes(), reverse.rgba_bytes());
+            assert_eq!(pixel(&forward, 56, 28), style.rgba);
+            assert_eq!(pixel(&forward, 32, 28), [0; 4]);
+            assert_eq!(pixel(&forward, 8, 8), [0; 4]);
+            if !dashed {
+                for (x, y) in [(8, 28), (32, 8), (32, 48)] {
+                    assert_eq!(pixel(&forward, x, y), style.rgba);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn degenerate_ellipses_render_as_a_line_or_point() {
+        for dashed in [false, true] {
+            let style = outline_style(dashed);
+            let mut image = CapturedImage::from_rgba(0, 0, 32, 32, &[0; 32 * 32 * 4]).unwrap();
+            image.draw_ellipse((12, 24), (12, 8), style);
+            assert_eq!(pixel(&image, 12, 10), style.rgba);
+            assert_eq!(pixel(&image, 16, 10), [0; 4]);
+            image.draw_ellipse((20, 20), (20, 20), style);
+            assert_eq!(pixel(&image, 20, 20), style.rgba);
+        }
+    }
+
+    #[test]
+    fn dashed_style_does_not_change_pen_or_arrow_strokes() {
+        let mut solid = CapturedImage::from_rgba(0, 0, 64, 64, &[0; 64 * 64 * 4]).unwrap();
+        let mut dashed = solid.clone();
+        solid.draw_line((8, 8), (40, 8), outline_style(false));
+        solid.draw_arrow((8, 24), (40, 40), outline_style(false));
+        dashed.draw_line((8, 8), (40, 8), outline_style(true));
+        dashed.draw_arrow((8, 24), (40, 40), outline_style(true));
+        assert_eq!(solid.rgba_bytes(), dashed.rgba_bytes());
+    }
 
     #[test]
     fn arrow_head_requires_a_visible_segment() {

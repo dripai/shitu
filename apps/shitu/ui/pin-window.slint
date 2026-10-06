@@ -1,4 +1,6 @@
 import { AnnotationView } from "annotation-view.slint";
+import { AnnotationPalette } from "annotation-palette.slint";
+import { AnnotationSelection } from "annotation-selection.slint";
 
 export component PinWindow inherits Window {
     title: @tr("钉住图像");
@@ -7,6 +9,7 @@ export component PinWindow inherits Window {
     background: #000000;
     no-frame: true;
     always-on-top: true;
+    forward-focus: canvas-keys;
 
     in property <image> screenshot;
     in-out property <int> alpha-percent: 100;
@@ -24,6 +27,12 @@ export component PinWindow inherits Window {
     in-out property <int> active-tool: 0;
     in-out property <int> color-index: 0;
     in-out property <int> stroke-radius: 2;
+    in-out property <int> text-size: 20;
+    in property <bool> annotation-selected: false;
+    in property <float> annotation-left;
+    in property <float> annotation-top;
+    in property <float> annotation-width;
+    in property <float> annotation-height;
     in-out property <bool> drawing: false;
     in-out property <bool> text-editing: false;
     in-out property <float> text-editor-x: 0;
@@ -54,8 +63,10 @@ export component PinWindow inherits Window {
     callback flip-horizontal();
     callback flip-vertical();
     callback begin-annotation(float, float, int);
-    callback update-annotation(float, float);
+    callback begin-annotation-edit(float, float, int);
+    callback update-annotation(float, float, bool);
     callback finish-annotation();
+    callback cancel-annotation();
     callback add-text(float, float, string, int);
     callback undo();
     callback redo();
@@ -64,14 +75,39 @@ export component PinWindow inherits Window {
         if root.text-editing && root.text-editor-value != "" {
             let image-x = root.text-editor-x / (root.width / 1px) * root.screenshot.width;
             let image-y = root.text-editor-y / (root.height / 1px) * root.screenshot.height;
-            let font-size = root.stroke-radius == 1 ? 16 : root.stroke-radius == 4 ? 28 : 20;
-            root.add-text(image-x, image-y, root.text-editor-value, font-size);
+            root.add-text(image-x, image-y, root.text-editor-value, root.text-size);
         }
         root.text-editor-value = "";
         root.text-editing = false;
     }
 
-    FocusScope {
+    // Slint 1.17 native KeyBinding stays in the canvas focus scope, so the
+    // text editor and toolbar retain their native input and undo behavior.
+    canvas-keys := FocusScope {
+        width: 0px;
+        height: 0px;
+        focus-on-click: false;
+        focus-on-tab-navigation: false;
+        KeyBinding {
+            keys: @keys(Control + Z);
+            enabled: !root.text-editing && !root.drawing;
+            activated => { root.undo(); }
+        }
+        KeyBinding {
+            keys: @keys(Control + Y);
+            enabled: !root.text-editing && !root.drawing;
+            activated => { root.redo(); }
+        }
+        KeyBinding {
+            keys: @keys(Control + Shift + Z);
+            enabled: !root.text-editing && !root.drawing;
+            activated => { root.redo(); }
+        }
+        KeyBinding {
+            keys: @keys(Return);
+            enabled: !root.text-editing && !root.drawing;
+            activated => { root.copy-image(); }
+        }
         key-pressed(event) => {
             if event.text == Key.Escape {
                 root.close-pin();
@@ -174,6 +210,7 @@ export component PinWindow inherits Window {
         pointer-event(event) => {
             if event.kind == PointerEventKind.down {
                 if event.button == PointerEventButton.left {
+                    canvas-keys.focus();
                     root.drag-pin();
                 } else if event.button == PointerEventButton.right {
                     menu-area.show({ x: self.mouse-x, y: self.mouse-y });
@@ -215,6 +252,7 @@ export component PinWindow inherits Window {
             annotation.stroke-width * parent.width / 1px / root.screenshot.width
         ) * 1px;
         stroke-line-cap: round;
+        stroke-line-join: round;
     }
 
     for annotation in root.annotations: Text {
@@ -234,7 +272,8 @@ export component PinWindow inherits Window {
         visible: root.active-tool > 0;
         width: parent.width;
         height: parent.height;
-        mouse-cursor: root.active-tool == 5 || root.active-tool == 6 ? none : crosshair;
+        mouse-cursor: root.active-tool == 8 ? move
+            : root.active-tool == 5 || root.active-tool == 6 ? none : crosshair;
 
         pointer-event(event) => {
             let image-x = self.mouse-x / self.width * root.screenshot.width;
@@ -249,6 +288,7 @@ export component PinWindow inherits Window {
                         root.text-editing = true;
                         text-editor.focus();
                     } else {
+                        canvas-keys.focus();
                         root.drawing = true;
                         root.begin-annotation(image-x, image-y, root.active-tool);
                     }
@@ -256,16 +296,35 @@ export component PinWindow inherits Window {
                     menu-area.show({ x: self.mouse-x, y: self.mouse-y });
                 }
             } else if event.kind == PointerEventKind.move && root.drawing {
-                root.update-annotation(image-x, image-y);
-            } else if event.kind == PointerEventKind.up && root.drawing {
-                root.update-annotation(image-x, image-y);
+                root.update-annotation(image-x, image-y, event.modifiers.shift);
+            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left && root.drawing {
+                root.update-annotation(image-x, image-y, event.modifiers.shift);
                 root.finish-annotation();
                 root.drawing = false;
             } else if event.kind == PointerEventKind.cancel && root.drawing {
-                root.finish-annotation();
+                root.cancel-annotation();
                 root.drawing = false;
             }
         }
+    }
+
+    if root.active-tool == 8 && root.annotation-selected: AnnotationSelection {
+        width: parent.width;
+        height: parent.height;
+        selected-left: root.annotation-left;
+        selected-top: root.annotation-top;
+        selected-width: root.annotation-width;
+        selected-height: root.annotation-height;
+        image-width: root.screenshot.width;
+        image-height: root.screenshot.height;
+        focus-canvas => { canvas-keys.focus(); }
+        begin-edit(x, y, handle) => {
+            root.drawing = true;
+            root.begin-annotation-edit(x, y, handle);
+        }
+        update-edit(x, y, constrained) => { root.update-annotation(x, y, constrained); }
+        finish-edit => { root.finish-annotation(); root.drawing = false; }
+        cancel-edit => { root.cancel-annotation(); root.drawing = false; }
     }
 
     if (root.active-tool == 5 || root.active-tool == 6) && annotation-touch.has-hover: Rectangle {
@@ -299,7 +358,7 @@ export component PinWindow inherits Window {
         x: root.text-editor-x * 1px;
         y: root.text-editor-y * 1px;
         width: Math.max(80px, Math.min(240px, parent.width - self.x));
-        height: 30px;
+        height: Math.max(30px, root.text-size / Math.max(1, root.screenshot.width) * root.width + 8px);
         border-width: 1px;
         border-color: #54a5ff;
         background: #ffffffee;
@@ -310,18 +369,16 @@ export component PinWindow inherits Window {
             width: parent.width - 8px;
             height: parent.height - 4px;
             text <=> root.text-editor-value;
-            color: root.color-index == 0 ? #ec5c66
-                : root.color-index == 1 ? #4a90e2
-                : root.color-index == 2 ? #31a36b : #c59b00;
+            color: AnnotationPalette.colors[root.color-index];
             font-family: "Microsoft YaHei UI";
-            font-size: root.stroke-radius == 1 ? 16px
-                : root.stroke-radius == 4 ? 28px : 20px;
+            font-size: Math.max(1px, root.text-size / Math.max(1, root.screenshot.width) * root.width);
             single-line: true;
-            accepted => { root.commit-text-editor(); }
+            accepted => { root.commit-text-editor(); canvas-keys.focus(); }
             key-pressed(event) => {
                 if event.text == Key.Escape {
                     root.text-editor-value = "";
                     root.text-editing = false;
+                    canvas-keys.focus();
                     accept
                 } else {
                     reject

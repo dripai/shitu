@@ -3,7 +3,7 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: ./start.sh <dev|build> [shitu|shiping|shiyin]" >&2
+    echo "Usage: ./start.sh <dev|build> [shitu|shiyin]" >&2
 }
 
 if (( $# < 1 || $# > 2 )); then
@@ -17,9 +17,6 @@ app="${2:-shitu}"
 case "$app" in
     shitu)
         bin="ShiTu"
-        ;;
-    shiping)
-        bin="ShiPing"
         ;;
     shiyin)
         bin="shiyin"

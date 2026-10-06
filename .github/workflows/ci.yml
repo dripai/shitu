@@ -1,4 +1,4 @@
-name: Cross-platform CI
+name: ShiTu CI
 
 on:
   push:
@@ -32,51 +32,19 @@ jobs:
           components: rustfmt
       - run: cargo fmt --all -- --check
 
-  shiping:
-    name: ShiPing (${{ matrix.platform }})
+  shitu:
+    name: ShiTu (Windows)
     needs: lockfile
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: Windows
-            os: windows-latest
-          - platform: macOS
-            os: macos-15
-          - platform: Linux
-            os: ubuntu-24.04
-    runs-on: ${{ matrix.os }}
-    env:
-      MACOSX_DEPLOYMENT_TARGET: '15.0'
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.96.0
-
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: shiping-${{ runner.os }}
-
-      - name: Install Linux build dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes \
-            libdbus-1-dev \
-            libfontconfig1-dev \
-            libpipewire-0.3-dev \
-            libwayland-dev \
-            libx11-dev \
-            libxcb1-dev \
-            libxkbcommon-dev \
-            libxkbcommon-x11-dev \
-            libxrandr-dev \
-            pkg-config
-
-      - name: Compile ShiPing
-        run: cargo check --locked --package shiping
-
-      - name: Test ShiPing
-        run: cargo test --locked --package shiping
+          shared-key: shitu-windows
+      - name: Compile ShiTu
+        run: cargo check --locked --package shitu
+      - name: Test ShiTu workspace
+        run: cargo test --workspace --locked
