@@ -1,4 +1,4 @@
-import { Palette } from "std-widgets.slint";
+import { AppTheme } from "theme.slint";
 import { SettingsPanel } from "settings-panel.slint";
 import { StatusBar } from "@shi-ui/status-bar.slint";
 
@@ -7,12 +7,12 @@ export component MainWindow inherits Window {
     icon: @image-url("icons/tray.svg");
     // Fluent body text is 1.0769rem; this resolves native controls to 13px.
     default-font-size: 12.07px;
-    preferred-width: 468px;
-    preferred-height: 475px;
-    min-width: 448px;
-    min-height: 445px;
-    max-width: 620px;
-    background: Palette.background;
+    preferred-width: 560px;
+    preferred-height: 530px;
+    min-width: 520px;
+    min-height: 420px;
+    max-width: 800px;
+    background: AppTheme.background;
 
     in property <string> status-text: @tr("就绪");
     in property <int> status-level: 0;
@@ -25,7 +25,7 @@ export component MainWindow inherits Window {
     in property <bool> ai-ocr-can-install: false;
 
     in-out property <int> current-tab: 0;
-    in-out property <int> theme-mode: 0;
+    in-out property <int> theme-mode <=> AppTheme.mode;
     in-out property <int> language-mode: 0;
     in-out property <bool> launch-at-startup: false;
     in-out property <bool> start-minimized: false;
@@ -62,29 +62,23 @@ export component MainWindow inherits Window {
     callback clear-hotkey();
     callback prepare-ai-ocr();
     callback preview-language(int);
+    callback theme-changed(int);
     callback ai-ocr-prepared(string);
 
-    init => {
-        Palette.color-scheme = root.theme-mode == 1
-            ? ColorScheme.light
-            : root.theme-mode == 2 ? ColorScheme.dark : ColorScheme.unknown;
-    }
     changed theme-mode => {
-        Palette.color-scheme = root.theme-mode == 1
-            ? ColorScheme.light
-            : root.theme-mode == 2 ? ColorScheme.dark : ColorScheme.unknown;
+        root.theme-changed(root.theme-mode);
     }
 
     VerticalLayout {
         spacing: 0px;
 
         Rectangle {
-            background: Palette.background;
+            background: AppTheme.background;
 
             VerticalLayout {
-                padding-left: 8px;
-                padding-right: 8px;
-                padding-bottom: 8px;
+                padding-left: 12px;
+                padding-right: 12px;
+                padding-bottom: 12px;
                 padding-top: 0px;
 
                 SettingsPanel {
@@ -140,6 +134,12 @@ export component MainWindow inherits Window {
         StatusBar {
             status-text: root.status-text;
             status-level: root.status-level;
+            background: AppTheme.card;
+            foreground-color: AppTheme.text;
+            muted-color: AppTheme.muted-text;
+            success-color: AppTheme.success;
+            error-color: AppTheme.error;
+            divider-color: AppTheme.divider;
         }
     }
 }

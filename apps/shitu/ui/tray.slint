@@ -1,4 +1,7 @@
+import { AppTheme } from "theme.slint";
+
 export component CaptureTray inherits SystemTrayIcon {
+    in-out property <int> theme-mode <=> AppTheme.mode;
     icon: @image-url("icons/tray.svg");
     tooltip: @tr("拾图");
     title: @tr("拾图");

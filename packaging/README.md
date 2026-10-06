@@ -3,13 +3,13 @@
 `tools/package-store-msix.ps1` packages only ShiTu. It uses `packaging/shitu/AppxManifest.xml`, preserves the existing Store identity, replaces `__PACKAGE_VERSION__` with `X.Y.Z.0`, and rejects a mismatched executable name.
 
 ```powershell
-.\tools\package-store-msix.ps1 -Product ShiTu -ExecutablePath .\target\release\ShiTu.exe -Version 0.1.34 -OutputDirectory .\release-assets
+.\tools\package-store-msix.ps1 -Product ShiTu -ExecutablePath .\target\release\ShiTu.exe -Version 0.2.0 -OutputDirectory .\release-assets
 ```
 
 Windows SDK `MakeAppx.exe` is required. Output:
 
-- `ShiTu-0.1.34-windows-x64.msix`: unsigned MSIX.
-- `ShiTu-0.1.34-store.msixupload`: Partner Center upload archive.
+- `ShiTu-0.2.0-windows-x64.msix`: unsigned MSIX.
+- `ShiTu-0.2.0-store.msixupload`: Partner Center upload archive.
 
 ShiTu declares `runFullTrust`, `systemAIModels`, and the Windows App Runtime dependency for enhanced Windows AI OCR.
 

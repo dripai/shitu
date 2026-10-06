@@ -1,4 +1,5 @@
-import { Button, Palette, TextEdit } from "std-widgets.slint";
+import { Button, TextEdit } from "std-widgets.slint";
+import { AppTheme } from "theme.slint";
 
 export component OcrResultWindow inherits Window {
     title: @tr("OCR 识别结果");
@@ -7,7 +8,7 @@ export component OcrResultWindow inherits Window {
     preferred-height: 360px;
     min-width: 380px;
     min-height: 260px;
-    background: Palette.background;
+    background: AppTheme.background;
     default-font-size: 12.07px;
 
     in-out property <string> result-text;
@@ -33,7 +34,7 @@ export component OcrResultWindow inherits Window {
 
         Text {
             text: @tr("识别结果");
-            color: Palette.foreground;
+            color: AppTheme.text;
             font-size: 14px;
             font-weight: 700;
             vertical-alignment: center;
@@ -52,7 +53,7 @@ export component OcrResultWindow inherits Window {
 
             Text {
                 text: root.status-text;
-                color: Palette.alternate-foreground;
+                color: AppTheme.muted-text;
                 font-size: 13px;
                 vertical-alignment: center;
                 overflow: elide;
@@ -60,6 +61,7 @@ export component OcrResultWindow inherits Window {
             Rectangle { }
             Button {
                 text: @tr("复制全部");
+                primary: true;
                 clicked => { root.copy-text(); }
             }
             Button {

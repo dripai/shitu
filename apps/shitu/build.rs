@@ -16,6 +16,7 @@ fn main() {
     let library_paths =
         std::collections::HashMap::from([("shi-ui".to_owned(), shi_ui::slint_library_path())]);
     let config = slint_build::CompilerConfiguration::new()
+        .with_style("fluent".to_owned())
         .with_library_paths(library_paths)
         .with_bundled_translations("translations")
         .with_default_translation_context(slint_build::DefaultTranslationContext::None);

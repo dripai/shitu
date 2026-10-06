@@ -9,12 +9,14 @@ A local Windows screenshot, annotation, OCR, and pinning tool. No account is req
 ShiTu is built for the small screenshot tasks that happen all day: copying part of a document, explaining a UI issue, extracting text, or keeping a reference visible while you work.
 
 - Capture a screen region or select a visible window.
-- Annotate with pen, rectangle, arrow, text, and eraser tools, with undo and redo.
+- Annotate with pen, rectangle, ellipse, arrow, text, eraser, and mosaic tools; select, move and resize annotations, with undo and redo.
 - Copy immediately, save as PNG/JPEG, or enable automatic saving.
 - Pin screenshots above other windows and adjust zoom, opacity, and always-on-top behavior.
 - Recognize text locally with Windows system OCR and copy the result.
 - Start a capture from the system tray or the default `Ctrl+Alt+C` shortcut.
 - Use the system theme with English or Simplified Chinese.
+
+See the [v0.2.0 changes](CHANGELOG.md) for themes, annotation editing, and toolbar placement.
 
 ## Download and support
 

@@ -1,5 +1,6 @@
 import { ComboBox, SpinBox } from "std-widgets.slint";
 import { AnnotationPalette } from "annotation-palette.slint";
+import { AppTheme } from "theme.slint";
 
 component ToolCell inherits Rectangle {
     in property <image> icon;
@@ -11,8 +12,8 @@ component ToolCell inherits Rectangle {
     height: 28px;
     border-radius: 3px;
     border-width: root.selected ? 1px : 0px;
-    border-color: #6ba4dc;
-    background: root.selected ? #dcecff : (touch.has-hover ? #e7ebf0 : transparent);
+    border-color: AppTheme.accent;
+    background: root.selected ? AppTheme.selected : (touch.has-hover ? AppTheme.hover : transparent);
     accessible-role: button;
     accessible-label: root.tip;
 
@@ -22,6 +23,7 @@ component ToolCell inherits Rectangle {
         width: 16px;
         height: 16px;
         source: root.icon;
+        colorize: root.selected ? AppTheme.accent : AppTheme.text;
         image-fit: contain;
     }
 
@@ -42,7 +44,7 @@ component ColorCell inherits Rectangle {
     width: 24px;
     height: 28px;
     border-radius: 3px;
-    background: touch.has-hover ? #e7ebf0 : transparent;
+    background: touch.has-hover ? AppTheme.hover : transparent;
     accessible-role: button;
     accessible-label: root.tip;
 
@@ -52,7 +54,7 @@ component ColorCell inherits Rectangle {
         width: 16px;
         height: 16px;
         border-width: root.selected ? 2px : 1px;
-        border-color: root.selected ? #343a43 : #aeb6c2;
+        border-color: root.selected ? AppTheme.text : AppTheme.border;
         background: root.swatch-color;
     }
 
@@ -109,8 +111,8 @@ export component CaptureToolbar inherits Rectangle {
     height: root.calculated-height;
     border-radius: 4px;
     border-width: 1px;
-    border-color: #aeb6c2;
-    background: #f7f8fa;
+    border-color: AppTheme.border;
+    background: AppTheme.card;
 
     HorizontalLayout {
         x: 4px;
@@ -133,7 +135,7 @@ export component CaptureToolbar inherits Rectangle {
         if root.annotation-tools-visible: Rectangle {
             width: 1px;
             height: 20px;
-            background: #c7cdd5;
+            background: AppTheme.divider;
         }
 
         if root.annotation-tools-visible: ToolCell {
@@ -211,7 +213,7 @@ export component CaptureToolbar inherits Rectangle {
         if root.annotation-tools-visible: Rectangle {
             width: 1px;
             height: 20px;
-            background: #c7cdd5;
+            background: AppTheme.divider;
         }
 
         if root.ocr-available: ToolCell {
@@ -288,7 +290,7 @@ export component CaptureToolbar inherits Rectangle {
         if root.active-tool != 6: Rectangle {
             width: 1px;
             height: 50px;
-            background: #c7cdd5;
+            background: AppTheme.divider;
         }
         VerticalLayout {
             width: 188px;

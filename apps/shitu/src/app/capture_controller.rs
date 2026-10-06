@@ -1,11 +1,11 @@
 use std::{cell::RefCell, rc::Rc, thread, time::Duration};
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, PhysicalSize, Timer, VecModel};
 use windows::Win32::Foundation::RECT;
 
 use super::{
-    AnnotationView, AppController, MainWindow, OverlayWindow, StatusLevel,
+    AnnotationView, AppController, AppTheme, MainWindow, OverlayWindow, StatusLevel,
     annotation::AnnotationHistory,
     annotation_color_index,
     pin::{PinRegistry, PinRequest},
@@ -99,6 +99,11 @@ fn open_overlay(
     desktop_snapshot: CapturedImage,
 ) -> Result<()> {
     let overlay = crate::platform::windows::window::create_without_taskbar(OverlayWindow::new)?;
+    let theme_mode = main
+        .upgrade()
+        .context("Main window is unavailable")?
+        .get_theme_mode();
+    overlay.global::<AppTheme>().set_mode(theme_mode);
     let style = state.borrow().draw_style;
     overlay.set_color_index(annotation_color_index(style.rgba)?);
     overlay.set_stroke_radius(style.radius);
@@ -1022,6 +1027,12 @@ pub(super) struct CaptureSession {
     annotations: AnnotationHistory,
     toolbar_layout: ToolbarLayout,
     _overlay: OverlayWindow,
+}
+
+impl CaptureSession {
+    pub(super) fn set_theme_mode(&self, mode: i32) {
+        self._overlay.global::<AppTheme>().set_mode(mode);
+    }
 }
 
 fn relative_bounds(desktop: DesktopBounds, target: DesktopBounds) -> DesktopBounds {

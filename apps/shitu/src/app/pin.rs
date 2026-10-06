@@ -5,12 +5,12 @@ use std::{
     thread,
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use slint::{ComponentHandle, ModelRc, PhysicalPosition, PhysicalSize, VecModel};
 use windows::Win32::Foundation::RECT;
 
 use super::{
-    AnnotationView, AppController, MainWindow, PinToolbarWindow, PinWindow, StatusLevel,
+    AnnotationView, AppController, AppTheme, MainWindow, PinToolbarWindow, PinWindow, StatusLevel,
     annotation::AnnotationHistory,
     annotation_color,
     capture_controller::ocr_result_payload,
@@ -61,6 +61,12 @@ impl PinRegistry {
         } = request;
         let pin = PinWindow::new()?;
         let toolbar = PinToolbarWindow::new()?;
+        let theme_mode = main
+            .upgrade()
+            .context("Main window is unavailable")?
+            .get_theme_mode();
+        pin.global::<AppTheme>().set_mode(theme_mode);
+        toolbar.global::<AppTheme>().set_mode(theme_mode);
         pin.set_screenshot(image.slint_image());
         pin.set_alpha_percent(pin_config.default_opacity as i32);
         pin.set_shadow_enabled(pin_config.shadow);
@@ -141,6 +147,13 @@ impl PinRegistry {
             _state: state,
         });
         Ok(())
+    }
+
+    pub(super) fn set_theme_mode(&self, mode: i32) {
+        for pinned in &self.windows {
+            pinned._ui.global::<AppTheme>().set_mode(mode);
+            pinned._toolbar_ui.global::<AppTheme>().set_mode(mode);
+        }
     }
 }
 
@@ -1013,21 +1026,21 @@ impl PinController {
         let (Some(pin), Some(toolbar)) = (self.pin.upgrade(), self.toolbar.upgrade()) else {
             return;
         };
-        if pin.get_toolbar_visible() {
-            if let Err(error) = self.layout_toolbar(&pin, &toolbar) {
-                let _ = toolbar.hide();
-                pin.set_toolbar_visible(false);
-                pin.set_active_tool(0);
-                toolbar.set_active_tool(0);
-                logging::error(format!("Pin toolbar placement failed: {error}"));
-                self.status(
-                    format!(
-                        "{}: {error}",
-                        i18n::text("工具栏定位失败", "Toolbar placement failed")
-                    ),
-                    StatusLevel::Error,
-                );
-            }
+        if pin.get_toolbar_visible()
+            && let Err(error) = self.layout_toolbar(&pin, &toolbar)
+        {
+            let _ = toolbar.hide();
+            pin.set_toolbar_visible(false);
+            pin.set_active_tool(0);
+            toolbar.set_active_tool(0);
+            logging::error(format!("Pin toolbar placement failed: {error}"));
+            self.status(
+                format!(
+                    "{}: {error}",
+                    i18n::text("工具栏定位失败", "Toolbar placement failed")
+                ),
+                StatusLevel::Error,
+            );
         }
     }
 

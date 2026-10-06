@@ -1,6 +1,7 @@
 import { AnnotationView } from "annotation-view.slint";
 import { AnnotationPalette } from "annotation-palette.slint";
 import { AnnotationSelection } from "annotation-selection.slint";
+import { AppTheme } from "theme.slint";
 
 export component PinWindow inherits Window {
     title: @tr("钉住图像");
@@ -10,6 +11,8 @@ export component PinWindow inherits Window {
     no-frame: true;
     always-on-top: true;
     forward-focus: canvas-keys;
+
+    in-out property <int> theme-mode <=> AppTheme.mode;
 
     in property <image> screenshot;
     in-out property <int> alpha-percent: 100;

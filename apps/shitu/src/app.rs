@@ -2,6 +2,7 @@ mod annotation;
 mod capture_controller;
 mod pin;
 mod settings;
+mod theme;
 mod toolbar_layout;
 
 use std::{
@@ -167,6 +168,7 @@ pub fn run(start_minimized: bool) -> Result<(), slint::PlatformError> {
     bind_main_window(&main, Rc::clone(&state));
     bind_ocr_result_window(&ocr_result, main.as_weak(), Rc::clone(&state));
     settings::bind(&main, Rc::clone(&state));
+    theme::bind(&main, &tray, Rc::clone(&state));
     bind_tray(&tray, main.as_weak(), Rc::clone(&state));
     bind_hotkey_events(main.as_weak(), state.borrow().hotkey.active_id_handle());
 

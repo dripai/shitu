@@ -1,0 +1,29 @@
+import { Palette } from "std-widgets.slint";
+
+// Slint 1.17 Fluent exposes read-only colors and a writable color-scheme.
+// Its solid background already resolves Unknown against the live system theme.
+// Derive the decorative colors from that background, without another OS observer.
+// Native controls keep the system accent and all native input/focus behavior.
+export global AppTheme {
+    in-out property <int> mode: 0;
+    private property <color> native-background: Palette.background;
+    out property <bool> dark: native-background.to-oklch().lightness < 0.5;
+
+    changed mode => {
+        Palette.color-scheme = self.mode == 1 ? ColorScheme.light
+            : self.mode == 2 ? ColorScheme.dark : ColorScheme.unknown;
+    }
+
+    out property <color> background: dark ? #191d25 : #f4f6f9;
+    out property <color> card: dark ? #252a34 : #ffffff;
+    out property <color> text: dark ? #f2f4f8 : #202733;
+    out property <color> muted-text: dark ? #b3bdcc : #626e7e;
+    out property <color> border: dark ? #414957 : #dde3eb;
+    out property <color> divider: dark ? #39414e : #e6ebf1;
+    out property <color> hover: dark ? #343e4c : #edf2f8;
+    out property <color> accent: dark ? #43d4c3 : #006bc7;
+    out property <color> selected: dark ? #244b4d : #e4f0fc;
+    out property <color> shadow: dark ? #00000030 : #172b4d0d;
+    out property <color> success: dark ? #70df9c : #187e43;
+    out property <color> error: dark ? #ff98a3 : #c5273b;
+}
