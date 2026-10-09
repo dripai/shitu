@@ -19,7 +19,7 @@ $ErrorActionPreference = 'Stop'
 $products = @{
     ShiTu = @{
         ExecutableName = 'ShiTu.exe'
-        ManifestTemplate = Join-Path $PSScriptRoot '..\packaging\shitu\AppxManifest.xml'
+        ManifestTemplate = Join-Path $PSScriptRoot '..\packaging\AppxManifest.xml'
         IconSource = Join-Path $PSScriptRoot '..\assets\app.png'
     }
 }

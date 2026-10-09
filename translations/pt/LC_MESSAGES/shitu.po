@@ -1,0 +1,833 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: shitu\n"
+"Language: pt\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+msgid "取消截图"
+msgstr "Cancelar captura"
+
+msgid "撤销上一步操作"
+msgstr "Desfazer última ação"
+
+msgid "重做上一步操作"
+msgstr "Refazer última ação"
+
+msgid "画笔标注"
+msgstr "Caneta"
+
+msgid "选择 / 编辑标注"
+msgstr "Selecionar / editar anotação"
+
+msgid "绘制矩形"
+msgstr "Retângulo"
+
+msgid "绘制圆形 / 椭圆"
+msgstr "Círculo / elipse"
+
+msgid "绘制箭头"
+msgstr "Seta"
+
+msgid "添加文字"
+msgstr "Texto"
+
+msgid "擦除标注"
+msgstr "Borracha"
+
+msgid "添加马赛克"
+msgstr "Mosaico"
+
+msgid "识别选区文字"
+msgstr "Reconhecer texto da seleção"
+
+msgid "识别图像文字"
+msgstr "Reconhecer texto da imagem"
+
+msgid "将截图钉在屏幕上"
+msgstr "Fixar captura"
+
+msgid "保存截图到文件"
+msgstr "Salvar captura"
+
+msgid "复制截图到剪贴板"
+msgstr "Copiar captura para a área de transferência"
+
+msgid "红色"
+msgstr "Vermelho"
+
+msgid "蓝色"
+msgstr "Azul"
+
+msgid "绿色"
+msgstr "Verde"
+
+msgid "黄色"
+msgstr "Amarelo"
+
+msgid "橙色"
+msgstr "Laranja"
+
+msgid "紫色"
+msgstr "Roxo"
+
+msgid "粉色"
+msgstr "Rosa"
+
+msgid "青色"
+msgstr "Ciano"
+
+msgid "黑色"
+msgstr "Preto"
+
+msgid "白色"
+msgstr "Branco"
+
+msgid "灰色"
+msgstr "Cinza"
+
+msgid "棕色"
+msgstr "Marrom"
+
+msgid "线宽"
+msgstr "Espessura da linha"
+
+msgid "文字大小"
+msgstr "Tamanho do texto"
+
+msgid "马赛克大小"
+msgstr "Tamanho do mosaico"
+
+msgid "边框样式"
+msgstr "Estilo da borda"
+
+msgid "拾图"
+msgstr "ShiTu"
+
+msgid "就绪"
+msgstr "Pronto"
+
+msgid "OCR 识别结果"
+msgstr "Resultados do OCR"
+
+msgid "可选择文字，或复制全部内容。"
+msgstr "Selecione o texto ou copie todo o conteúdo."
+
+msgid "识别结果"
+msgstr "Resultado"
+
+msgid "复制全部"
+msgstr "Copiar tudo"
+
+msgid "关闭"
+msgstr "Fechar"
+
+msgid "选择截图区域"
+msgstr "Selecionar área de captura"
+
+msgid "钉住工具栏"
+msgstr "Barra de ferramentas da imagem fixada"
+
+msgid "图像另存为..."
+msgstr "Salvar imagem como..."
+
+msgid "复制图像"
+msgstr "Copiar imagem"
+
+msgid "关闭钉住"
+msgstr "Fechar imagem fixada"
+
+msgid "钉住"
+msgstr "Imagens fixadas"
+
+msgid "钉住图像"
+msgstr "Imagem fixada"
+
+msgid "OCR 识别"
+msgstr "OCR"
+
+msgid "显示工具栏"
+msgstr "Mostrar barra de ferramentas"
+
+msgid "窗口阴影"
+msgstr "Sombra da janela"
+
+msgid "始终置顶"
+msgstr "Sempre no topo"
+
+msgid "不透明度"
+msgstr "Opacidade"
+
+msgid "缩放（{}%）"
+msgstr "Zoom ({}%)"
+
+msgid "适合屏幕"
+msgstr "Ajustar à tela"
+
+msgid "恢复原始大小"
+msgstr "Tamanho original"
+
+msgid "图像处理"
+msgstr "Transformar imagem"
+
+msgid "向左旋转 90°"
+msgstr "Girar 90° à esquerda"
+
+msgid "向右旋转 90°"
+msgstr "Girar 90° à direita"
+
+msgid "水平翻转"
+msgstr "Inverter horizontalmente"
+
+msgid "垂直翻转"
+msgstr "Inverter verticalmente"
+
+msgid "替换图像"
+msgstr "Substituir imagem"
+
+msgid "从剪贴板"
+msgstr "Da área de transferência"
+
+msgid "从文件..."
+msgstr "De um arquivo..."
+
+msgid "在文件夹中显示"
+msgstr "Mostrar na pasta"
+
+msgid "原始尺寸：{}"
+msgstr "Tamanho original: {}"
+
+msgid "应用"
+msgstr "Aplicativo"
+
+msgid "开机启动"
+msgstr "Iniciar com o sistema"
+
+msgid "启动最小化"
+msgstr "Iniciar minimizado"
+
+msgid "外观模式"
+msgstr "Aparência"
+
+msgid "跟随系统"
+msgstr "Seguir o sistema"
+
+msgid "浅色"
+msgstr "Claro"
+
+msgid "深色"
+msgstr "Escuro"
+
+msgid "界面语言"
+msgstr "Idioma"
+
+msgid "简体中文"
+msgstr "Chinês simplificado"
+
+msgid "文件与诊断"
+msgstr "Arquivos e diagnóstico"
+
+msgid "打开日志"
+msgstr "Abrir registros"
+
+msgid "打开配置"
+msgstr "Abrir configuração"
+
+msgid "输出"
+msgstr "Saída"
+
+msgid "图像格式"
+msgstr "Formato da imagem"
+
+msgid "质量"
+msgstr "Qualidade"
+
+msgid "无损"
+msgstr "Sem perdas"
+
+msgid "保存目录"
+msgstr "Pasta para salvar"
+
+msgid "选择..."
+msgstr "Procurar..."
+
+msgid "打开目录"
+msgstr "Abrir pasta"
+
+msgid "文件名模板"
+msgstr "Modelo de nome do arquivo"
+
+msgid "自动保存（执行复制或钉住时同时保存）"
+msgstr "Salvar automaticamente ao copiar ou fixar"
+
+msgid "显示保存结果"
+msgstr "Mostrar resultado ao salvar"
+
+msgid "识别引擎"
+msgstr "Mecanismo de reconhecimento"
+
+msgid "默认引擎"
+msgstr "Mecanismo padrão"
+
+msgid "兼容系统 OCR"
+msgstr "OCR do sistema (compatível)"
+
+msgid "Windows AI OCR（增强）"
+msgstr "Windows AI OCR (avançado)"
+
+msgid "兼容 OCR"
+msgstr "OCR do sistema"
+
+msgid "增强 OCR"
+msgstr "OCR avançado"
+
+msgid "安装模型"
+msgstr "Instalar modelo"
+
+msgid "增强 OCR 输出"
+msgstr "Saída do OCR avançado"
+
+msgid "最低置信度"
+msgstr "Confiança mínima"
+
+msgid "仅过滤 Windows AI OCR 返回的低置信度词语。"
+msgstr "Filtra apenas palavras de baixa confiança retornadas pelo Windows AI OCR."
+
+msgid "新建钉住窗口"
+msgstr "Nova imagem fixada"
+
+msgid "默认不透明度"
+msgstr "Opacidade padrão"
+
+msgid "启用滚轮缩放"
+msgstr "Zoom com a roda do mouse"
+
+msgid "缩放步长"
+msgstr "Passo do zoom"
+
+msgid "双击关闭"
+msgstr "Duplo clique para fechar"
+
+msgid "全局快捷键"
+msgstr "Atalho global"
+
+msgid "区域截图"
+msgstr "Captura de região"
+
+msgid "默认 Ctrl+Alt+C；留空则关闭"
+msgstr "Padrão: Ctrl+Alt+C; vazio para desativar"
+
+msgid "清除"
+msgstr "Limpar"
+
+msgid "未设置时不会注册任何全局快捷键。"
+msgstr "Se o campo estiver vazio, nenhum atalho global será registrado."
+
+msgid "一款轻量、便捷的截图、标注与钉图工具。"
+msgstr "Uma ferramenta leve para capturas, anotações e imagens fixadas."
+
+msgid "作者："
+msgstr "Autor:"
+
+msgid "使用 Rust 与 GPUI Kit 构建 · © 2026"
+msgstr "Criado com Rust e GPUI Kit · © 2026"
+
+msgid "常规"
+msgstr "Geral"
+
+msgid "截图"
+msgstr "Captura"
+
+msgid "快捷键"
+msgstr "Atalhos"
+
+msgid "关于"
+msgstr "Sobre"
+
+msgid "开始截图"
+msgstr "Iniciar captura"
+
+msgid "恢复默认"
+msgstr "Restaurar padrões"
+
+msgid "保存"
+msgstr "Salvar"
+
+msgid "显示控制面板"
+msgstr "Mostrar painel de controle"
+
+msgid "隐藏控制面板"
+msgstr "Ocultar painel de controle"
+
+msgid "退出"
+msgstr "Sair"
+
+msgid "标注颜色无效"
+msgstr "Cor da anotação inválida"
+
+msgid "就绪。右键托盘图标可打开菜单。"
+msgstr "Pronto. Clique com o botão direito no ícone da bandeja para abrir o menu."
+
+msgid "配置加载失败，已使用默认值"
+msgstr "Não foi possível carregar as configurações; usando os valores padrão"
+
+msgid "语言初始化失败"
+msgstr "Falha ao inicializar o idioma"
+
+msgid "已复制全部文字"
+msgstr "Todo o texto foi copiado"
+
+msgid "已复制 OCR 文字"
+msgstr "Texto do OCR copiado"
+
+msgid "复制失败"
+msgstr "Falha ao copiar"
+
+msgid "OCR 文字复制失败"
+msgstr "Não foi possível copiar o texto do OCR"
+
+msgid "OCR 识别失败，错误详情已写入日志。"
+msgstr "O OCR falhou. Os detalhes foram gravados no registro."
+
+msgid "OCR 识别已完成。"
+msgstr "OCR concluído."
+
+msgid "OCR 结果窗口已不可用"
+msgstr "A janela de resultados do OCR está indisponível"
+
+msgid "启动快捷键异常"
+msgstr "Erro no atalho ao iniciar"
+
+msgid "可用（Windows 系统 OCR）"
+msgstr "Disponível (OCR do sistema Windows)"
+
+msgid "不可用"
+msgstr "Indisponível"
+
+msgid "读取配置失败"
+msgstr "Não foi possível ler as configurações"
+
+msgid "配置文件格式无效"
+msgstr "Arquivo de configurações inválido"
+
+msgid "配置路径没有父目录"
+msgstr "O caminho das configurações não tem pasta pai"
+
+msgid "创建配置目录失败"
+msgstr "Não foi possível criar a pasta de configurações"
+
+msgid "创建临时配置失败"
+msgstr "Não foi possível criar o arquivo temporário de configurações"
+
+msgid "写入临时配置失败"
+msgstr "Não foi possível gravar o arquivo temporário de configurações"
+
+msgid "同步临时配置失败"
+msgstr "Não foi possível sincronizar o arquivo temporário de configurações"
+
+msgid "文件名模板不能为空"
+msgstr "O modelo de nome do arquivo não pode estar vazio"
+
+msgid "文件名模板包含 Windows 不允许的字符"
+msgstr "O modelo de nome contém caracteres não permitidos pelo Windows"
+
+msgid "组合键无效"
+msgstr "Combinação de teclas inválida"
+
+msgid "已被占用"
+msgstr "Já está em uso"
+
+msgid "系统拒绝注册"
+msgstr "O sistema rejeitou o registro"
+
+msgid "图像像素尺寸无效"
+msgstr "Dimensões da imagem inválidas"
+
+msgid "无法读取图像"
+msgstr "Não foi possível ler a imagem"
+
+msgid "当前平台尚未实现文字标注"
+msgstr "Anotações de texto ainda não estão implementadas nesta plataforma"
+
+msgid "图像裁剪坐标溢出"
+msgstr "As coordenadas de recorte excedem o intervalo"
+
+msgid "图像裁剪区域无效"
+msgstr "Área de recorte inválida"
+
+msgid "创建截图保存目录失败"
+msgstr "Não foi possível criar a pasta de capturas"
+
+msgid "PNG 图像"
+msgstr "Imagem PNG"
+
+msgid "JPEG 图像"
+msgstr "Imagem JPEG"
+
+msgid "创建目录失败"
+msgstr "Não foi possível criar a pasta"
+
+msgid "创建图像文件失败"
+msgstr "Não foi possível criar o arquivo de imagem"
+
+msgid "PNG 编码失败"
+msgstr "Falha na codificação PNG"
+
+msgid "JPEG 编码失败"
+msgstr "Falha na codificação JPEG"
+
+msgid "写入图像文件失败"
+msgstr "Não foi possível gravar o arquivo de imagem"
+
+msgid "同步图像文件失败"
+msgstr "Não foi possível sincronizar o arquivo de imagem"
+
+msgid "已有截图任务正在进行，请先完成或取消"
+msgstr "Já há uma captura em andamento; conclua ou cancele primeiro"
+
+msgid "正在准备截图..."
+msgstr "Preparando captura..."
+
+msgid "截图窗口打开失败"
+msgstr "Não foi possível abrir a janela de captura"
+
+msgid "选区无效"
+msgstr "Seleção inválida"
+
+msgid "已保存到"
+msgstr "Salvo em"
+
+msgid "保存失败"
+msgstr "Falha ao salvar"
+
+msgid "正在识别文字..."
+msgstr "Reconhecendo texto..."
+
+msgid "OCR 失败"
+msgstr "Falha no OCR"
+
+msgid "钉住失败"
+msgstr "Falha ao fixar"
+
+msgid "已钉住，但自动保存失败"
+msgstr "Imagem fixada, mas o salvamento automático falhou"
+
+msgid "已将截图钉在屏幕上"
+msgstr "Captura fixada"
+
+msgid "已取消截图"
+msgstr "Captura cancelada"
+
+msgid "工具栏定位失败"
+msgstr "Falha ao posicionar a barra de ferramentas"
+
+msgid "OCR 识别完成"
+msgstr "OCR concluído"
+
+msgid "未识别到文字"
+msgstr "Nenhum texto reconhecido"
+
+msgid "缺少可用的 Windows OCR 语言包"
+msgstr "Nenhum pacote de idioma compatível com o Windows OCR está instalado"
+
+msgid "当前系统或程序安装方式不支持 Windows 系统 OCR"
+msgstr "O OCR do sistema Windows não é compatível com este sistema ou instalação"
+
+msgid "OCR 识别失败"
+msgstr "Falha no OCR"
+
+msgid "已复制并保存到"
+msgstr "Copiado e salvo em"
+
+msgid "已复制到剪贴板"
+msgstr "Copiado para a área de transferência"
+
+msgid "工具栏显示失败"
+msgstr "Não foi possível mostrar a barra de ferramentas"
+
+msgid "已复制钉住图像"
+msgstr "Imagem fixada copiada"
+
+msgid "图像已保存到"
+msgstr "Imagem salva em"
+
+msgid "图像保存失败"
+msgstr "Não foi possível salvar a imagem"
+
+msgid "已从剪贴板替换图像"
+msgstr "Imagem substituída pela área de transferência"
+
+msgid "替换图像失败"
+msgstr "Não foi possível substituir a imagem"
+
+msgid "已从文件替换图像"
+msgstr "Imagem substituída por um arquivo"
+
+msgid "已在文件夹中显示"
+msgstr "Mostrado na pasta"
+
+msgid "当前图像尚未保存"
+msgstr "A imagem atual ainda não foi salva"
+
+msgid "图像处理失败"
+msgstr "Falha ao processar a imagem"
+
+msgid "图像已向左旋转"
+msgstr "Imagem girada à esquerda"
+
+msgid "图像已向右旋转"
+msgstr "Imagem girada à direita"
+
+msgid "图像已水平翻转"
+msgstr "Imagem invertida horizontalmente"
+
+msgid "图像已垂直翻转"
+msgstr "Imagem invertida verticalmente"
+
+msgid "操作失败"
+msgstr "Falha na operação"
+
+msgid "界面语言已预览，点击保存后生效"
+msgstr "Prévia do idioma aplicada; clique em Salvar para manter"
+
+msgid "语言切换失败"
+msgstr "Falha ao alterar o idioma"
+
+msgid "正在准备 Windows AI OCR 模型..."
+msgstr "Preparando o modelo do Windows AI OCR..."
+
+msgid "已恢复当前页默认值，点击保存后生效"
+msgstr "Padrões desta página restaurados; clique em Salvar para aplicar"
+
+msgid "已打开保存目录"
+msgstr "Pasta de salvamento aberta"
+
+msgid "已打开日志文件夹"
+msgstr "Pasta de registros aberta"
+
+msgid "已打开配置文件夹"
+msgstr "Pasta de configurações aberta"
+
+msgid "手动修改配置后需要重启应用。"
+msgstr "Reinicie o aplicativo após editar manualmente o arquivo de configurações."
+
+msgid "快捷键已注销，点击保存后永久生效"
+msgstr "Atalho removido; clique em Salvar para manter a alteração"
+
+msgid "快捷键注销失败"
+msgstr "Não foi possível remover o atalho"
+
+msgid "设置无效"
+msgstr "Configurações inválidas"
+
+msgid "快捷键无效"
+msgstr "Atalho inválido"
+
+msgid "设置已保存"
+msgstr "Configurações salvas"
+
+msgid "开机启动设置失败"
+msgstr "Não foi possível alterar a inicialização com o sistema"
+
+msgid "快捷键设置失败"
+msgstr "Não foi possível alterar o atalho"
+
+msgid "恢复开机启动失败"
+msgstr "Não foi possível restaurar a inicialização com o sistema"
+
+msgid "恢复快捷键失败"
+msgstr "Não foi possível restaurar o atalho"
+
+msgid "配置保存失败"
+msgstr "Não foi possível salvar as configurações"
+
+msgid "；回滚失败："
+msgstr "; falha ao reverter: "
+
+msgid "快捷键已注册"
+msgstr "Atalho registrado"
+
+msgid "可用（Windows AI OCR）"
+msgstr "Disponível (Windows AI OCR)"
+
+msgid "正在检测 Windows AI OCR..."
+msgstr "Verificando a disponibilidade do Windows AI OCR..."
+
+msgid "正在下载并准备识别模型..."
+msgstr "Baixando e preparando o modelo de reconhecimento..."
+
+msgid "支持，但识别模型尚未安装"
+msgstr "Compatível, mas o modelo de reconhecimento não está instalado"
+
+msgid "当前系统、硬件、驱动或策略不支持 Windows AI OCR"
+msgstr "O Windows AI OCR não é compatível com o sistema, hardware, driver ou política atuais"
+
+msgid "Windows AI 功能已被用户禁用"
+msgstr "O usuário desativou os recursos do Windows AI"
+
+msgid "Windows AI OCR 组件或包身份不可用"
+msgstr "O componente do Windows AI OCR ou a identidade do pacote está indisponível"
+
+msgid "Windows AI OCR 检测失败"
+msgstr "Falha ao verificar o Windows AI OCR"
+
+msgid "文字标注参数无效"
+msgstr "Parâmetros da anotação de texto inválidos"
+
+msgid "创建文字绘制上下文失败"
+msgstr "Não foi possível criar o contexto de renderização de texto"
+
+msgid "创建文字字体失败"
+msgstr "Não foi possível criar a fonte de anotação"
+
+msgid "绘制文字标注失败"
+msgstr "Não foi possível renderizar a anotação de texto"
+
+msgid "当前平台尚未实现屏幕截图"
+msgstr "A captura de tela ainda não está implementada nesta plataforma"
+
+msgid "当前平台尚未实现图像剪贴板"
+msgstr "A área de transferência de imagens ainda não está implementada nesta plataforma"
+
+msgid "当前平台尚未实现文字剪贴板"
+msgstr "A área de transferência de texto ainda não está implementada nesta plataforma"
+
+msgid "OCR 结果窗口打开失败"
+msgstr "Não foi possível abrir a janela de resultados do OCR"
+
+msgid "没有活动截图"
+msgstr "Nenhuma captura ativa"
+
+msgid "选区过小"
+msgstr "A seleção é muito pequena"
+
+msgid "尚未选择截图区域"
+msgstr "Nenhuma área de captura selecionada"
+
+msgid "图像"
+msgstr "Imagens"
+
+msgid "替换文件失败"
+msgstr "Não foi possível substituir o arquivo"
+
+msgid "无法定位 OCR 程序"
+msgstr "Não foi possível localizar o executável do OCR"
+
+msgid "无法启动增强 OCR 检测"
+msgstr "Não foi possível iniciar a verificação do OCR avançado"
+
+msgid "增强 OCR 准备"
+msgstr "Preparação do OCR avançado"
+
+msgid "无法读取增强 OCR 检测结果"
+msgstr "Não foi possível ler o resultado da verificação do OCR avançado"
+
+msgid "增强 OCR 检测结果格式无效"
+msgstr "Resultado da verificação do OCR avançado inválido"
+
+msgid "无法准备 OCR 图像"
+msgstr "Não foi possível preparar a imagem para OCR"
+
+msgid "无法启动 OCR 子进程"
+msgstr "Não foi possível iniciar o processo do OCR"
+
+msgid "无法读取 OCR 结果"
+msgstr "Não foi possível ler o resultado do OCR"
+
+msgid "OCR 结果格式无效"
+msgstr "Formato do resultado do OCR inválido"
+
+msgid "操作超时"
+msgstr "O tempo da operação se esgotou"
+
+msgid "无法获取 OCR 子进程状态"
+msgstr "Não foi possível obter o estado do processo do OCR"
+
+msgid "未知 OCR 引擎"
+msgstr "Mecanismo de OCR desconhecido"
+
+msgid "Windows OCR 子进程异常退出"
+msgstr "O processo do Windows OCR terminou inesperadamente"
+
+msgid "无法创建 OCR 临时目录"
+msgstr "Não foi possível criar a pasta temporária do OCR"
+
+msgid "GlobalLock 失败"
+msgstr "Falha em GlobalLock"
+
+msgid "剪贴板中没有可用图像"
+msgstr "Nenhuma imagem disponível na área de transferência"
+
+msgid "剪贴板图像数据无效"
+msgstr "Dados de imagem da área de transferência inválidos"
+
+msgid "暂不支持该剪贴板图像格式"
+msgstr "Formato de imagem da área de transferência não compatível"
+
+msgid "剪贴板图像数据不完整"
+msgstr "Dados de imagem da área de transferência incompletos"
+
+msgid "虚拟桌面没有可见像素"
+msgstr "A área de trabalho virtual não tem pixels visíveis"
+
+msgid "截图区域没有可见像素"
+msgstr "A área de captura não tem pixels visíveis"
+
+msgid "截图区域坐标溢出"
+msgstr "As coordenadas de captura excedem o intervalo"
+
+msgid "截图区域超出虚拟桌面"
+msgstr "A área de captura está fora da área de trabalho virtual"
+
+msgid "GetDC 失败"
+msgstr "Falha em GetDC"
+
+msgid "CreateCompatibleDC 失败"
+msgstr "Falha em CreateCompatibleDC"
+
+msgid "BitBlt 失败"
+msgstr "Falha em BitBlt"
+
+msgid "无法在文件夹中显示该文件"
+msgstr "Não foi possível mostrar o arquivo na pasta"
+
+msgid "打开目标失败，系统返回代码"
+msgstr "Não foi possível abrir o destino; código do sistema"
+
+msgid "打开开机启动注册表失败"
+msgstr "Não foi possível abrir a chave de registro de inicialização"
+
+msgid "无法获取当前程序路径"
+msgstr "Não foi possível obter o caminho do aplicativo"
+
+msgid "写入开机启动设置失败"
+msgstr "Não foi possível gravar as configurações de inicialização"
+
+msgid "删除开机启动设置失败"
+msgstr "Não foi possível remover as configurações de inicialização"
+
+msgid "未知 Windows AI 状态"
+msgstr "Estado do Windows AI desconhecido"
+
+msgid "Windows AI OCR 模型准备失败"
+msgstr "Falha ao preparar o modelo do Windows AI OCR"
+
+msgid "Cut"
+msgstr "Recortar"
+
+msgid "Copy"
+msgstr "Copiar"
+
+msgid "Paste"
+msgstr "Colar"
+
+msgid "Select All"
+msgstr "Selecionar tudo"
+
+msgid "实线"
+msgstr "Linha contínua"
+
+msgid "虚线"
+msgstr "Linha tracejada"

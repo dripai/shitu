@@ -5,6 +5,8 @@ on:
     branches:
       - main
   pull_request:
+  # Explicit cloud checks without publishing release assets.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,6 +14,11 @@ permissions:
 jobs:
   lockfile:
     name: Cargo lockfile
+    # Code-only pushes keep local checks; releases run checks in release.yml.
+    if: >-
+      github.event_name != 'push' ||
+      (!contains(github.event.head_commit.message, '[code-only]') &&
+       !contains(github.event.head_commit.message, '[release]'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -23,6 +30,10 @@ jobs:
 
   format:
     name: Rustfmt
+    if: >-
+      github.event_name != 'push' ||
+      (!contains(github.event.head_commit.message, '[code-only]') &&
+       !contains(github.event.head_commit.message, '[release]'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -34,6 +45,10 @@ jobs:
 
   shitu:
     name: ShiTu (Windows)
+    if: >-
+      github.event_name != 'push' ||
+      (!contains(github.event.head_commit.message, '[code-only]') &&
+       !contains(github.event.head_commit.message, '[release]'))
     needs: lockfile
     runs-on: windows-latest
     steps:

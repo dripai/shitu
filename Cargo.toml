@@ -1,34 +1,25 @@
-[workspace]
-resolver = "2"
-members = [
-    "apps/shitu",
-    "apps/shiyin",
-    "crates/shi-foundation",
-    "crates/shi-ui",
-]
-default-members = ["apps/shitu"]
-exclude = ["tools/windows-ai-bindgen", "vendor/i-slint-core"]
-
-[workspace.package]
+[package]
+name = "shitu"
 version = "0.3.0"
 edition = "2024"
+rust-version = "1.96"
+description = "Windows screenshot, annotation, OCR and pinning utility"
+publish = false
 
-[workspace.dependencies]
+[[bin]]
+name = "ShiTu"
+path = "src/main.rs"
+
+[dependencies]
 anyhow = "1.0"
+gpui-kit = "=0.7.1"
+tray-icon = "=0.21.2"
 global-hotkey = "0.8"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png"] }
 raw-window-handle = "0.6"
 rfd = { version = "0.15.4", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-slint = { version = "=1.17.0", default-features = false, features = [
-    "std",
-    "backend-winit",
-    "renderer-skia",
-    "compat-1-2",
-    "raw-window-handle-06",
-    "system-tray",
-] }
 windows = { version = "0.62", features = [
     "Foundation",
     "Globalization",
@@ -39,10 +30,6 @@ windows = { version = "0.62", features = [
     "Win32_Globalization",
     "Win32_Graphics_Dwm",
     "Win32_Graphics_Gdi",
-    "Win32_Media_Audio",
-    "Win32_Media_KernelStreaming",
-    "Win32_Media_MediaFoundation",
-    "Win32_Media_Multimedia",
     "Win32_Security",
     "Win32_Storage_FileSystem",
     "Win32_System_DataExchange",
@@ -59,12 +46,13 @@ windows = { version = "0.62", features = [
 ] }
 windows-core = "0.62.2"
 windows-future = "0.3.2"
-slint-build = "=1.17.0"
-winresource = "0.1.31"
 
-[patch.crates-io]
-# Slint 1.17.0 drops popup boundary constraints when updating their position.
-i-slint-core = { path = "vendor/i-slint-core" }
+[build-dependencies]
+chrono = { version = "0.4.45", default-features = false, features = ["now"] }
+regex = "1.12.4"
+rspolib = "0.1.2"
+serde_json = "1.0"
+winresource = "0.1.31"
 
 [profile.release]
 opt-level = "z"

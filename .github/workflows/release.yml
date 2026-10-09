@@ -3,7 +3,17 @@ name: Publish ShiTu release
 on:
   push:
     tags:
-      - 'v*'
+      # Stable major/minor versions build automatically; patches require dispatch.
+      - 'v[0-9]+.[0-9]+.0'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag, for example v0.3.1
+        required: true
+        type: string
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 permissions:
   contents: read
@@ -14,10 +24,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+
+      - name: Validate release tag
+        shell: pwsh
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+            throw "Expected a stable release tag such as v0.3.1, got $env:RELEASE_TAG"
+          }
 
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.96.0
+
+      - name: Verify Rust formatting
+        run: cargo fmt --all -- --check
 
       - name: Verify tag matches package versions
         shell: pwsh
@@ -35,8 +57,8 @@ jobs:
 
           foreach ($package in $packages) {
             $expectedTag = "v$($package.version)"
-            if ($env:GITHUB_REF_NAME -ne $expectedTag) {
-              throw "Release tag $env:GITHUB_REF_NAME must match $($package.name) version $expectedTag"
+            if ($env:RELEASE_TAG -ne $expectedTag) {
+              throw "Release tag $env:RELEASE_TAG must match $($package.name) version $expectedTag"
             }
           }
 
@@ -55,6 +77,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -118,7 +142,7 @@ jobs:
               throw "Expected release executable was not produced: $($product.Executable)"
             }
 
-            $archiveName = "$($product.Name)-$env:GITHUB_REF_NAME-windows-x86_64.zip"
+            $archiveName = "$($product.Name)-$env:RELEASE_TAG-windows-x86_64.zip"
             $archivePath = Join-Path 'release-assets' $archiveName
             Compress-Archive -LiteralPath $product.Executable -DestinationPath $archivePath -Force
 
@@ -147,8 +171,8 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
           prerelease: false
           generate_release_notes: true
           files: release-assets/*

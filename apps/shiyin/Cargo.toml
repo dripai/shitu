@@ -1,6 +1,0 @@
-[package]
-name = "shiyin"
-version.workspace = true
-edition.workspace = true
-description = "Planned ShiYin audio recorder application"
-publish = false
