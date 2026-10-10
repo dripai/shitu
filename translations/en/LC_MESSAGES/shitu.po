@@ -97,6 +97,12 @@ msgstr "Line width"
 msgid "文字大小"
 msgstr "Text size"
 
+msgid "字体设置…"
+msgstr "Font settings…"
+
+msgid "笔刷大小"
+msgstr "Brush size"
+
 msgid "马赛克大小"
 msgstr "Mosaic brush size"
 
@@ -819,6 +825,15 @@ msgstr "Cut"
 
 msgid "Copy"
 msgstr "Copy"
+
+msgid "点击保存后生效"
+msgstr "Click Save to apply"
+
+msgid "请按快捷键"
+msgstr "Press a shortcut"
+
+msgid "未设置"
+msgstr "Not set"
 
 msgid "Paste"
 msgstr "Paste"

@@ -16,9 +16,9 @@ use windows::Win32::{
     },
     UI::WindowsAndMessaging::{
         GWL_STYLE, GWLP_HWNDPARENT, GetCursorPos, GetPropW, GetWindowLongPtrW, GetWindowRect,
-        HWND_NOTOPMOST, HWND_TOPMOST, IsWindowVisible, RemovePropW, SW_HIDE, SW_RESTORE,
-        SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW,
-        SetWindowPos, ShowWindow, WS_CAPTION, WS_POPUP, WS_THICKFRAME,
+        HWND_NOTOPMOST, HWND_TOPMOST, RemovePropW, SW_HIDE, SW_RESTORE, SWP_FRAMECHANGED,
+        SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos,
+        ShowWindow, WS_CAPTION, WS_POPUP, WS_THICKFRAME,
     },
 };
 
@@ -113,9 +113,6 @@ pub fn show_without_activation(window: &Window) -> Result<()> {
         );
     }
     Ok(())
-}
-pub fn visible(window: &Window) -> Result<bool> {
-    Ok(unsafe { IsWindowVisible(hwnd(window)?) }.as_bool())
 }
 pub fn bounds(window: &Window) -> Result<RECT> {
     let mut rect = RECT::default();

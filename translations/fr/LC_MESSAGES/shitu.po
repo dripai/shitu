@@ -97,6 +97,12 @@ msgstr "Épaisseur du trait"
 msgid "文字大小"
 msgstr "Taille du texte"
 
+msgid "字体设置…"
+msgstr "Paramètres de police…"
+
+msgid "笔刷大小"
+msgstr "Taille du pinceau"
+
 msgid "马赛克大小"
 msgstr "Taille de la mosaïque"
 
@@ -819,6 +825,15 @@ msgstr "Couper"
 
 msgid "Copy"
 msgstr "Copier"
+
+msgid "点击保存后生效"
+msgstr "Cliquez sur Enregistrer pour appliquer"
+
+msgid "请按快捷键"
+msgstr "Appuyez sur un raccourci"
+
+msgid "未设置"
+msgstr "Non défini"
 
 msgid "Paste"
 msgstr "Coller"

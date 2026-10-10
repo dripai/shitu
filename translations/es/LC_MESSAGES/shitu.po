@@ -97,6 +97,12 @@ msgstr "Grosor de línea"
 msgid "文字大小"
 msgstr "Tamaño del texto"
 
+msgid "字体设置…"
+msgstr "Configuración de fuente…"
+
+msgid "笔刷大小"
+msgstr "Tamaño del pincel"
+
 msgid "马赛克大小"
 msgstr "Tamaño del mosaico"
 
@@ -819,6 +825,15 @@ msgstr "Cortar"
 
 msgid "Copy"
 msgstr "Copiar"
+
+msgid "点击保存后生效"
+msgstr "Pulsa Guardar para aplicar"
+
+msgid "请按快捷键"
+msgstr "Pulsa una combinación"
+
+msgid "未设置"
+msgstr "Sin configurar"
 
 msgid "Paste"
 msgstr "Pegar"

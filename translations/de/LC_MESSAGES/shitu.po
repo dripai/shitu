@@ -97,6 +97,12 @@ msgstr "Linienbreite"
 msgid "文字大小"
 msgstr "Textgröße"
 
+msgid "字体设置…"
+msgstr "Schrifteinstellungen…"
+
+msgid "笔刷大小"
+msgstr "Pinselgröße"
+
 msgid "马赛克大小"
 msgstr "Mosaikgröße"
 
@@ -819,6 +825,15 @@ msgstr "Ausschneiden"
 
 msgid "Copy"
 msgstr "Kopieren"
+
+msgid "点击保存后生效"
+msgstr "Zum Übernehmen auf Speichern klicken"
+
+msgid "请按快捷键"
+msgstr "Tastenkombination drücken"
+
+msgid "未设置"
+msgstr "Nicht festgelegt"
 
 msgid "Paste"
 msgstr "Einfügen"

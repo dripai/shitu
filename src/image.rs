@@ -26,6 +26,23 @@ pub struct DrawStyle {
     pub dashed: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TextFont {
+    pub family: String,
+    pub weight: i32,
+    pub italic: bool,
+}
+
+impl Default for TextFont {
+    fn default() -> Self {
+        Self {
+            family: "Microsoft YaHei UI".into(),
+            weight: 400,
+            italic: false,
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum OutlineShape {
     Rectangle,
@@ -62,11 +79,28 @@ pub fn outline_polylines(
             OutlineShape::Ellipse => ellipse_points(left, top, right, bottom),
         }
     };
+    stroke_polylines(&points, style)
+}
+
+pub fn stroke_polylines(points: &[(u32, u32)], style: DrawStyle) -> Vec<Vec<(u32, u32)>> {
     if style.dashed {
-        dashed_polylines(&points, style.radius)
+        dashed_polylines(points, style.radius)
     } else {
-        vec![points]
+        vec![points.to_vec()]
     }
+}
+
+pub fn arrow_polylines(
+    start: (u32, u32),
+    end: (u32, u32),
+    style: DrawStyle,
+) -> Vec<Vec<(u32, u32)>> {
+    let mut paths = stroke_polylines(&[start, end], style);
+    // Keep the direction marker solid even when the shaft is dashed.
+    if let Some((left, right)) = arrow_head(start, end) {
+        paths.push(vec![left, end, right]);
+    }
+    paths
 }
 
 fn ellipse_points(left: u32, top: u32, right: u32, bottom: u32) -> Vec<(u32, u32)> {
@@ -200,6 +234,7 @@ impl CapturedImage {
         position: (u32, u32),
         text: &str,
         font_size: u32,
+        font: &TextFont,
         rgba: [u8; 4],
     ) -> Result<()> {
         let mask = crate::platform::windows::text::render_text_mask(
@@ -208,6 +243,7 @@ impl CapturedImage {
             position,
             text,
             font_size,
+            font,
         )?;
         for (pixel, coverage) in Arc::make_mut(&mut self.pixels)
             .as_mut_slice()
@@ -233,6 +269,7 @@ impl CapturedImage {
         _position: (u32, u32),
         _text: &str,
         _font_size: u32,
+        _font: &TextFont,
         _rgba: [u8; 4],
     ) -> Result<()> {
         Err(anyhow!(i18n::text("当前平台尚未实现文字标注")))
@@ -530,7 +567,15 @@ impl CapturedImage {
         end: (u32, u32),
         style: DrawStyle,
     ) {
-        for path in outline_polylines(shape, start, end, style) {
+        self.draw_paths(outline_polylines(shape, start, end, style), style);
+    }
+
+    pub fn draw_stroke(&mut self, points: &[(u32, u32)], style: DrawStyle) {
+        self.draw_paths(stroke_polylines(points, style), style);
+    }
+
+    fn draw_paths(&mut self, paths: Vec<Vec<(u32, u32)>>, style: DrawStyle) {
+        for path in paths {
             if let [point] = path.as_slice() {
                 self.draw_line(*point, *point, style);
             } else {
@@ -542,12 +587,7 @@ impl CapturedImage {
     }
 
     pub fn draw_arrow(&mut self, start: (u32, u32), end: (u32, u32), style: DrawStyle) {
-        self.draw_line(start, end, style);
-        let Some((left, right)) = arrow_head(start, end) else {
-            return;
-        };
-        self.draw_line(end, left, style);
-        self.draw_line(end, right, style);
+        self.draw_paths(arrow_polylines(start, end, style), style);
     }
 
     fn paint_dot(&mut self, center_x: i32, center_y: i32, style: DrawStyle) {
@@ -694,14 +734,27 @@ mod tests {
     }
 
     #[test]
-    fn dashed_style_does_not_change_pen_or_arrow_strokes() {
+    fn pen_and_arrow_have_dash_gaps_and_arrow_tip_stays_visible() {
         let mut solid = CapturedImage::from_rgba(0, 0, 64, 64, &[0; 64 * 64 * 4]).unwrap();
         let mut dashed = solid.clone();
-        solid.draw_line((8, 8), (40, 8), outline_style(false));
-        solid.draw_arrow((8, 24), (40, 40), outline_style(false));
-        dashed.draw_line((8, 8), (40, 8), outline_style(true));
-        dashed.draw_arrow((8, 24), (40, 40), outline_style(true));
-        assert_eq!(solid.rgba_bytes(), dashed.rgba_bytes());
+        solid.draw_stroke(&[(8, 8), (60, 8)], outline_style(false));
+        solid.draw_arrow((8, 32), (60, 32), outline_style(false));
+        dashed.draw_stroke(
+            &[(8, 8), (12, 8), (16, 8), (20, 8), (60, 8)],
+            outline_style(true),
+        );
+        dashed.draw_arrow((8, 32), (60, 32), outline_style(true));
+        for y in [8, 32] {
+            assert_ne!(pixel(&solid, 16, y), [0; 4]);
+            assert_eq!(pixel(&dashed, 16, y), [0; 4]);
+            assert_ne!(pixel(&dashed, 11, y), [0; 4]);
+        }
+        assert_ne!(pixel(&dashed, 60, 32), [0; 4]);
+        let mut direct = CapturedImage::from_rgba(0, 0, 64, 64, &[0; 64 * 64 * 4]).unwrap();
+        direct.draw_stroke(&[(8, 8), (60, 8)], outline_style(true));
+        for x in 0..64 {
+            assert_eq!(pixel(&direct, x, 8), pixel(&dashed, x, 8));
+        }
     }
 
     #[test]
@@ -759,7 +812,13 @@ mod tests {
         let original = image.rgba_bytes();
 
         image
-            .draw_text((2, 2), "Test", 20, [255, 255, 255, 255])
+            .draw_text(
+                (2, 2),
+                "Test",
+                20,
+                &Default::default(),
+                [255, 255, 255, 255],
+            )
             .unwrap();
 
         assert_ne!(image.rgba_bytes(), original);

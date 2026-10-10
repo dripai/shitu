@@ -97,6 +97,12 @@ msgstr "线宽"
 msgid "文字大小"
 msgstr "文字大小"
 
+msgid "字体设置…"
+msgstr "字体设置…"
+
+msgid "笔刷大小"
+msgstr "笔刷大小"
+
 msgid "马赛克大小"
 msgstr "马赛克大小"
 
@@ -819,6 +825,15 @@ msgstr "剪切"
 
 msgid "Copy"
 msgstr "复制"
+
+msgid "点击保存后生效"
+msgstr "点击保存后生效"
+
+msgid "请按快捷键"
+msgstr "请按快捷键"
+
+msgid "未设置"
+msgstr "未设置"
 
 msgid "Paste"
 msgstr "粘贴"

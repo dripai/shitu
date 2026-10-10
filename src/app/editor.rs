@@ -10,26 +10,32 @@ use super::{
 };
 use crate::{
     capture, i18n,
-    image::{CapturedImage, DrawStyle},
+    image::{CapturedImage, DrawStyle, TextFont},
     logging, output,
     platform::{
         ocr,
-        windows::{shell, window as native, window_target::WindowTargets},
+        windows::{
+            shell,
+            text::{self as native_text, FontChoice},
+            tooltip::{NativeTooltips, TipRegion},
+            window as native,
+            window_target::WindowTargets,
+        },
     },
 };
 use anyhow::{Result, anyhow};
 use gpui_kit::component::{
     button::*,
-    input::{InputEvent, InputState, NumberInput},
-    menu::{DropdownMenu, PopupMenuItem},
+    input::{InputEvent, InputState, NumberInput, NumberStep},
     native_menu::NativeMenu,
+    radio::{Radio, RadioGroup},
     scroll::ScrollableElement,
     *,
 };
 use gpui_kit::prelude::FluentBuilder;
 use gpui_kit::*;
 use std::{
-    cell::Cell,
+    cell::{Cell, RefCell},
     path::PathBuf,
     rc::Rc,
     sync::{Arc, mpsc},
@@ -88,9 +94,11 @@ const COLORS: [[u8; 4]; 12] = [
 // One compact command row; expand only the active tool's relevant properties.
 const TOOLBAR_WIDTH: f64 = 462.;
 const TOOLBAR_MAIN_HEIGHT: f64 = 38.;
-fn property_height(tool: i32) -> f64 {
+fn property_height(tool: i32, font_size: f32) -> f64 {
     match tool {
-        1..=4 | 6 | 7 => 68.,
+        5 | 6 => 40.,
+        4 => (font_size as f64 * 1.5 + 8.).max(72.),
+        1..=3 | 7 => 64.,
         _ => 0.,
     }
 }
@@ -118,9 +126,9 @@ enum Gesture {
 enum Command {
     Tool(i32),
     Color(usize),
-    Width(i32),
+    Number(NumberKind, i32),
+    AdjustNumber(NumberKind, i32),
     Dashed(bool),
-    TextSize(u32),
     Undo,
     Redo,
     Copy,
@@ -139,6 +147,8 @@ enum Command {
     RevealFile,
     Opacity(u8),
     CommitText,
+    ChooseFont,
+    FontChosen(std::result::Result<Option<FontChoice>, String>),
 }
 
 struct Editor {
@@ -158,7 +168,11 @@ struct Editor {
     focus: FocusHandle,
     tool: i32,
     style: DrawStyle,
+    radii: [i32; 9],
+    brush_position: Option<(u32, u32)>,
     text_size: u32,
+    text_font: TextFont,
+    font_dialog_open: bool,
     text: Entity<InputState>,
     text_position: Option<(u32, u32)>,
     commands: mpsc::Receiver<Command>,
@@ -390,7 +404,11 @@ impl Editor {
                 radius: 2,
                 dashed: false,
             },
+            radii: [2, 2, 2, 2, 2, 10, 18, 2, 2],
+            brush_position: None,
             text_size: 20,
+            text_font: TextFont::default(),
+            font_dialog_open: false,
             text,
             text_position: None,
             commands,
@@ -438,7 +456,13 @@ impl Editor {
     }
     fn poll(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         while let Ok(command) = self.commands.try_recv() {
-            let reflow = matches!(command, Command::Tool(_));
+            let reflow = matches!(
+                command,
+                Command::Tool(_)
+                    | Command::Number(NumberKind::Font, _)
+                    | Command::AdjustNumber(NumberKind::Font, _)
+                    | Command::FontChosen(_)
+            );
             if let Err(error) = self.command(command, window, cx) {
                 self.error(error);
             }
@@ -462,10 +486,44 @@ impl Editor {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Result<()> {
+        if self.font_dialog_open && !matches!(command, Command::FontChosen(_)) {
+            return Ok(());
+        }
         if self.busy && !matches!(command, Command::Close) {
             return Ok(());
         }
         match command {
+            Command::ChooseFont => {
+                if self.tool != 4 {
+                    return Ok(());
+                }
+                let owner = native::hwnd(window)?.0 as isize;
+                let choice = FontChoice {
+                    font: self.text_font.clone(),
+                    size: self.text_size,
+                };
+                let sender = self.sender.clone();
+                std::thread::Builder::new()
+                    .name("font-dialog".into())
+                    .spawn(move || {
+                        let result = native_text::choose_font(owner, choice)
+                            .map_err(|error| format!("{error:#}"));
+                        let _ = sender.send(Command::FontChosen(result));
+                    })?;
+                self.font_dialog_open = true;
+            }
+            Command::FontChosen(result) => {
+                self.font_dialog_open = false;
+                if let Some(choice) = result.map_err(|error| anyhow!(error))? {
+                    self.text_font = choice.font;
+                    self.text_size = choice.size;
+                }
+                if self.text_position.is_some() {
+                    self.text.update(cx, |input, cx| input.focus(window, cx));
+                } else {
+                    self.focus.focus(window, cx);
+                }
+            }
             Command::Close => {
                 window.remove_window();
                 return Ok(());
@@ -474,13 +532,21 @@ impl Editor {
                 self.commit_text(window, cx)?;
                 self.annotations.finish();
                 self.tool = if self.tool == tool { 0 } else { tool };
+                self.style.radius = self.radii[self.tool as usize];
+                self.brush_position = None;
                 window.activate_window();
                 self.focus.focus(window, cx);
             }
             Command::Color(index) => self.style.rgba = COLORS[index],
-            Command::Width(width) => self.style.radius = width.clamp(1, 12),
+            Command::Number(kind, value) => self.set_number(kind, value),
+            Command::AdjustNumber(kind, steps) => {
+                let current = match kind {
+                    NumberKind::Font => self.text_size as i32,
+                    NumberKind::Width(tool) => self.radii[tool as usize] * 2,
+                };
+                self.set_number(kind, current + steps * kind.step());
+            }
             Command::Dashed(value) => self.style.dashed = value,
-            Command::TextSize(value) => self.text_size = value.clamp(8, 96),
             Command::CommitText => self.commit_text(window, cx)?,
             Command::Undo => {
                 self.annotations.undo();
@@ -688,6 +754,18 @@ impl Editor {
                 .clamp(0., self.source.height() as f32) as u32,
         )
     }
+    fn set_number(&mut self, kind: NumberKind, value: i32) {
+        let value = kind.normalize(value);
+        match kind {
+            NumberKind::Font => self.text_size = value as u32,
+            NumberKind::Width(tool) => {
+                self.radii[tool as usize] = value / 2;
+                if self.tool == tool {
+                    self.style.radius = value / 2;
+                }
+            }
+        }
+    }
     fn local_point(&self, point: (u32, u32)) -> (u32, u32) {
         let origin = self.region.map(|r| (r.x, r.y)).unwrap_or((0, 0));
         let image = self.base.as_ref().unwrap_or(&self.source);
@@ -697,11 +775,14 @@ impl Editor {
         )
     }
     fn mouse_down(&mut self, event: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if self.busy {
+        if self.busy || self.font_dialog_open {
             return;
         }
         self.focus.focus(window, cx);
         let p = self.point(event.position);
+        if matches!(self.tool, 5 | 6) {
+            self.brush_position = Some(p);
+        }
         if self.desktop.is_none() && self.tool == 0 && event.click_count == 2 {
             // Consume the caption double-click even when close is disabled;
             // don't let DefWindowProc turn it into a maximize action.
@@ -764,10 +845,14 @@ impl Editor {
             .ceil() as u32
     }
     fn mouse_move(&mut self, event: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if self.busy {
+        if self.busy || self.font_dialog_open {
             return;
         }
         let p = self.point(event.position);
+        if matches!(self.tool, 5 | 6) {
+            self.brush_position = Some(p);
+            cx.notify();
+        }
         if let Some(gesture) = self.gesture {
             match gesture {
                 Gesture::Select(start) => {
@@ -838,6 +923,9 @@ impl Editor {
         let _ = window;
     }
     fn mouse_up(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.font_dialog_open {
+            return;
+        }
         if let Some(gesture) = self.gesture.take() {
             if matches!(gesture, Gesture::Draw) {
                 self.annotations.finish();
@@ -876,8 +964,13 @@ impl Editor {
     fn commit_text(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Result<()> {
         if let Some(position) = self.text_position.take() {
             let text = self.text.read(cx).value().to_string();
-            self.annotations
-                .add_text(position, &text, self.style, self.text_size);
+            self.annotations.add_text(
+                position,
+                &text,
+                self.style,
+                self.text_size,
+                self.text_font.clone(),
+            );
             self.refresh()?;
             self.focus.focus(window, cx);
         }
@@ -889,7 +982,7 @@ impl Editor {
             let editor = cx.entity();
             let snapshot = self.toolbar_snapshot();
             let sender = self.sender.clone();
-            let (handle, _) = gpui_kit::open_window(
+            let (handle, toolbar) = gpui_kit::open_window(
                 WindowOptions {
                     titlebar: None,
                     kind: WindowKind::PopUp,
@@ -907,22 +1000,38 @@ impl Editor {
                     window.set_window_title("ShiTu · Toolbar");
                     window.on_window_should_close(cx, |_, _| false);
                     cx.new(|cx| {
-                        let font_size = cx.new(|cx| {
+                        let kind = snapshot.number_kind();
+                        let (min, max) = kind.limits();
+                        let number_input = cx.new(|cx| {
                             InputState::new(window, cx)
-                                .default_value(snapshot.text_size.to_string())
-                                .min(8.)
-                                .max(96.)
-                                .step(1.)
+                                .default_value(snapshot.number_value().to_string())
+                                .min(min as f64)
+                                .max(max as f64)
+                                .step(kind.step() as f64)
                         });
-                        let font_subscription = cx.subscribe(
-                            &font_size,
-                            |toolbar: &mut Toolbar, input, event: &InputEvent, cx| {
+                        let number_subscription = cx.subscribe_in(
+                            &number_input,
+                            window,
+                            |toolbar: &mut Toolbar, input, event: &InputEvent, window, cx| {
+                                let kind = toolbar.snapshot.number_kind();
+                                let value = input.read(cx).value().parse::<i32>();
+                                let commit = matches!(
+                                    event,
+                                    InputEvent::Blur | InputEvent::PressEnter { .. }
+                                );
                                 if matches!(event, InputEvent::Change)
-                                    && let Ok(value) = input.read(cx).value().parse::<u32>()
-                                    && (8..=96).contains(&value)
-                                    && value != toolbar.snapshot.text_size
+                                    && let Ok(value) = value
+                                    && value == kind.normalize(value)
                                 {
-                                    let _ = toolbar.sender.send(Command::TextSize(value));
+                                    let _ = toolbar.sender.send(Command::Number(kind, value));
+                                } else if commit {
+                                    let value = kind.normalize(
+                                        value.unwrap_or(toolbar.snapshot.number_value()),
+                                    );
+                                    input.update(cx, |input, cx| {
+                                        input.set_value(value.to_string(), window, cx)
+                                    });
+                                    let _ = toolbar.sender.send(Command::Number(kind, value));
                                 }
                             },
                         );
@@ -931,12 +1040,23 @@ impl Editor {
                             window,
                             |toolbar: &mut Toolbar, editor, window, cx| {
                                 let snapshot = editor.read(cx).toolbar_snapshot();
-                                let font_changed = toolbar.snapshot.text_size != snapshot.text_size;
+                                let number_changed = toolbar.snapshot.number_kind()
+                                    != snapshot.number_kind()
+                                    || toolbar.snapshot.number_value() != snapshot.number_value();
                                 toolbar.snapshot = snapshot;
-                                if font_changed {
-                                    toolbar.font_size.update(cx, |input, cx| {
+                                if number_changed {
+                                    toolbar.number_input.update(cx, |input, cx| {
+                                        let kind = toolbar.snapshot.number_kind();
+                                        let (min, max) = kind.limits();
+                                        input.set_min(Some(min as f64), window, cx);
+                                        input.set_max(Some(max as f64), window, cx);
+                                        input.set_step(
+                                            Some(NumberStep::from(kind.step() as f64)),
+                                            window,
+                                            cx,
+                                        );
                                         input.set_value(
-                                            toolbar.snapshot.text_size.to_string(),
+                                            toolbar.snapshot.number_value().to_string(),
                                             window,
                                             cx,
                                         )
@@ -948,18 +1068,32 @@ impl Editor {
                         Toolbar {
                             snapshot,
                             sender,
-                            font_size,
-                            _subscriptions: vec![subscription, font_subscription],
+                            number_input,
+                            focus: cx.focus_handle(),
+                            tips: Rc::new(RefCell::new(None)),
+                            _subscriptions: vec![subscription, number_subscription],
                         }
                     })
                 },
             )?;
+            let setup = handle
+                .update(cx, |_, toolbar_window, cx| {
+                    native::hide(toolbar_window)?;
+                    native::prepare_image_window(toolbar_window, false)?;
+                    native::set_owner(toolbar_window, window)?;
+                    let tips = NativeTooltips::new(native::hwnd(toolbar_window)?)?;
+                    toolbar.update(cx, |toolbar, cx| {
+                        *toolbar.tips.borrow_mut() = Some(tips);
+                        cx.notify();
+                    });
+                    Ok::<_, anyhow::Error>(())
+                })
+                .and_then(|r| r);
+            if let Err(error) = setup {
+                let _ = handle.update(cx, |_, w, _| w.remove_window());
+                return Err(error);
+            }
             self.toolbar = Some(handle);
-            handle.update(cx, |_, toolbar_window, _| {
-                native::hide(toolbar_window)?;
-                native::prepare_image_window(toolbar_window, false)?;
-                native::set_owner(toolbar_window, window)
-            })??;
         }
         self.position_toolbar(window, cx)?;
         if let Some(handle) = self.toolbar {
@@ -974,9 +1108,10 @@ impl Editor {
     fn toolbar_snapshot(&self) -> ToolbarSnapshot {
         ToolbarSnapshot {
             tool: self.tool,
-            busy: self.busy,
+            busy: self.busy || self.font_dialog_open,
             style: self.style,
             text_size: self.text_size,
+            text_font: self.text_font.clone(),
             capture: self.desktop.is_some(),
             properties_above: self.properties_above,
             can_undo: self.annotations.can_undo(),
@@ -1013,7 +1148,9 @@ impl Editor {
         toolbar.update(cx, |_, toolbar_window, _| -> Result<()> {
             let scale = toolbar_window.scale_factor() as f64;
             let width = (TOOLBAR_WIDTH * scale).min((work.right - work.left - 20) as f64);
-            let height = (TOOLBAR_MAIN_HEIGHT + property_height(self.tool)) * scale;
+            let height = (TOOLBAR_MAIN_HEIGHT
+                + property_height(self.tool, self.text_size as f32 / scale as f32))
+                * scale;
             let placement = self.layout.place(
                 selected,
                 rect(work),
@@ -1021,7 +1158,7 @@ impl Editor {
                     width,
                     height,
                     main_height: TOOLBAR_MAIN_HEIGHT * scale,
-                    expanded_height: (TOOLBAR_MAIN_HEIGHT + 68.) * scale,
+                    expanded_height: height.max((TOOLBAR_MAIN_HEIGHT + 64.) * scale),
                     popup_padding: 0.,
                 },
             )?;
@@ -1039,7 +1176,7 @@ impl Editor {
         Ok(())
     }
     fn key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.focus.is_focused(window) {
+        if self.font_dialog_open || !self.focus.is_focused(window) {
             return;
         }
         let key = event.keystroke.key.as_str();
@@ -1082,6 +1219,9 @@ impl Editor {
         cx.notify();
     }
     fn menu(&mut self, event: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.font_dialog_open {
+            return;
+        }
         // The pin canvas is a native drag area when no annotation tool is active.
         // Consume its right-click so Windows doesn't also open a caption menu.
         cx.stop_propagation();
@@ -1202,6 +1342,24 @@ fn normalized_selection(
     })
 }
 
+fn brush_bounds(
+    image: Bounds<Pixels>,
+    source: (u32, u32),
+    point: (u32, u32),
+    radius: i32,
+) -> Bounds<Pixels> {
+    let sx = f32::from(image.size.width) / source.0 as f32;
+    let sy = f32::from(image.size.height) / source.1 as f32;
+    Bounds::new(
+        image.origin
+            + gpui_kit::point(
+                px((point.0 as f32 - radius as f32) * sx),
+                px((point.1 as f32 - radius as f32) * sy),
+            ),
+        size(px(radius as f32 * 2. * sx), px(radius as f32 * 2. * sy)),
+    )
+}
+
 fn image_display_bounds(
     bounds: Bounds<Pixels>,
     source: (u32, u32),
@@ -1228,6 +1386,13 @@ impl Render for Editor {
         let capture = self.desktop.is_some();
         let source_size = (self.source.width(), self.source.height());
         let selected = self.annotations.selection_bounds();
+        let brush = if matches!(self.tool, 5 | 6) && !self.busy && self.base.is_some() {
+            self.brush_position
+                .filter(|p| self.region.is_none_or(|r| r.contains(*p)))
+                .map(|p| (p, self.style.radius))
+        } else {
+            None
+        };
         let region_origin = self.region.map(|r| (r.x, r.y)).unwrap_or((0, 0));
         let measured = self.canvas_bounds.clone();
         let canvas = canvas(
@@ -1352,6 +1517,22 @@ impl Render for Editor {
                         ));
                     }
                 }
+                if let Some((p, radius)) = brush {
+                    let ring = brush_bounds(image_bounds, source_size, p, radius);
+                    let clip = region.map(region_bounds).unwrap_or(image_bounds);
+                    window.with_content_mask(Some(ContentMask { bounds: clip }), |window| {
+                        window.paint_quad(
+                            outline(ring, rgb(0x000000), BorderStyle::Solid)
+                                .corner_radii(ring.size.width.min(ring.size.height) / 2.)
+                                .border_widths(px(2.)),
+                        );
+                        window.paint_quad(
+                            outline(ring, rgb(0xffffff), BorderStyle::Solid)
+                                .corner_radii(ring.size.width.min(ring.size.height) / 2.)
+                                .border_widths(px(1.)),
+                        );
+                    });
+                }
             },
         )
         .size_full();
@@ -1359,6 +1540,14 @@ impl Render for Editor {
             .id("image-editor")
             .size_full()
             .relative()
+            .when(matches!(self.tool, 5 | 6), |root| {
+                root.cursor(CursorStyle::Crosshair)
+            })
+            .on_hover(cx.listener(|this, hovered, _, cx| {
+                if !hovered && this.brush_position.take().is_some() {
+                    cx.notify();
+                }
+            }))
             // start_window_move() is a no-op in gpui-pre-windows 0.3.8.
             // The official TitleBar uses this hit-test area, which the Windows
             // backend maps to HTCAPTION and native window dragging instead.
@@ -1477,14 +1666,35 @@ impl Render for Editor {
             let b = self.canvas_bounds.get();
             let sx = f32::from(b.size.width) / source_size.0 as f32;
             let sy = f32::from(b.size.height) / source_size.1 as f32;
+            let available_width = self
+                .base
+                .as_ref()
+                .map_or(source_size.0, |image| image.width())
+                .saturating_sub(p.0) as f32
+                * sx;
             root = root.child(
                 div()
                     .absolute()
                     .left(px((p.0 + region_origin.0) as f32 * sx))
                     .top(px((p.1 + region_origin.1) as f32 * sy))
-                    .w(px(240.))
+                    .w(px((self.text_size as f32 * sx * 8.)
+                        .max(240.)
+                        .min(available_width.max(1.))))
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .child(super::text_input(&self.text)),
+                    .child(
+                        super::text_input(&self.text)
+                            .font_family(self.text_font.family.clone())
+                            .font_weight(FontWeight(self.text_font.weight as f32))
+                            .when(self.text_font.italic, |input| input.italic())
+                            .text_size(px(self.text_size as f32 * sy))
+                            .line_height(relative(1.3))
+                            .h(px(self.text_size as f32 * sy * 1.5 + 4.))
+                            .px_0()
+                            .py_0()
+                            .text_color(rgb((self.style.rgba[0] as u32) << 16
+                                | (self.style.rgba[1] as u32) << 8
+                                | self.style.rgba[2] as u32)),
+                    ),
             );
         }
         root
@@ -1496,18 +1706,186 @@ struct ToolbarSnapshot {
     busy: bool,
     style: DrawStyle,
     text_size: u32,
+    text_font: TextFont,
     capture: bool,
     properties_above: bool,
     can_undo: bool,
     can_redo: bool,
 }
+impl ToolbarSnapshot {
+    fn number_kind(&self) -> NumberKind {
+        if self.tool == 4 {
+            NumberKind::Font
+        } else {
+            NumberKind::Width(self.tool)
+        }
+    }
+    fn number_value(&self) -> i32 {
+        if self.tool == 4 {
+            self.text_size as i32
+        } else {
+            self.style.radius * 2
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum NumberKind {
+    Font,
+    Width(i32),
+}
+
+fn number_wheel_steps(event: &ScrollWheelEvent) -> i32 {
+    let delta = event.delta.pixel_delta(px(16.));
+    // gpui-pre-windows 0.3.8 routes Shift+WM_MOUSEWHEEL to the X axis.
+    let delta = if event.modifiers.shift && delta.y == px(0.) {
+        delta.x
+    } else {
+        delta.y
+    };
+    let direction = if delta > px(0.) {
+        1
+    } else if delta < px(0.) {
+        -1
+    } else {
+        0
+    };
+    direction * if event.modifiers.shift { 5 } else { 1 }
+}
+impl NumberKind {
+    fn limits(self) -> (i32, i32) {
+        match self {
+            Self::Font => (8, 96),
+            Self::Width(5 | 6) => (4, 128),
+            Self::Width(_) => (2, 24),
+        }
+    }
+    fn step(self) -> i32 {
+        if self == Self::Font { 1 } else { 2 }
+    }
+    fn normalize(self, value: i32) -> i32 {
+        let (min, max) = self.limits();
+        // Image-space brushes use whole-pixel radii, so diameters step by 2px.
+        let value = value.clamp(min, max);
+        ((value + self.step() / 2) / self.step() * self.step()).min(max)
+    }
+}
+
+#[derive(Clone, PartialEq)]
+enum ToolbarOption {
+    Number(NumberKind, i32),
+}
+#[derive(Clone, PartialEq, Action)]
+#[action(no_json)]
+struct SetToolbarOption {
+    value: ToolbarOption,
+}
+
+// Collect the real button rectangles during prepaint. The native control gets
+// the complete set after layout, including clipping at narrow screen edges.
+fn tooltip_button(
+    button: Button,
+    label: &'static str,
+    regions: &Rc<RefCell<Vec<TipRegion>>>,
+    dimensions: (f32, f32),
+) -> impl IntoElement {
+    let regions = regions.clone();
+    div()
+        .relative()
+        .flex_shrink_0()
+        .w(px(dimensions.0))
+        .h(px(dimensions.1))
+        .child(button.accessibility_label(label))
+        .child(
+            canvas(
+                move |bounds, window, _| {
+                    let scale = window.scale_factor();
+                    let viewport = window.viewport_size();
+                    let rect = RECT {
+                        left: (f32::from(bounds.left()).max(0.) * scale).round() as i32,
+                        top: (f32::from(bounds.top()).max(0.) * scale).round() as i32,
+                        right: (f32::from(bounds.right()).min(viewport.width.into()) * scale)
+                            .round() as i32,
+                        bottom: (f32::from(bounds.bottom()).min(viewport.height.into()) * scale)
+                            .round() as i32,
+                    };
+                    if rect.right > rect.left && rect.bottom > rect.top {
+                        let mut regions = regions.borrow_mut();
+                        let id = regions.len() + 1;
+                        regions.push(TipRegion {
+                            id,
+                            text: label,
+                            rect,
+                        });
+                    }
+                },
+                |_, _, _, _| {},
+            )
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full(),
+        )
+}
+
 struct Toolbar {
     snapshot: ToolbarSnapshot,
     sender: mpsc::Sender<Command>,
-    font_size: Entity<InputState>,
+    number_input: Entity<InputState>,
+    focus: FocusHandle,
+    tips: Rc<RefCell<Option<NativeTooltips>>>,
     _subscriptions: Vec<Subscription>,
 }
 impl Toolbar {
+    // NumberInput 0.7.1 owns editing/stepping/limits, but has no wheel handler.
+    // Keep wheel routing scoped to the numeric control using GPUI hit testing.
+    fn wheel_control(&self, id: &'static str, content: impl IntoElement) -> impl IntoElement {
+        let sender = self.sender.clone();
+        let kind = self.snapshot.number_kind();
+        let busy = self.snapshot.busy;
+        div()
+            .id(id)
+            .child(content)
+            .on_scroll_wheel(move |event, _, cx| {
+                let steps = number_wheel_steps(event);
+                if !busy && steps != 0 {
+                    let _ = sender.send(Command::AdjustNumber(kind, steps));
+                    cx.stop_propagation();
+                }
+            })
+    }
+    fn menu_button(
+        &self,
+        id: &'static str,
+        label: impl Into<SharedString>,
+        options: Vec<(String, bool, ToolbarOption)>,
+    ) -> Button {
+        let focus = self.focus.clone();
+        let tips = self.tips.clone();
+        Button::new(id)
+            .dropdown_caret(true)
+            .label(label)
+            .w(px(188.))
+            .h(px(32.))
+            .disabled(self.snapshot.busy)
+            .on_click(move |event, window, cx| {
+                if let Some(tips) = tips.borrow().as_ref() {
+                    tips.dismiss();
+                }
+                focus.focus(window, cx);
+                let mut menu = NativeMenu::new();
+                for (label, checked, value) in &options {
+                    menu = menu.menu_with_check(
+                        label.clone(),
+                        *checked,
+                        Box::new(SetToolbarOption {
+                            value: value.clone(),
+                        }),
+                    );
+                }
+                menu.show(event.position(), window, cx);
+            })
+    }
     fn button(
         &self,
         id: &'static str,
@@ -1520,7 +1898,6 @@ impl Toolbar {
         let sender = self.sender.clone();
         Button::new(id)
             .icon(Icon::default().data(bytes).size(px(16.)))
-            .tooltip(label)
             .accessibility_label(label)
             .ghost()
             .selected(selected)
@@ -1535,12 +1912,15 @@ impl Toolbar {
     }
 }
 impl Render for Toolbar {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let tip_regions = Rc::new(RefCell::new(Vec::new()));
         // Native window creation/placement can paint synchronously while the
         // editor is borrowed. Render a snapshot instead of reentering it.
         let editor = &self.snapshot;
         let tool = editor.tool;
         let busy = editor.busy;
+        let sample_size = editor.text_size as f32 / window.scale_factor();
+        let properties_height = property_height(tool, sample_size);
         // Preserve the original screenshot palette while native components own
         // button input, keyboard focus, tooltip and dropdown behavior.
         let dark = cx.theme().is_dark();
@@ -1557,7 +1937,7 @@ impl Render for Toolbar {
             .flex_shrink_0();
         macro_rules! tool_button {
             ($id:literal,$label:expr,$icon:literal,$command:expr,$selected:expr) => {
-                buttons = buttons.child(
+                buttons = buttons.child(tooltip_button(
                     self.button(
                         $id,
                         $label,
@@ -1574,7 +1954,10 @@ impl Render for Toolbar {
                             .border_1()
                             .border_color(accent)
                     }),
-                );
+                    $label,
+                    &tip_regions,
+                    (28., 28.),
+                ));
             };
         }
         tool_button!(
@@ -1701,7 +2084,7 @@ impl Render for Toolbar {
                 let color = COLORS[index];
                 let sender = self.sender.clone();
                 let value = rgb((color[0] as u32) << 16 | (color[1] as u32) << 8 | color[2] as u32);
-                swatches = swatches.child(
+                swatches = swatches.child(tooltip_button(
                     Button::new(("color", index))
                         .ghost()
                         .small()
@@ -1709,7 +2092,6 @@ impl Render for Toolbar {
                         .h(px(28.))
                         .p_0()
                         .rounded(px(3.))
-                        .tooltip(color_names[index])
                         .accessibility_label(color_names[index])
                         .selected(color == editor.style.rgba)
                         .disabled(busy)
@@ -1723,136 +2105,155 @@ impl Render for Toolbar {
                         .on_click(move |_, _, _| {
                             let _ = sender.send(Command::Color(index));
                         }),
-                );
+                    color_names[index],
+                    &tip_regions,
+                    (24., 28.),
+                ));
             }
             colors = colors.child(swatches);
         }
-        let mut controls = div().v_flex().gap(px(2.)).w(px(188.)).flex_shrink_0();
-        if tool == 4 {
-            let sender = self.sender.clone();
-            let selected = editor.text_size;
-            controls = controls
-                .child(
-                    Button::new("font-size")
-                        .dropdown_caret(true)
-                        .label(selected.to_string())
-                        .tooltip(i18n::text("文字大小"))
-                        .w(px(188.))
-                        .h(px(32.))
-                        .disabled(busy)
-                        .dropdown_menu(move |mut menu, _, _| {
-                            for value in [8, 12, 16, 20, 24, 32, 48, 64, 96] {
-                                let sender = sender.clone();
-                                menu = menu.item(
-                                    PopupMenuItem::new(value.to_string())
-                                        .checked(value == selected)
-                                        .on_click(move |_, _, _| {
-                                            let _ = sender.send(Command::TextSize(value));
-                                        }),
-                                );
-                            }
-                            menu
-                        }),
-                )
-                .child(
-                    NumberInput::new(&self.font_size)
+        let brush = matches!(tool, 5 | 6);
+        let dot = |diameter: f32| {
+            div()
+                .size(px(32.))
+                .flex_shrink_0()
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(div().size(px(diameter)).rounded_full().bg(rgb(if dark {
+                    0xf0f0f0
+                } else {
+                    0x111111
+                })))
+        };
+        let mut controls = div().h_flex().gap(px(6.)).flex_shrink_0();
+        if tool == 4 || brush {
+            if brush {
+                // Keep a fixed slot; the canvas ring shows the true pixel size.
+                controls =
+                    controls.child(dot(4. + (editor.number_value() as f32 - 4.) / 124. * 24.));
+            }
+            controls = controls.child(
+                self.wheel_control(
+                    "size-input-wheel",
+                    NumberInput::new(&self.number_input)
+                        .suffix("px")
                         .small()
-                        .w(px(188.))
+                        .w(px(if tool == 4 { 148. } else { 188. }))
                         .h(px(32.))
                         .disabled(busy),
-                );
-        } else {
-            let mosaic = tool == 6;
-            let selected = editor.style.radius;
-            let values = if mosaic {
-                vec![(1, 20), (2, 36), (4, 60)]
-            } else {
-                vec![(1, 2), (2, 4), (3, 6), (4, 8), (6, 12), (8, 16), (12, 24)]
-            };
-            let display = if mosaic {
-                if selected == 1 {
-                    20
-                } else if selected >= 4 {
-                    60
-                } else {
-                    36
-                }
-            } else {
-                selected * 2
-            };
-            let sender = self.sender.clone();
-            controls = controls.child(
-                Button::new("stroke-width")
-                    .dropdown_caret(true)
-                    .label(display.to_string())
-                    .tooltip(if mosaic {
-                        i18n::text("马赛克大小")
-                    } else {
-                        i18n::text("线宽")
-                    })
-                    .w(px(188.))
-                    .h(px(32.))
-                    .disabled(busy)
-                    .dropdown_menu(move |mut menu, _, _| {
-                        for (radius, diameter) in &values {
-                            let sender = sender.clone();
-                            let radius = *radius;
-                            menu = menu.item(
-                                PopupMenuItem::new(diameter.to_string())
-                                    .checked(*diameter == display)
-                                    .on_click(move |_, _, _| {
-                                        let _ = sender.send(Command::Width(radius));
-                                    }),
-                            );
-                        }
-                        menu
-                    }),
+                ),
             );
-            if matches!(tool, 2 | 7) {
+            if tool == 4 {
                 let sender = self.sender.clone();
-                let selected = editor.style.dashed;
-                controls = controls.child(
-                    Button::new("line-style")
-                        .dropdown_caret(true)
-                        .label(if selected {
-                            "┄┄┄┄┄┄┄┄"
-                        } else {
-                            "────────"
-                        })
-                        .tooltip(i18n::text("边框样式"))
-                        .w(px(188.))
-                        .h(px(32.))
-                        .disabled(busy)
-                        .dropdown_menu(move |mut menu, _, _| {
-                            for dashed in [false, true] {
-                                let sender = sender.clone();
-                                menu = menu.item(
-                                    PopupMenuItem::new(if dashed {
-                                        i18n::text("虚线")
-                                    } else {
-                                        i18n::text("实线")
+                let fields = div()
+                    .v_flex()
+                    .gap(px(4.))
+                    .w(px(148.))
+                    .flex_shrink_0()
+                    .child(controls)
+                    .child(
+                        Button::new("font-settings")
+                            .small()
+                            .h(px(28.))
+                            .w_full()
+                            .label(i18n::text("字体设置…"))
+                            .disabled(busy)
+                            .on_click(move |_, _, _| {
+                                let _ = sender.send(Command::ChooseFont);
+                            }),
+                    );
+                controls = div()
+                    .h_flex()
+                    .gap(px(6.))
+                    .flex_shrink_0()
+                    .child(fields)
+                    .child(
+                        div()
+                            .w(px(104.))
+                            .h(px((properties_height - 8.) as f32))
+                            .flex_shrink_0()
+                            .h_flex()
+                            .justify_center()
+                            .font_family(editor.text_font.family.clone())
+                            .font_weight(FontWeight(editor.text_font.weight as f32))
+                            .when(editor.text_font.italic, |sample| sample.italic())
+                            .text_size(px(sample_size))
+                            .line_height(relative(1.3))
+                            .child("字"),
+                    );
+            }
+        } else {
+            let display = editor.number_value();
+            let width = 150.;
+            let width_row = div()
+                .h_flex()
+                .gap(px(6.))
+                .child(
+                    self.wheel_control(
+                        "width-presets-wheel",
+                        tooltip_button(
+                            self.menu_button(
+                                "stroke-width",
+                                format!("{display} px"),
+                                [2, 4, 6, 8, 12, 16, 24]
+                                    .into_iter()
+                                    .map(|diameter| {
+                                        (
+                                            format!("{diameter} px"),
+                                            diameter == display,
+                                            ToolbarOption::Number(
+                                                NumberKind::Width(tool),
+                                                diameter,
+                                            ),
+                                        )
                                     })
-                                    .checked(dashed == selected)
-                                    .on_click(
-                                        move |_, _, _| {
-                                            let _ = sender.send(Command::Dashed(dashed));
-                                        },
-                                    ),
-                                );
-                            }
-                            menu
+                                    .collect(),
+                            )
+                            .w(px(width)),
+                            i18n::text("线宽"),
+                            &tip_regions,
+                            (width, 32.),
+                        ),
+                    ),
+                )
+                .child(dot(display as f32));
+            let sender = self.sender.clone();
+            controls = div()
+                .v_flex()
+                .gap(px(4.))
+                .w(px(188.))
+                .flex_shrink_0()
+                .child(width_row)
+                .child(
+                    RadioGroup::horizontal("stroke-style")
+                        .selected_index(Some(usize::from(editor.style.dashed)))
+                        .disabled(busy)
+                        .child(
+                            Radio::new("solid")
+                                .small()
+                                .label("────")
+                                .accessibility_label(i18n::text("实线")),
+                        )
+                        .child(
+                            Radio::new("dashed")
+                                .small()
+                                .label("┄┄┄┄")
+                                .accessibility_label(i18n::text("虚线")),
+                        )
+                        .on_change(move |index, _, _| {
+                            let _ = sender.send(Command::Dashed(*index == 1));
                         }),
                 );
-            }
         }
         let properties = div()
             .h_flex()
             .justify_center()
             .gap(px(8.))
             .px(px(3.))
-            .h(px(property_height(tool) as f32))
+            .h(px(properties_height as f32))
             .flex_shrink_0()
-            .when(tool != 6, |row| {
+            .when(!brush, |row| {
                 row.child(colors)
                     .child(div().w(px(1.)).h(px(50.)).bg(cx.theme().border))
             })
@@ -1860,15 +2261,19 @@ impl Render for Toolbar {
         let content = div().v_flex();
         let content = if editor.properties_above {
             content
-                .when(property_height(tool) > 0., |row| row.child(properties))
+                .when(properties_height > 0., |row| row.child(properties))
                 .child(buttons)
         } else {
             content
                 .child(buttons)
-                .when(property_height(tool) > 0., |row| row.child(properties))
+                .when(properties_height > 0., |row| row.child(properties))
         };
+        let tips = self.tips.clone();
+        let reset_regions = tip_regions.clone();
         div()
             .id("toolbar-scroll")
+            .relative()
+            .track_focus(&self.focus)
             .size_full()
             .overflow_x_scrollbar()
             .bg(card)
@@ -1877,7 +2282,40 @@ impl Render for Toolbar {
             .rounded(px(4.))
             .text_color(cx.theme().foreground)
             .text_xs()
+            .child(
+                canvas(
+                    move |_, _, _| reset_regions.borrow_mut().clear(),
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full(),
+            )
             .child(content)
+            .child(
+                canvas(
+                    |_, _, _| {},
+                    move |_, _, _, _| {
+                        if let Some(tips) = tips.borrow_mut().as_mut()
+                            && let Err(error) = tips.sync(&tip_regions.borrow())
+                        {
+                            logging::error(format!("Update toolbar tooltips: {error:#}"));
+                        }
+                    },
+                )
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full(),
+            )
+            .on_action(cx.listener(|this, action: &SetToolbarOption, _, cx| {
+                let command = match action.value {
+                    ToolbarOption::Number(kind, value) => Command::Number(kind, value),
+                };
+                let _ = this.sender.send(command);
+                cx.stop_propagation();
+            }))
             .into_any_element()
     }
 }
@@ -1886,6 +2324,58 @@ impl Render for Toolbar {
 mod tests {
     use super::{Region, fitted_size, image_display_bounds, normalized_selection, render_image};
     use crate::image::CapturedImage;
+    #[test]
+    fn brush_outline_tracks_image_pixels_across_dpi_and_pin_zoom() {
+        use super::brush_bounds;
+        use gpui_kit::{Bounds, point, px, size};
+        for dpi in [1., 1.25, 1.5, 2.] {
+            for zoom in [0.5, 1., 2.] {
+                let image = Bounds::new(
+                    point(px(12.), px(8.)),
+                    size(px(800. * zoom / dpi), px(600. * zoom / dpi)),
+                );
+                for radius in [2, 18, 64] {
+                    let ring = brush_bounds(image, (800, 600), (200, 100), radius);
+                    assert!(
+                        (f32::from(ring.size.width) * dpi - radius as f32 * 2. * zoom).abs()
+                            < 0.001
+                    );
+                    assert!(
+                        (f32::from(ring.center().x - image.origin.x) * dpi - 200. * zoom).abs()
+                            < 0.001
+                    );
+                }
+            }
+        }
+    }
+    #[test]
+    fn number_wheel_handles_windows_shift_axis_and_limits() {
+        use super::{NumberKind, number_wheel_steps};
+        use gpui_kit::{ScrollDelta, ScrollWheelEvent, point};
+        let mut event = ScrollWheelEvent {
+            delta: ScrollDelta::Lines(point(0., 3.)),
+            ..Default::default()
+        };
+        assert_eq!(number_wheel_steps(&event), 1);
+        event.delta = ScrollDelta::Lines(point(0., -3.));
+        assert_eq!(number_wheel_steps(&event), -1);
+        event.delta = ScrollDelta::Lines(point(3., 0.));
+        assert_eq!(number_wheel_steps(&event), 0);
+        event.modifiers.shift = true;
+        assert_eq!(number_wheel_steps(&event), 5);
+        for kind in [
+            NumberKind::Font,
+            NumberKind::Width(1),
+            NumberKind::Width(5),
+            NumberKind::Width(6),
+        ] {
+            let (min, max) = kind.limits();
+            assert_eq!(kind.normalize(min - kind.step()), min);
+            assert_eq!(kind.normalize(max + kind.step()), max);
+        }
+        assert_eq!(NumberKind::Width(6).normalize(35), 36);
+        assert_eq!(NumberKind::Width(5).limits(), (4, 128));
+    }
     #[test]
     fn capture_preview_keeps_device_pixels_even_with_a_smaller_client_area() {
         use gpui_kit::{Bounds, point, px, size};

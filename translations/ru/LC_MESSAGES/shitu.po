@@ -97,6 +97,12 @@ msgstr "Толщина линии"
 msgid "文字大小"
 msgstr "Размер текста"
 
+msgid "字体设置…"
+msgstr "Настройки шрифта…"
+
+msgid "笔刷大小"
+msgstr "Размер кисти"
+
 msgid "马赛克大小"
 msgstr "Размер мозаики"
 
@@ -819,6 +825,15 @@ msgstr "Вырезать"
 
 msgid "Copy"
 msgstr "Копировать"
+
+msgid "点击保存后生效"
+msgstr "Нажмите «Сохранить», чтобы применить"
+
+msgid "请按快捷键"
+msgstr "Нажмите сочетание клавиш"
+
+msgid "未设置"
+msgstr "Не задано"
 
 msgid "Paste"
 msgstr "Вставить"

@@ -1,6 +1,9 @@
 use anyhow::Result;
 
-use crate::image::{CapturedImage, DrawStyle, OutlineShape, arrow_head, outline_polylines};
+use crate::image::{
+    CapturedImage, DrawStyle, OutlineShape, TextFont, arrow_head, arrow_polylines,
+    outline_polylines, stroke_polylines,
+};
 
 #[derive(Default)]
 pub struct AnnotationHistory {
@@ -9,6 +12,7 @@ pub struct AnnotationHistory {
     redo: Vec<Vec<AnnotationCommand>>,
     active: bool,
     active_tool: i32,
+    eraser: Option<((u32, u32), f64)>,
     active_before: Option<Vec<AnnotationCommand>>,
     selected: Option<usize>,
     edit: Option<EditDrag>,
@@ -87,6 +91,7 @@ impl AnnotationHistory {
         self.redo.clear();
         self.active = false;
         self.active_tool = 0;
+        self.eraser = None;
         self.active_before = None;
         self.selected = None;
         self.edit = None;
@@ -127,15 +132,17 @@ impl AnnotationHistory {
             5 => {
                 self.active = true;
                 self.active_tool = tool;
-                self.erase_at(point, style.radius.max(4) as f64 * 2.0);
+                let radius = style.radius.max(1) as f64;
+                self.eraser = Some((point, radius));
+                self.erase_at(point, radius);
                 return;
             }
             6 => {
-                let (radius, block_size) = mosaic_parameters(style.radius);
                 AnnotationCommand::Mosaic {
                     points: vec![point],
-                    radius,
-                    block_size,
+                    radius: style.radius.max(1) as u32,
+                    // Brush coverage and pixelation strength are independent.
+                    block_size: 10,
                 }
             }
             _ => {
@@ -201,7 +208,21 @@ impl AnnotationHistory {
             return;
         }
         if self.active_tool == 5 {
-            self.erase_at(point, 10.0);
+            if let Some((previous, radius)) = self.eraser {
+                // Cover the path between mouse samples at the selected size.
+                let steps = (distance(previous, point) / (radius / 2.).max(1.)).ceil() as u32;
+                for step in 1..=steps.max(1) {
+                    let t = step as f64 / steps.max(1) as f64;
+                    let sample = (
+                        (previous.0 as f64 + (point.0 as f64 - previous.0 as f64) * t).round()
+                            as u32,
+                        (previous.1 as f64 + (point.1 as f64 - previous.1 as f64) * t).round()
+                            as u32,
+                    );
+                    self.erase_at(sample, radius);
+                }
+                self.eraser = Some((point, radius));
+            }
             return;
         }
         match self.commands.last_mut() {
@@ -238,6 +259,7 @@ impl AnnotationHistory {
         self.active = false;
         self.active_tool = 0;
         self.active_before = None;
+        self.eraser = None;
         self.edit = None;
     }
 
@@ -297,6 +319,7 @@ impl AnnotationHistory {
         }
         self.active = false;
         self.active_tool = 0;
+        self.eraser = None;
         self.edit = None;
         if self
             .selected
@@ -306,7 +329,14 @@ impl AnnotationHistory {
         }
     }
 
-    pub fn add_text(&mut self, position: (u32, u32), text: &str, style: DrawStyle, font_size: u32) {
+    pub fn add_text(
+        &mut self,
+        position: (u32, u32),
+        text: &str,
+        style: DrawStyle,
+        font_size: u32,
+        font: TextFont,
+    ) {
         self.finish();
         self.selected = None;
         let text = text.trim();
@@ -320,6 +350,7 @@ impl AnnotationHistory {
             text: text.to_owned(),
             style,
             font_size,
+            font,
         });
     }
 
@@ -390,6 +421,7 @@ enum AnnotationCommand {
         text: String,
         style: DrawStyle,
         font_size: u32,
+        font: TextFont,
     },
     Mosaic {
         points: Vec<(u32, u32)>,
@@ -591,13 +623,7 @@ impl AnnotationCommand {
     fn render(&self, image: &mut CapturedImage) -> Result<()> {
         match self {
             Self::Pen { points, style } => {
-                if points.len() == 1 {
-                    image.draw_line(points[0], points[0], *style);
-                } else {
-                    for pair in points.windows(2) {
-                        image.draw_line(pair[0], pair[1], *style);
-                    }
-                }
+                image.draw_stroke(points, *style);
             }
             Self::Rectangle { start, end, style } => {
                 image.draw_rectangle(*start, *end, *style);
@@ -613,7 +639,8 @@ impl AnnotationCommand {
                 text,
                 style,
                 font_size,
-            } => image.draw_text(*position, text, *font_size, style.rgba)?,
+                font,
+            } => image.draw_text(*position, text, *font_size, font, style.rgba)?,
             Self::Mosaic { .. } => self.render_mosaic(image),
         }
         Ok(())
@@ -623,12 +650,7 @@ impl AnnotationCommand {
         match self {
             Self::Pen { points, style } => {
                 let tolerance = tolerance + style.radius.max(1) as f64;
-                points
-                    .windows(2)
-                    .any(|pair| distance_to_segment(point, pair[0], pair[1]) <= tolerance)
-                    || points
-                        .first()
-                        .is_some_and(|candidate| distance(*candidate, point) <= tolerance)
+                paths_hit_test(&stroke_polylines(points, *style), point, tolerance)
             }
             Self::Rectangle { start, end, style } => {
                 let tolerance = tolerance + style.radius.max(1) as f64;
@@ -654,11 +676,7 @@ impl AnnotationCommand {
             }
             Self::Arrow { start, end, style } => {
                 let tolerance = tolerance + style.radius.max(1) as f64;
-                distance_to_segment(point, *start, *end) <= tolerance
-                    || arrow_head(*start, *end).is_some_and(|(left, right)| {
-                        distance_to_segment(point, *end, left) <= tolerance
-                            || distance_to_segment(point, *end, right) <= tolerance
-                    })
+                paths_hit_test(&arrow_polylines(*start, *end, *style), point, tolerance)
             }
             Self::Text {
                 position,
@@ -807,14 +825,6 @@ fn map_point(point: (u32, u32), source: AnnotationBounds, target: AnnotationBoun
     )
 }
 
-fn mosaic_parameters(size: i32) -> (u32, u32) {
-    match size {
-        1 => (10, 6),
-        4.. => (30, 14),
-        _ => (18, 10),
-    }
-}
-
 fn estimated_text_size(text: &str, font_size: u32) -> (f64, f64) {
     let units = text
         .chars()
@@ -854,15 +864,21 @@ fn outline_hit_test(
     point: (u32, u32),
     tolerance: f64,
 ) -> bool {
-    outline_polylines(shape, start, end, style)
-        .iter()
-        .any(|path| {
-            path.windows(2)
-                .any(|pair| distance_to_segment(point, pair[0], pair[1]) <= tolerance)
-                || path
-                    .first()
-                    .is_some_and(|candidate| distance(*candidate, point) <= tolerance)
-        })
+    paths_hit_test(
+        &outline_polylines(shape, start, end, style),
+        point,
+        tolerance,
+    )
+}
+
+fn paths_hit_test(paths: &[Vec<(u32, u32)>], point: (u32, u32), tolerance: f64) -> bool {
+    paths.iter().any(|path| {
+        path.windows(2)
+            .any(|pair| distance_to_segment(point, pair[0], pair[1]) <= tolerance)
+            || path
+                .first()
+                .is_some_and(|candidate| distance(*candidate, point) <= tolerance)
+    })
 }
 
 #[cfg(test)]
@@ -1130,6 +1146,7 @@ mod tests {
                 text: "Test".into(),
                 style: style(),
                 font_size: 12,
+                font: Default::default(),
             },
             AnnotationCommand::Mosaic {
                 points: vec![(20, 20), (40, 40)],
@@ -1185,6 +1202,7 @@ mod tests {
                 text: "Test".into(),
                 style: style(),
                 font_size: 12,
+                font: Default::default(),
             },
             AnnotationCommand::Mosaic {
                 points: vec![(0, 0)],
@@ -1288,6 +1306,87 @@ mod tests {
         assert!(history.commands.is_empty());
         history.redo();
         assert_eq!(history.commands.len(), 1);
+    }
+
+    #[test]
+    fn text_annotations_keep_independent_font_choices_through_undo_and_resize() {
+        let mut history = AnnotationHistory::default();
+        let chosen = crate::image::TextFont {
+            weight: 700,
+            italic: true,
+            ..Default::default()
+        };
+        history.add_text((10, 10), "One", style(), 20, chosen.clone());
+        history.add_text((10, 50), "Two", style(), 12, Default::default());
+        history.undo();
+        assert!(
+            matches!(&history.commands[0], AnnotationCommand::Text { font, font_size: 20, .. } if *font == chosen)
+        );
+        history.redo();
+        assert!(
+            matches!(&history.commands[1], AnnotationCommand::Text { font, .. } if *font == Default::default())
+        );
+        history.commands[0].resize_to(
+            super::AnnotationBounds {
+                left: 10,
+                top: 10,
+                width: 120,
+                height: 70,
+            },
+            3,
+        );
+        assert!(
+            matches!(&history.commands[0], AnnotationCommand::Text { font, .. } if *font == chosen)
+        );
+    }
+
+    #[test]
+    fn pen_and_arrow_dash_gaps_match_erasure_and_survive_undo() {
+        let base = CapturedImage::from_rgba(0, 0, 100, 64, &[0; 100 * 64 * 4]).unwrap();
+        for tool in [1, 3] {
+            let mut history = AnnotationHistory::default();
+            history.begin(
+                tool,
+                (8, 20),
+                DrawStyle {
+                    radius: 2,
+                    dashed: true,
+                    ..style()
+                },
+            );
+            history.update((80, 20), false, (100, 64));
+            history.finish();
+            let drawn = history.render(&base).unwrap().rgba_bytes();
+            assert_eq!(&drawn[(20 * 100 + 24) * 4..(20 * 100 + 25) * 4], &[0; 4]);
+            history.begin(
+                5,
+                (24, 20),
+                DrawStyle {
+                    radius: 1,
+                    ..style()
+                },
+            );
+            history.finish();
+            assert_eq!(
+                history.commands.len(),
+                1,
+                "eraser in a gap must not hit tool {tool}"
+            );
+            history.begin(
+                5,
+                (12, 20),
+                DrawStyle {
+                    radius: 1,
+                    ..style()
+                },
+            );
+            history.finish();
+            assert!(history.commands.is_empty());
+            history.undo();
+            assert_eq!(history.render(&base).unwrap().rgba_bytes(), drawn);
+            history.redo();
+            assert!(history.commands.is_empty());
+        }
     }
 
     #[test]
@@ -1421,5 +1520,60 @@ mod tests {
 
         history.undo();
         assert_eq!(history.render(&base).unwrap().rgba_bytes(), original);
+    }
+
+    #[test]
+    fn eraser_keeps_selected_radius_through_drag_and_covers_between_events() {
+        for (radius, remaining) in [(2, 1), (20, 0)] {
+            let mut history = AnnotationHistory::default();
+            let pen = DrawStyle {
+                radius: 1,
+                ..style()
+            };
+            history.begin(1, (50, 50), pen);
+            history.finish();
+            // The line passes 15px away; endpoints are both far from the mark.
+            history.begin(5, (10, 65), DrawStyle { radius, ..pen });
+            history.update((90, 65), false, (100, 100));
+            history.finish();
+            assert_eq!(history.commands.len(), remaining);
+            if remaining == 0 {
+                history.undo();
+                assert_eq!(history.commands.len(), 1);
+                history.redo();
+                assert!(history.commands.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn mosaic_brush_size_changes_coverage_without_changing_grain() {
+        let rgba = (0..128 * 128)
+            .flat_map(|i| [(i % 251) as u8, 0, 0, 255])
+            .collect::<Vec<_>>();
+        let base = CapturedImage::from_rgba(0, 0, 128, 128, &rgba).unwrap();
+        let mut coverage = Vec::new();
+        for radius in [2, 18, 32, 64] {
+            let mut history = AnnotationHistory::default();
+            history.begin(6, (64, 64), DrawStyle { radius, ..style() });
+            history.finish();
+            assert!(
+                matches!(history.commands[0], AnnotationCommand::Mosaic { radius: r, block_size: 10, .. } if r == radius as u32)
+            );
+            let output = history.render(&base).unwrap().rgba_bytes();
+            let mut changed = 0;
+            for (index, (before, after)) in
+                rgba.chunks_exact(4).zip(output.chunks_exact(4)).enumerate()
+            {
+                if before != after {
+                    changed += 1;
+                    let dx = index as i32 % 128 - 64;
+                    let dy = index as i32 / 128 - 64;
+                    assert!(dx * dx + dy * dy <= radius * radius);
+                }
+            }
+            coverage.push(changed);
+        }
+        assert!(coverage.windows(2).all(|pair| pair[0] < pair[1]));
     }
 }

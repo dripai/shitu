@@ -6,6 +6,7 @@ pub mod screen_capture;
 pub mod shell;
 pub mod startup;
 pub mod text;
+pub mod tooltip;
 pub mod window;
 pub mod window_target;
 mod windows_ai_bindings;

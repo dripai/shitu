@@ -97,6 +97,12 @@ msgstr "रेखा की मोटाई"
 msgid "文字大小"
 msgstr "पाठ का आकार"
 
+msgid "字体设置…"
+msgstr "फ़ॉन्ट सेटिंग…"
+
+msgid "笔刷大小"
+msgstr "ब्रश का आकार"
+
 msgid "马赛克大小"
 msgstr "मोज़ेक का आकार"
 
@@ -819,6 +825,15 @@ msgstr "काटें"
 
 msgid "Copy"
 msgstr "कॉपी करें"
+
+msgid "点击保存后生效"
+msgstr "लागू करने के लिए सहेजें पर क्लिक करें"
+
+msgid "请按快捷键"
+msgstr "शॉर्टकट दबाएँ"
+
+msgid "未设置"
+msgstr "सेट नहीं है"
 
 msgid "Paste"
 msgstr "चिपकाएँ"

@@ -97,6 +97,12 @@ msgstr "線の太さ"
 msgid "文字大小"
 msgstr "文字サイズ"
 
+msgid "字体设置…"
+msgstr "フォント設定…"
+
+msgid "笔刷大小"
+msgstr "ブラシサイズ"
+
 msgid "马赛克大小"
 msgstr "モザイクサイズ"
 
@@ -819,6 +825,15 @@ msgstr "切り取り"
 
 msgid "Copy"
 msgstr "コピー"
+
+msgid "点击保存后生效"
+msgstr "保存すると適用されます"
+
+msgid "请按快捷键"
+msgstr "ショートカットを押してください"
+
+msgid "未设置"
+msgstr "未設定"
 
 msgid "Paste"
 msgstr "貼り付け"

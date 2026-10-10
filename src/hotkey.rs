@@ -65,6 +65,13 @@ impl HotkeyState {
             Some(value) => Some(parse_hotkey(value).ok_or(HotkeyFailure::Invalid)?),
             None => None,
         };
+        // Recording normalizes spelling/order. The same physical combination
+        // must not be registered twice just because its display text changed.
+        if candidate == self.registered && candidate.is_some() {
+            self.binding = normalized;
+            self.error = None;
+            return Ok(());
+        }
         if candidate.is_none() && self.registered.is_none() {
             self.binding = None;
             self.error = None;
@@ -104,6 +111,10 @@ impl HotkeyState {
     pub fn active_id_handle(&self) -> Arc<AtomicU32> {
         Arc::clone(&self.active_id)
     }
+
+    pub fn binding(&self) -> Option<&str> {
+        self.binding.as_deref()
+    }
 }
 
 fn classify_registration_error(error: impl ToString) -> HotkeyFailure {
@@ -125,6 +136,33 @@ pub fn validate_binding(value: &str) -> Result<(), HotkeyFailure> {
     } else {
         Err(HotkeyFailure::Invalid)
     }
+}
+
+/// GPUI's Windows keyboard mapper restores Shift+digit from shifted symbols.
+/// Keep recorded values inside the same supported grammar as saved bindings.
+pub fn recorded_binding(stroke: &gpui_kit::KeybindingKeystroke) -> Option<String> {
+    let modifiers = stroke.modifiers();
+    if modifiers.function {
+        return None;
+    }
+    let mut parts = Vec::new();
+    for (enabled, label) in [
+        (modifiers.control, "Ctrl"),
+        (modifiers.alt, "Alt"),
+        (modifiers.shift, "Shift"),
+        (modifiers.platform, "Win"),
+    ] {
+        if enabled {
+            parts.push(label.to_owned());
+        }
+    }
+    parts.push(if stroke.key() == "space" {
+        "Space".to_owned()
+    } else {
+        stroke.key().to_ascii_uppercase()
+    });
+    let binding = parts.join("+");
+    parse_hotkey(&binding).map(|_| binding)
 }
 
 pub fn parse_hotkey(value: &str) -> Option<HotKey> {
@@ -208,7 +246,58 @@ pub fn parse_hotkey(value: &str) -> Option<HotKey> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_hotkey;
+    use super::{HotkeyState, parse_hotkey, recorded_binding};
+    use gpui_kit::{KeybindingKeystroke, Keystroke, Modifiers};
+    use std::sync::{Arc, atomic::AtomicU32};
+
+    #[test]
+    fn recorded_combinations_round_trip_to_supported_hotkeys() {
+        for (keys, expected) in [
+            ("ctrl-alt-c", "Ctrl+Alt+C"),
+            ("ctrl-shift-2", "Ctrl+Shift+2"),
+            ("win-shift-k", "Shift+Win+K"),
+            ("alt-space", "Alt+Space"),
+            ("ctrl-f12", "Ctrl+F12"),
+        ] {
+            let stroke = KeybindingKeystroke::from_keystroke(Keystroke::parse(keys).unwrap());
+            assert_eq!(recorded_binding(&stroke).as_deref(), Some(expected));
+            assert!(parse_hotkey(expected).is_some());
+        }
+        for keys in ["c", "ctrl-escape", "ctrl-f13", "ctrl-;", "fn-ctrl-c"] {
+            let stroke = KeybindingKeystroke::from_keystroke(Keystroke::parse(keys).unwrap());
+            assert!(recorded_binding(&stroke).is_none(), "{keys}");
+        }
+        // Windows maps Ctrl+@ back to Ctrl+Shift+2 for display. Recording must
+        // use that mapping rather than the inner shifted character.
+        let mapped = KeybindingKeystroke::new(
+            Keystroke::parse("ctrl-@").unwrap(),
+            Modifiers {
+                control: true,
+                shift: true,
+                ..Default::default()
+            },
+            "2".into(),
+        );
+        assert_eq!(recorded_binding(&mapped).as_deref(), Some("Ctrl+Shift+2"));
+    }
+
+    #[test]
+    fn equivalent_recorded_binding_does_not_reregister() {
+        let key = parse_hotkey("alt+control+c").unwrap();
+        // No native manager: a needless registration would fail this test.
+        let mut state = HotkeyState {
+            manager: None,
+            registered: Some(key),
+            binding: Some("alt+control+c".into()),
+            error: None,
+            active_id: Arc::new(AtomicU32::new(key.id())),
+        };
+        assert!(state.set_binding(Some("Ctrl+Alt+C")).is_ok());
+        assert_eq!(state.binding(), Some("Ctrl+Alt+C"));
+        assert_eq!(state.registered, Some(key));
+        assert!(state.set_binding(Some("Ctrl+Alt+D")).is_err());
+        assert_eq!(state.binding(), Some("Ctrl+Alt+C"));
+    }
 
     #[test]
     fn parses_modifier_key_binding() {

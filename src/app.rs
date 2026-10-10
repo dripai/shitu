@@ -6,7 +6,7 @@ mod tray;
 use crate::{
     capture,
     config::{AppearanceMode, Config, ImageFormat, LanguageMode, OcrEngineKind},
-    hotkey::{HotkeyState, validate_binding},
+    hotkey::{HotkeyState, recorded_binding, validate_binding},
     i18n,
     image::CapturedImage,
     logging,
@@ -120,6 +120,7 @@ struct Panel {
     draft: Config,
     fields: HashMap<&'static str, Entity<InputState>>,
     hotkey: HotkeyState,
+    hotkey_recording: Option<String>,
     tray: Option<tray::Tray>,
     tab: usize,
     status: String,
@@ -127,7 +128,6 @@ struct Panel {
     system_ocr: Result<(), OcrFailure>,
     capture_due: Option<Instant>,
     capturing: bool,
-    restore_main: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -223,6 +223,7 @@ impl Panel {
             draft,
             fields: HashMap::new(),
             hotkey,
+            hotkey_recording: None,
             tray,
             tab: 0,
             status,
@@ -230,10 +231,28 @@ impl Panel {
             system_ocr,
             capture_due: None,
             capturing: false,
-            restore_main: false,
             _subscriptions: vec![theme_subscription],
         };
         panel.populate(window, cx);
+        panel._subscriptions.push(cx.subscribe_in(
+            &panel.fields["hotkey"],
+            window,
+            |this, _, event, window, cx| match event {
+                component::input::InputEvent::Focus => this.begin_hotkey_recording(window, cx),
+                component::input::InputEvent::Blur => {
+                    this.finish_hotkey_recording(false, window, cx)
+                }
+                _ => cx.notify(),
+            },
+        ));
+        panel
+            ._subscriptions
+            .push(cx.observe_window_activation(window, |this, window, cx| {
+                if !window.is_window_active() && this.hotkey_recording.is_some() {
+                    this.finish_hotkey_recording(false, window, cx);
+                    window.blur(cx);
+                }
+            }));
         panel.apply_theme(window, cx);
         panel.probe_ai(false);
         panel
@@ -262,6 +281,11 @@ impl Panel {
                 self.fields.insert(key, input(value, window, cx));
             }
         }
+        self.fields["hotkey"].update(cx, |state, cx| {
+            state.set_readonly(true, cx);
+            state.set_context_menu_enabled(false);
+            state.set_placeholder(i18n::text("未设置"), window, cx);
+        });
     }
     fn value(&self, key: &str, cx: &App) -> String {
         self.fields[key].read(cx).value().to_string()
@@ -283,6 +307,7 @@ impl Panel {
         Ok(config)
     }
     fn save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.finish_hotkey_recording(false, window, cx);
         let result = self.candidate(cx).and_then(|candidate| {
             settings::apply_transaction(
                 &self.shared.borrow().config,
@@ -320,6 +345,9 @@ impl Panel {
     fn apply_language(&self, window: &mut Window, cx: &mut App) {
         i18n::prepare(self.draft.language);
         gpui_kit::component::set_locale(i18n::current_language().bundle_code());
+        self.fields["hotkey"].update(cx, |state, cx| {
+            state.set_placeholder(i18n::text("未设置"), window, cx);
+        });
         window.set_window_title(i18n::text("拾图"));
         if let Some(tray) = &self.tray {
             tray.refresh_language();
@@ -343,36 +371,40 @@ impl Panel {
             let _ = sender.send(Message::Ai(result, prepare));
         });
     }
-    fn start_capture(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn start_capture(&mut self, cx: &mut Context<Self>) {
         if self.capturing {
             return;
         }
-        match native::visible(window).and_then(|visible| {
-            if visible {
-                native::hide(window)?;
-            }
-            Ok(visible)
-        }) {
-            Ok(visible) => {
-                logging::info("capture scheduled");
-                self.restore_main = visible;
-                self.capturing = true;
-                self.capture_due = Some(Instant::now() + Duration::from_millis(160));
-            }
-            Err(error) => self.report(Err(error), ""),
-        }
+        // Capture the desktop as the user left it, including this window when
+        // visible. Keep the delay so a triggering tray menu can close first.
+        logging::info("capture scheduled");
+        self.capturing = true;
+        self.capture_due = Some(Instant::now() + Duration::from_millis(160));
         cx.notify();
     }
     fn poll(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         while let Ok(event) = GlobalHotKeyEvent::receiver().try_recv() {
             let active = self.hotkey.active_id_handle().load(Ordering::Relaxed);
             if should_trigger_hotkey_event(&event, active) {
-                self.start_capture(window, cx);
+                if self.hotkey_recording.is_some() && window.is_window_active() {
+                    // Windows can deliver an already registered combination as
+                    // WM_HOTKEY instead of a focused input's keydown event.
+                    if let Some(binding) = self.hotkey.binding().map(str::to_owned) {
+                        self.fields["hotkey"]
+                            .update(cx, |state, cx| state.set_value(binding, window, cx));
+                        self.status = i18n::text("点击保存后生效").to_owned();
+                        cx.notify();
+                    } else {
+                        logging::error("Active hotkey event has no registered binding");
+                    }
+                } else {
+                    self.start_capture(cx);
+                }
             }
         }
         while let Some(action) = self.tray.as_ref().and_then(tray::Tray::next) {
             match action {
-                tray::Action::Capture => self.start_capture(window, cx),
+                tray::Action::Capture => self.start_capture(cx),
                 tray::Action::Show => {
                     self.report(native::show(window), i18n::text("就绪"));
                     cx.notify();
@@ -389,14 +421,14 @@ impl Panel {
             self.capture_due = None;
             if let Err(error) = editor::open_capture(self.shared.clone(), cx) {
                 self.report(Err(error), "");
-                self.capture_finished(window);
+                self.capture_finished();
                 cx.notify();
             }
         }
         while let Ok(message) = self.receiver.try_recv() {
             match message {
                 Message::Status(status) => self.status = status,
-                Message::CaptureClosed => self.capture_finished(window),
+                Message::CaptureClosed => self.capture_finished(),
                 Message::Pin(image, path) => {
                     self.report(
                         editor::open_pin(image, path, self.shared.clone(), cx),
@@ -431,16 +463,11 @@ impl Panel {
             cx.notify();
         }
     }
-    fn capture_finished(&mut self, window: &mut Window) {
+    fn capture_finished(&mut self) {
         self.capturing = false;
-        if self.restore_main
-            && let Err(error) = native::show_without_activation(window)
-        {
-            self.report(Err(error), "");
-        }
-        self.restore_main = false;
     }
     fn restore_defaults(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.finish_hotkey_recording(false, window, cx);
         // Preserve even invalid, unfinished input on all other pages.
         let retained: Vec<_> = self
             .fields
@@ -473,6 +500,81 @@ impl Panel {
     }
     fn field(&self, label: &'static str, key: &'static str) -> AnyElement {
         row(label, text_input(&self.fields[key]).into_any_element()).into_any_element()
+    }
+
+    // Input/readonly/focus are owned by GPUI Kit 0.7.1. It has no shortcut
+    // recorder, so only combination conversion and draft state live here.
+    fn begin_hotkey_recording(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.hotkey_recording.is_some() {
+            return;
+        }
+        self.hotkey_recording = Some(self.value("hotkey", cx));
+        self.status = i18n::text("就绪").to_owned();
+        self.fields["hotkey"].update(cx, |state, cx| {
+            state.set_value("", window, cx);
+            state.set_placeholder(i18n::text("请按快捷键"), window, cx);
+        });
+        cx.notify();
+    }
+
+    fn finish_hotkey_recording(
+        &mut self,
+        cancel: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(original) = self.hotkey_recording.take() else {
+            return;
+        };
+        let restore = cancel || self.value("hotkey", cx).is_empty();
+        self.fields["hotkey"].update(cx, |state, cx| {
+            if restore {
+                state.set_value(original, window, cx);
+            }
+            state.set_placeholder(i18n::text("未设置"), window, cx);
+        });
+        if cancel {
+            self.status = i18n::text("就绪").to_owned();
+        }
+        cx.notify();
+    }
+
+    fn record_hotkey(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.hotkey_recording.is_none() {
+            return;
+        }
+        let stroke = &event.keystroke;
+        if stroke.key == "tab"
+            && !stroke.modifiers.control
+            && !stroke.modifiers.alt
+            && !stroke.modifiers.platform
+        {
+            self.finish_hotkey_recording(false, window, cx);
+            return; // Preserve GPUI's Tab/Shift+Tab focus traversal.
+        }
+        window.prevent_default();
+        cx.stop_propagation();
+        if event.is_held {
+            return;
+        }
+        if stroke.key == "escape" || (stroke.key == "enter" && !stroke.modifiers.modified()) {
+            self.finish_hotkey_recording(stroke.key == "escape", window, cx);
+            window.blur(cx);
+            return;
+        }
+        let mapped = KeybindingKeystroke::new_with_mapper(
+            stroke.clone(),
+            false,
+            cx.keyboard_mapper().as_ref(),
+        );
+        if let Some(binding) = recorded_binding(&mapped) {
+            self.fields["hotkey"].update(cx, |state, cx| state.set_value(binding, window, cx));
+            self.status = i18n::text("点击保存后生效").to_owned();
+            cx.notify();
+        } else {
+            self.status = i18n::text("组合键无效").to_owned();
+            cx.notify();
+        }
     }
     fn checkbox(
         &self,
@@ -779,25 +881,46 @@ impl Render for Panel {
                     ));
             }
             4 => {
-                page = page
-                    .child(self.field(i18n::text("区域截图"), "hotkey"))
-                    .child(i18n::text("默认 Ctrl+Alt+C；留空则关闭"))
-                    .child(
-                        Button::new("clear-hotkey")
-                            .label(i18n::text("清除"))
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                let result = this
-                                    .hotkey
-                                    .set_binding(None)
-                                    .map_err(|e| anyhow!(e.message()));
-                                if result.is_ok() {
+                page = page.child(row(
+                    i18n::text("区域截图"),
+                    div()
+                        .h_flex()
+                        .gap_2()
+                        .child(
+                            div()
+                                .id("hotkey-recorder")
+                                .flex_1()
+                                .min_w_0()
+                                .child(Input::new(&self.fields["hotkey"]))
+                                .capture_key_down(cx.listener(Self::record_hotkey))
+                                .on_mouse_down_out(cx.listener(|this, _, window, cx| {
+                                    if this.hotkey_recording.is_some() {
+                                        this.finish_hotkey_recording(false, window, cx);
+                                        window.blur(cx);
+                                    }
+                                })),
+                        )
+                        .child(
+                            Button::new("clear-hotkey")
+                                .label(i18n::text("清除"))
+                                .flex_shrink_0()
+                                .disabled(
+                                    self.value("hotkey", cx).trim().is_empty()
+                                        && self
+                                            .hotkey_recording
+                                            .as_ref()
+                                            .is_none_or(|value| value.is_empty()),
+                                )
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.finish_hotkey_recording(false, window, cx);
                                     this.fields["hotkey"]
                                         .update(cx, |state, cx| state.set_value("", window, cx));
-                                }
-                                this.report(result, i18n::text("快捷键已注销，点击保存后永久生效"));
-                                cx.notify();
-                            })),
-                    );
+                                    this.status = i18n::text("点击保存后生效").to_owned();
+                                    cx.notify();
+                                })),
+                        )
+                        .into_any_element(),
+                ));
             }
             _ => {
                 let icon = std::sync::Arc::new(gpui_kit::Image::from_bytes(
@@ -836,16 +959,6 @@ impl Render for Panel {
                             ),
                     )
                     .child(div().h(px(1.)).bg(cx.theme().border))
-                    .child(div().text_color(cx.theme().muted_foreground).child(format!(
-                        "Windows {} · GPUI Kit 0.7.1 · {} · {}",
-                        std::env::consts::ARCH,
-                        if cfg!(debug_assertions) {
-                            "Debug"
-                        } else {
-                            "Release"
-                        },
-                        env!("SHITU_BUILD_DATE")
-                    )))
                     .child(
                         div()
                             .h_flex()
@@ -875,11 +988,6 @@ impl Render for Panel {
                                         cx.open_url("https://github.com/dripai/shitu")
                                     }),
                             ),
-                    )
-                    .child(
-                        div()
-                            .text_color(cx.theme().muted_foreground)
-                            .child(i18n::text("使用 Rust 与 GPUI Kit 构建 · © 2026")),
                     );
             }
         }
@@ -908,9 +1016,7 @@ impl Render for Panel {
                             .primary()
                             .label(i18n::text("开始截图"))
                             .disabled(self.capturing)
-                            .on_click(
-                                cx.listener(|this, _, window, cx| this.start_capture(window, cx)),
-                            ),
+                            .on_click(cx.listener(|this, _, _, cx| this.start_capture(cx))),
                     )
                     .child(div().flex_1())
                     .when(self.tab != 5, |row| {

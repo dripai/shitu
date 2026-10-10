@@ -97,6 +97,12 @@ msgstr "선 두께"
 msgid "文字大小"
 msgstr "글자 크기"
 
+msgid "字体设置…"
+msgstr "글꼴 설정…"
+
+msgid "笔刷大小"
+msgstr "브러시 크기"
+
 msgid "马赛克大小"
 msgstr "모자이크 크기"
 
@@ -819,6 +825,15 @@ msgstr "잘라내기"
 
 msgid "Copy"
 msgstr "복사"
+
+msgid "点击保存后生效"
+msgstr "저장하면 적용됩니다"
+
+msgid "请按快捷键"
+msgstr "단축키를 누르세요"
+
+msgid "未设置"
+msgstr "설정 안 됨"
 
 msgid "Paste"
 msgstr "붙여넣기"
