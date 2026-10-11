@@ -37,6 +37,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.96.0
+          components: rustfmt
 
       - name: Verify Rust formatting
         run: cargo fmt --all -- --check
