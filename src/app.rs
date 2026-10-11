@@ -1010,7 +1010,7 @@ impl Render for Panel {
                                     .flex_1()
                                     .pl_4()
                                     .text_sm()
-                                    .child(i18n::text("一款轻量、便捷的截图、标注与钉图工具。")),
+                                    .child(i18n::text("轻量的截图与图片管理工具。")),
                             ),
                     )
                     .child(div().h(px(1.)).bg(cx.theme().border))

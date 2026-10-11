@@ -331,8 +331,8 @@ msgstr "Limpar"
 msgid "未设置时不会注册任何全局快捷键。"
 msgstr "Se o campo estiver vazio, nenhum atalho global será registrado."
 
-msgid "一款轻量、便捷的截图、标注与钉图工具。"
-msgstr "Uma ferramenta leve para capturas, anotações e imagens fixadas."
+msgid "轻量的截图与图片管理工具。"
+msgstr "Uma ferramenta leve para capturas de tela e gerenciamento de imagens."
 
 msgid "作者："
 msgstr "Autor:"
