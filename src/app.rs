@@ -133,6 +133,8 @@ struct Panel {
     gallery: Option<Entity<gallery::Gallery>>,
     tray: Option<tray::Tray>,
     tab: usize,
+    compact_size: gpui_kit::Size<Pixels>,
+    gallery_size: gpui_kit::Size<Pixels>,
     status: String,
     ai: AiOcrState,
     system_ocr: Result<(), OcrFailure>,
@@ -238,6 +240,8 @@ impl Panel {
             gallery: None,
             tray,
             tab: 0,
+            compact_size: window.window_bounds().get_bounds().size,
+            gallery_size: size(px(1000.), px(650.)),
             status,
             ai: AiOcrState::Checking,
             system_ocr,
@@ -383,6 +387,34 @@ impl Panel {
             };
             let _ = sender.send(Message::Ai(result, prepare));
         });
+    }
+    fn resize_for_tab(&mut self, tab: usize, window: &mut Window) -> Result<()> {
+        let was_gallery = self.tab == 6;
+        let is_gallery = tab == 6;
+        if was_gallery == is_gallery {
+            return Ok(());
+        }
+
+        // WindowBounds contains the normal restore size even when maximized.
+        // Keep the two content sizes separate; moving the window is up to the user.
+        let current_size = window.window_bounds().get_bounds().size;
+        if was_gallery {
+            self.gallery_size = current_size;
+        } else {
+            self.compact_size = current_size;
+        }
+        // gpui-pre-windows 0.3.8 implements zoom() as maximize only and has no
+        // restore API. Reuse the existing SW_RESTORE helper for this one step.
+        // https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-showwindow
+        if window.is_maximized() {
+            native::show(window)?;
+        }
+        window.resize(if is_gallery {
+            self.gallery_size
+        } else {
+            self.compact_size
+        });
+        Ok(())
     }
     fn start_capture(&mut self, cx: &mut Context<Self>) {
         if self.capturing {
@@ -685,7 +717,13 @@ impl Render for Panel {
             )
             .children(labels.into_iter().map(|label| Tab::new().label(label)))
             .on_click(cx.listener(|this, index, window, cx| {
-                this.tab = [0, 1, 6, 2, 3, 4, 5][*index];
+                let tab = [0, 1, 6, 2, 3, 4, 5][*index];
+                if let Err(error) = this.resize_for_tab(tab, window) {
+                    this.report(Err(error), "");
+                    cx.notify();
+                    return;
+                }
+                this.tab = tab;
                 if this.tab == 5 {
                     this.check_updates(false, cx);
                 }
@@ -719,9 +757,6 @@ impl Render for Panel {
                     }
                     if let Some(gallery) = &this.gallery {
                         this.status = gallery.read(cx).status().to_owned();
-                    }
-                    if window.viewport_size().width < px(900.) {
-                        window.resize(size(px(1000.), px(650.)));
                     }
                 }
                 cx.notify();
