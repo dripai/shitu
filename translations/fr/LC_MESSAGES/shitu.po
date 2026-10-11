@@ -823,6 +823,105 @@ msgstr "Échec de la préparation du modèle Windows AI OCR"
 msgid "Cut"
 msgstr "Couper"
 
+msgid "按大小"
+msgstr "Taille"
+
+msgid "按名称"
+msgstr "Nom"
+
+msgid "处理中…"
+msgstr "Traitement…"
+
+msgid "从图库移除"
+msgstr "Retirer de la galerie"
+
+msgid "打开"
+msgstr "Ouvrir"
+
+msgid "打开文件夹"
+msgstr "Ouvrir le dossier"
+
+msgid "复制"
+msgstr "Copier"
+
+msgid "加载中…"
+msgstr "Chargement…"
+
+msgid "列表"
+msgstr "Liste"
+
+msgid "目标文件已存在"
+msgstr "Le fichier cible existe déjà"
+
+msgid "目录不存在"
+msgstr "Le dossier n’existe pas"
+
+msgid "目录已添加"
+msgstr "Dossier déjà ajouté"
+
+msgid "取消"
+msgstr "Annuler"
+
+msgid "确定"
+msgstr "OK"
+
+msgid "删除未完成"
+msgstr "Suppression non terminée"
+
+msgid "刷新"
+msgstr "Actualiser"
+
+msgid "搜索文件名"
+msgstr "Rechercher un nom"
+
+msgid "缩略图"
+msgstr "Miniatures"
+
+msgid "添加文件夹"
+msgstr "Ajouter un dossier"
+
+msgid "图库"
+msgstr "Galerie"
+
+msgid "图片不存在或不受支持"
+msgstr "Image absente ou non prise en charge"
+
+msgid "文件名无效"
+msgstr "Nom de fichier invalide"
+
+msgid "移入回收站"
+msgstr "Mettre à la corbeille"
+
+msgid "已复制"
+msgstr "Copié"
+
+msgid "预览失败"
+msgstr "Échec de l’aperçu"
+
+msgid "暂无图片"
+msgstr "Aucune image"
+
+msgid "张图片"
+msgstr "images"
+
+msgid "重命名"
+msgstr "Renommer"
+
+msgid "最新优先"
+msgstr "Plus récentes"
+
+msgid "文件名"
+msgstr "Nom du fichier"
+
+msgid "尺寸"
+msgstr "Dimensions"
+
+msgid "文件大小"
+msgstr "Taille"
+
+msgid "修改时间"
+msgstr "Modifié"
+
 msgid "Copy"
 msgstr "Copier"
 
@@ -846,3 +945,102 @@ msgstr "Ligne continue"
 
 msgid "虚线"
 msgstr "Ligne en tirets"
+
+msgid "排序"
+msgstr "Trier"
+
+msgid "时间"
+msgstr "Date"
+
+msgid "名称"
+msgstr "Nom"
+
+msgid "类型"
+msgstr "Type"
+
+msgid "大小"
+msgstr "Taille"
+
+msgid "当前版本"
+msgstr "Version actuelle"
+
+msgid "图片预览"
+msgstr "Aperçu de l’image"
+
+msgid "上一张"
+msgstr "Précédente"
+
+msgid "下一张"
+msgstr "Suivante"
+
+msgid "缩小"
+msgstr "Zoom arrière"
+
+msgid "放大"
+msgstr "Zoom avant"
+
+msgid "适应窗口"
+msgstr "Adapter à la fenêtre"
+
+msgid "已移入回收站"
+msgstr "Déplacées dans la corbeille"
+
+msgid "未完成"
+msgstr "Non terminé"
+
+msgid "已选择"
+msgstr "Sélectionnées"
+
+msgid "删除"
+msgstr "Supprimer"
+
+msgid "永久删除"
+msgstr "Supprimer définitivement"
+
+msgid "已永久删除"
+msgstr "Supprimées définitivement"
+
+msgid "将永久删除所选图片，不会移入回收站，无法从回收站恢复。"
+msgstr "Les images sélectionnées seront supprimées définitivement. Elles ne seront pas placées dans la corbeille et ne pourront pas être restaurées depuis celle-ci."
+
+msgid "暂无可用更新"
+msgstr "Aucune version plus récente"
+
+msgid "最新发布"
+msgstr "Dernière version publiée"
+
+msgid "正在检查更新…"
+msgstr "Recherche de mises à jour…"
+
+msgid "检查更新失败"
+msgstr "Échec de la recherche de mises à jour"
+
+msgid "请先结束截图，再重新更新。"
+msgstr "Terminez la capture avant de réessayer la mise à jour."
+
+msgid "更新失败"
+msgstr "Échec de la mise à jour"
+
+msgid "更新完成"
+msgstr "Mise à jour terminée"
+
+msgid "检查更新"
+msgstr "Rechercher des mises à jour"
+
+msgid "更新并重启"
+msgstr "Mettre à jour et redémarrer"
+
+msgid "发现新版本"
+msgstr "Nouvelle version disponible"
+
+msgid "发行说明"
+msgstr "Notes de version"
+
+msgid "点击更新将关闭并重启软件，请先保存未完成的内容。"
+msgstr "La mise à jour fermera et redémarrera l’application. Enregistrez d’abord votre travail."
+
+msgid "请通过原安装渠道更新此版本。"
+msgstr "Mettez à jour cette installation via son canal de distribution d’origine."
+
+msgid "下载并校验更新…"
+msgstr "Téléchargement et vérification de la mise à jour…"

@@ -8,6 +8,11 @@ pub struct LocalTime {
     pub second: u16,
 }
 
+pub fn format_gallery_time(seconds: u64) -> String {
+    crate::platform::windows::clock::format_timestamp(seconds)
+        .unwrap_or_else(|error| error.to_string())
+}
+
 #[cfg(windows)]
 pub fn local_time() -> LocalTime {
     crate::platform::windows::clock::local_time()

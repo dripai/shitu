@@ -3,6 +3,7 @@
 mod app;
 mod capture;
 mod config;
+mod gallery;
 mod hotkey;
 mod i18n;
 mod image;
@@ -12,8 +13,12 @@ mod output;
 mod paths;
 mod platform;
 mod settings;
+mod updater;
 
 fn main() -> anyhow::Result<()> {
+    if let Some(exit_code) = updater::helper_exit_code() {
+        std::process::exit(exit_code);
+    }
     #[cfg(windows)]
     if let Some(exit_code) = platform::ocr::worker_exit_code() {
         std::process::exit(exit_code);
@@ -23,11 +28,13 @@ fn main() -> anyhow::Result<()> {
     if let Err(error) = &result {
         logging::error(format!("Startup failed: {error:#}"));
         // Release builds have no console: report startup failure explicitly.
-        rfd::MessageDialog::new()
-            .set_title(i18n::text("拾图"))
-            .set_level(rfd::MessageLevel::Error)
-            .set_description(format!("{}: {error:#}", i18n::text("操作失败")))
-            .show();
+        if !std::env::args_os().any(|arg| arg == "--update-started") {
+            rfd::MessageDialog::new()
+                .set_title(i18n::text("拾图"))
+                .set_level(rfd::MessageLevel::Error)
+                .set_description(format!("{}: {error:#}", i18n::text("操作失败")))
+                .show();
+        }
     }
     result
 }

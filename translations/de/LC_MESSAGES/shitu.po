@@ -823,6 +823,105 @@ msgstr "Vorbereitung des Windows-AI-OCR-Modells fehlgeschlagen"
 msgid "Cut"
 msgstr "Ausschneiden"
 
+msgid "按大小"
+msgstr "Größe"
+
+msgid "按名称"
+msgstr "Name"
+
+msgid "处理中…"
+msgstr "Wird verarbeitet…"
+
+msgid "从图库移除"
+msgstr "Aus Galerie entfernen"
+
+msgid "打开"
+msgstr "Öffnen"
+
+msgid "打开文件夹"
+msgstr "Ordner öffnen"
+
+msgid "复制"
+msgstr "Kopieren"
+
+msgid "加载中…"
+msgstr "Wird geladen…"
+
+msgid "列表"
+msgstr "Liste"
+
+msgid "目标文件已存在"
+msgstr "Zieldatei existiert bereits"
+
+msgid "目录不存在"
+msgstr "Ordner existiert nicht"
+
+msgid "目录已添加"
+msgstr "Ordner bereits hinzugefügt"
+
+msgid "取消"
+msgstr "Abbrechen"
+
+msgid "确定"
+msgstr "OK"
+
+msgid "删除未完成"
+msgstr "Löschen nicht abgeschlossen"
+
+msgid "刷新"
+msgstr "Aktualisieren"
+
+msgid "搜索文件名"
+msgstr "Dateinamen suchen"
+
+msgid "缩略图"
+msgstr "Vorschaubilder"
+
+msgid "添加文件夹"
+msgstr "Ordner hinzufügen"
+
+msgid "图库"
+msgstr "Galerie"
+
+msgid "图片不存在或不受支持"
+msgstr "Bild fehlt oder wird nicht unterstützt"
+
+msgid "文件名无效"
+msgstr "Ungültiger Dateiname"
+
+msgid "移入回收站"
+msgstr "In Papierkorb verschieben"
+
+msgid "已复制"
+msgstr "Kopiert"
+
+msgid "预览失败"
+msgstr "Vorschau fehlgeschlagen"
+
+msgid "暂无图片"
+msgstr "Keine Bilder"
+
+msgid "张图片"
+msgstr "Bilder"
+
+msgid "重命名"
+msgstr "Umbenennen"
+
+msgid "最新优先"
+msgstr "Neueste zuerst"
+
+msgid "文件名"
+msgstr "Dateiname"
+
+msgid "尺寸"
+msgstr "Abmessungen"
+
+msgid "文件大小"
+msgstr "Dateigröße"
+
+msgid "修改时间"
+msgstr "Geändert"
+
 msgid "Copy"
 msgstr "Kopieren"
 
@@ -846,3 +945,102 @@ msgstr "Durchgezogene Linie"
 
 msgid "虚线"
 msgstr "Gestrichelte Linie"
+
+msgid "排序"
+msgstr "Sortieren"
+
+msgid "时间"
+msgstr "Zeit"
+
+msgid "名称"
+msgstr "Name"
+
+msgid "类型"
+msgstr "Typ"
+
+msgid "大小"
+msgstr "Größe"
+
+msgid "当前版本"
+msgstr "Aktuelle Version"
+
+msgid "图片预览"
+msgstr "Bildvorschau"
+
+msgid "上一张"
+msgstr "Zurück"
+
+msgid "下一张"
+msgstr "Weiter"
+
+msgid "缩小"
+msgstr "Verkleinern"
+
+msgid "放大"
+msgstr "Vergrößern"
+
+msgid "适应窗口"
+msgstr "An Fenster anpassen"
+
+msgid "已移入回收站"
+msgstr "In den Papierkorb verschoben"
+
+msgid "未完成"
+msgstr "Nicht abgeschlossen"
+
+msgid "已选择"
+msgstr "Ausgewählt"
+
+msgid "删除"
+msgstr "Löschen"
+
+msgid "永久删除"
+msgstr "Endgültig löschen"
+
+msgid "已永久删除"
+msgstr "Endgültig gelöscht"
+
+msgid "将永久删除所选图片，不会移入回收站，无法从回收站恢复。"
+msgstr "Die ausgewählten Bilder werden endgültig gelöscht. Sie werden nicht in den Papierkorb verschoben und können daraus nicht wiederhergestellt werden."
+
+msgid "暂无可用更新"
+msgstr "Keine neuere Version"
+
+msgid "最新发布"
+msgstr "Neueste Veröffentlichung"
+
+msgid "正在检查更新…"
+msgstr "Suche nach Updates…"
+
+msgid "检查更新失败"
+msgstr "Update-Prüfung fehlgeschlagen"
+
+msgid "请先结束截图，再重新更新。"
+msgstr "Beenden Sie die Bildschirmaufnahme, bevor Sie das Update erneut versuchen."
+
+msgid "更新失败"
+msgstr "Update fehlgeschlagen"
+
+msgid "更新完成"
+msgstr "Update abgeschlossen"
+
+msgid "检查更新"
+msgstr "Nach Updates suchen"
+
+msgid "更新并重启"
+msgstr "Aktualisieren und neu starten"
+
+msgid "发现新版本"
+msgstr "Neue Version verfügbar"
+
+msgid "发行说明"
+msgstr "Versionshinweise"
+
+msgid "点击更新将关闭并重启软件，请先保存未完成的内容。"
+msgstr "Das Update schließt und startet die App neu. Speichern Sie zuerst Ihre Arbeit."
+
+msgid "请通过原安装渠道更新此版本。"
+msgstr "Aktualisieren Sie diese Installation über ihren ursprünglichen Vertriebsweg."
+
+msgid "下载并校验更新…"
+msgstr "Update wird heruntergeladen und geprüft…"

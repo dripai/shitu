@@ -823,6 +823,105 @@ msgstr "Windows AI OCR 모델 준비 실패"
 msgid "Cut"
 msgstr "잘라내기"
 
+msgid "按大小"
+msgstr "크기순"
+
+msgid "按名称"
+msgstr "이름순"
+
+msgid "处理中…"
+msgstr "처리 중…"
+
+msgid "从图库移除"
+msgstr "갤러리에서 제거"
+
+msgid "打开"
+msgstr "열기"
+
+msgid "打开文件夹"
+msgstr "폴더 열기"
+
+msgid "复制"
+msgstr "복사"
+
+msgid "加载中…"
+msgstr "불러오는 중…"
+
+msgid "列表"
+msgstr "목록"
+
+msgid "目标文件已存在"
+msgstr "대상 파일이 이미 존재합니다"
+
+msgid "目录不存在"
+msgstr "폴더가 존재하지 않습니다"
+
+msgid "目录已添加"
+msgstr "이미 추가된 폴더입니다"
+
+msgid "取消"
+msgstr "취소"
+
+msgid "确定"
+msgstr "확인"
+
+msgid "删除未完成"
+msgstr "삭제가 완료되지 않았습니다"
+
+msgid "刷新"
+msgstr "새로 고침"
+
+msgid "搜索文件名"
+msgstr "파일 이름 검색"
+
+msgid "缩略图"
+msgstr "썸네일"
+
+msgid "添加文件夹"
+msgstr "폴더 추가"
+
+msgid "图库"
+msgstr "갤러리"
+
+msgid "图片不存在或不受支持"
+msgstr "이미지가 없거나 지원되지 않습니다"
+
+msgid "文件名无效"
+msgstr "잘못된 파일 이름입니다"
+
+msgid "移入回收站"
+msgstr "휴지통으로 이동"
+
+msgid "已复制"
+msgstr "복사됨"
+
+msgid "预览失败"
+msgstr "미리보기 실패"
+
+msgid "暂无图片"
+msgstr "이미지 없음"
+
+msgid "张图片"
+msgstr "개 이미지"
+
+msgid "重命名"
+msgstr "이름 바꾸기"
+
+msgid "最新优先"
+msgstr "최신순"
+
+msgid "文件名"
+msgstr "파일 이름"
+
+msgid "尺寸"
+msgstr "크기"
+
+msgid "文件大小"
+msgstr "파일 크기"
+
+msgid "修改时间"
+msgstr "수정 시간"
+
 msgid "Copy"
 msgstr "복사"
 
@@ -846,3 +945,102 @@ msgstr "실선"
 
 msgid "虚线"
 msgstr "파선"
+
+msgid "排序"
+msgstr "정렬"
+
+msgid "时间"
+msgstr "시간"
+
+msgid "名称"
+msgstr "이름"
+
+msgid "类型"
+msgstr "유형"
+
+msgid "大小"
+msgstr "크기"
+
+msgid "当前版本"
+msgstr "현재 버전"
+
+msgid "图片预览"
+msgstr "이미지 미리보기"
+
+msgid "上一张"
+msgstr "이전"
+
+msgid "下一张"
+msgstr "다음"
+
+msgid "缩小"
+msgstr "축소"
+
+msgid "放大"
+msgstr "확대"
+
+msgid "适应窗口"
+msgstr "창에 맞추기"
+
+msgid "已移入回收站"
+msgstr "휴지통으로 이동됨"
+
+msgid "未完成"
+msgstr "미완료"
+
+msgid "已选择"
+msgstr "선택됨"
+
+msgid "删除"
+msgstr "삭제"
+
+msgid "永久删除"
+msgstr "영구 삭제"
+
+msgid "已永久删除"
+msgstr "영구 삭제됨"
+
+msgid "将永久删除所选图片，不会移入回收站，无法从回收站恢复。"
+msgstr "선택한 이미지를 영구적으로 삭제합니다. 휴지통으로 이동하지 않으며 휴지통에서 복원할 수 없습니다."
+
+msgid "暂无可用更新"
+msgstr "새 버전이 없습니다"
+
+msgid "最新发布"
+msgstr "최신 릴리스"
+
+msgid "正在检查更新…"
+msgstr "업데이트 확인 중…"
+
+msgid "检查更新失败"
+msgstr "업데이트 확인 실패"
+
+msgid "请先结束截图，再重新更新。"
+msgstr "캡처를 마친 후 업데이트를 다시 시도하세요."
+
+msgid "更新失败"
+msgstr "업데이트 실패"
+
+msgid "更新完成"
+msgstr "업데이트 완료"
+
+msgid "检查更新"
+msgstr "업데이트 확인"
+
+msgid "更新并重启"
+msgstr "업데이트 후 다시 시작"
+
+msgid "发现新版本"
+msgstr "새 버전 사용 가능"
+
+msgid "发行说明"
+msgstr "릴리스 정보"
+
+msgid "点击更新将关闭并重启软件，请先保存未完成的内容。"
+msgstr "업데이트하면 앱이 종료된 후 다시 시작됩니다. 먼저 작업을 저장하세요."
+
+msgid "请通过原安装渠道更新此版本。"
+msgstr "이 설치 버전은 원래 배포 경로를 통해 업데이트하세요."
+
+msgid "下载并校验更新…"
+msgstr "업데이트 다운로드 및 검증 중…"

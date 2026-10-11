@@ -823,6 +823,105 @@ msgstr "Windows AI OCR 模型准备失败"
 msgid "Cut"
 msgstr "剪切"
 
+msgid "按大小"
+msgstr "按大小"
+
+msgid "按名称"
+msgstr "按名称"
+
+msgid "处理中…"
+msgstr "处理中…"
+
+msgid "从图库移除"
+msgstr "从图库移除"
+
+msgid "打开"
+msgstr "打开"
+
+msgid "打开文件夹"
+msgstr "打开文件夹"
+
+msgid "复制"
+msgstr "复制"
+
+msgid "加载中…"
+msgstr "加载中…"
+
+msgid "列表"
+msgstr "列表"
+
+msgid "目标文件已存在"
+msgstr "目标文件已存在"
+
+msgid "目录不存在"
+msgstr "目录不存在"
+
+msgid "目录已添加"
+msgstr "目录已添加"
+
+msgid "取消"
+msgstr "取消"
+
+msgid "确定"
+msgstr "确定"
+
+msgid "删除未完成"
+msgstr "删除未完成"
+
+msgid "刷新"
+msgstr "刷新"
+
+msgid "搜索文件名"
+msgstr "搜索文件名"
+
+msgid "缩略图"
+msgstr "缩略图"
+
+msgid "添加文件夹"
+msgstr "添加文件夹"
+
+msgid "图库"
+msgstr "图库"
+
+msgid "图片不存在或不受支持"
+msgstr "图片不存在或不受支持"
+
+msgid "文件名无效"
+msgstr "文件名无效"
+
+msgid "移入回收站"
+msgstr "移入回收站"
+
+msgid "已复制"
+msgstr "已复制"
+
+msgid "预览失败"
+msgstr "预览失败"
+
+msgid "暂无图片"
+msgstr "暂无图片"
+
+msgid "张图片"
+msgstr "张图片"
+
+msgid "重命名"
+msgstr "重命名"
+
+msgid "最新优先"
+msgstr "最新优先"
+
+msgid "文件名"
+msgstr "文件名"
+
+msgid "尺寸"
+msgstr "尺寸"
+
+msgid "文件大小"
+msgstr "文件大小"
+
+msgid "修改时间"
+msgstr "修改时间"
+
 msgid "Copy"
 msgstr "复制"
 
@@ -846,3 +945,102 @@ msgstr "实线"
 
 msgid "虚线"
 msgstr "虚线"
+
+msgid "排序"
+msgstr "排序"
+
+msgid "时间"
+msgstr "时间"
+
+msgid "名称"
+msgstr "名称"
+
+msgid "类型"
+msgstr "类型"
+
+msgid "大小"
+msgstr "大小"
+
+msgid "当前版本"
+msgstr "当前版本"
+
+msgid "图片预览"
+msgstr "图片预览"
+
+msgid "上一张"
+msgstr "上一张"
+
+msgid "下一张"
+msgstr "下一张"
+
+msgid "缩小"
+msgstr "缩小"
+
+msgid "放大"
+msgstr "放大"
+
+msgid "适应窗口"
+msgstr "适应窗口"
+
+msgid "已移入回收站"
+msgstr "已移入回收站"
+
+msgid "未完成"
+msgstr "未完成"
+
+msgid "已选择"
+msgstr "已选择"
+
+msgid "删除"
+msgstr "删除"
+
+msgid "永久删除"
+msgstr "永久删除"
+
+msgid "已永久删除"
+msgstr "已永久删除"
+
+msgid "将永久删除所选图片，不会移入回收站，无法从回收站恢复。"
+msgstr "将永久删除所选图片，不会移入回收站，无法从回收站恢复。"
+
+msgid "暂无可用更新"
+msgstr "暂无可用更新"
+
+msgid "最新发布"
+msgstr "最新发布"
+
+msgid "正在检查更新…"
+msgstr "正在检查更新…"
+
+msgid "检查更新失败"
+msgstr "检查更新失败"
+
+msgid "请先结束截图，再重新更新。"
+msgstr "请先结束截图，再重新更新。"
+
+msgid "更新失败"
+msgstr "更新失败"
+
+msgid "更新完成"
+msgstr "更新完成"
+
+msgid "检查更新"
+msgstr "检查更新"
+
+msgid "更新并重启"
+msgstr "更新并重启"
+
+msgid "发现新版本"
+msgstr "发现新版本"
+
+msgid "发行说明"
+msgstr "发行说明"
+
+msgid "点击更新将关闭并重启软件，请先保存未完成的内容。"
+msgstr "点击更新将关闭并重启软件，请先保存未完成的内容。"
+
+msgid "请通过原安装渠道更新此版本。"
+msgstr "请通过原安装渠道更新此版本。"
+
+msgid "下载并校验更新…"
+msgstr "下载并校验更新…"

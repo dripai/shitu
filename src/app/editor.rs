@@ -368,14 +368,14 @@ impl Editor {
             }
         });
         cx.spawn_in(window, async move |this, cx| {
+            let mut polling = super::polling::Polling::default();
             loop {
                 cx.background_executor()
                     .timer(Duration::from_millis(30))
                     .await;
-                if cx
-                    .update(|window, cx| this.update(cx, |editor, cx| editor.poll(window, cx)))
-                    .is_err()
-                {
+                let result =
+                    cx.update(|window, cx| this.update(cx, |editor, cx| editor.poll(window, cx)));
+                if !polling.proceed(result, "Editor") {
                     break;
                 }
             }
@@ -569,6 +569,7 @@ impl Editor {
                             None
                         };
                         self.status(if config.capture.save_notification {
+                            // Gallery updates regardless of notification preference.
                             path.map(|p| {
                                 format!("{} {}", i18n::text("已复制并保存到"), p.display())
                             })
@@ -576,6 +577,9 @@ impl Editor {
                         } else {
                             i18n::text("已复制到剪贴板").to_owned()
                         });
+                        if config.capture.auto_save {
+                            let _ = self.shared.borrow().sender.send(Message::GalleryChanged);
+                        }
                         if self.desktop.is_some() {
                             window.remove_window();
                         }
@@ -589,6 +593,7 @@ impl Editor {
                             config.capture.jpeg_quality,
                         )? {
                             self.source_path = Some(path.clone());
+                            let _ = self.shared.borrow().sender.send(Message::GalleryChanged);
                             self.status(path.display().to_string());
                             if self.desktop.is_some() {
                                 window.remove_window();
@@ -605,6 +610,9 @@ impl Editor {
                             .borrow()
                             .sender
                             .send(Message::Pin(image, path))?;
+                        if config.capture.auto_save {
+                            let _ = self.shared.borrow().sender.send(Message::GalleryChanged);
+                        }
                         window.remove_window();
                     }
                     Command::Ocr => {

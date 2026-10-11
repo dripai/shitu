@@ -165,6 +165,127 @@
 
 官方依据：[InputState 0.7.1](https://docs.rs/gpui-base/0.7.1/gpui_base/input/struct.InputState.html)、[GPUI 0.3.8 键盘事件](https://docs.rs/gpui-pre/0.3.8/gpui/trait.InteractiveElement.html#method.capture_key_down)、[GPUI 0.3.8 键盘映射](https://docs.rs/gpui-pre/0.3.8/gpui/struct.KeybindingKeystroke.html)、[global-hotkey 0.8.0 Windows 实现](https://docs.rs/crate/global-hotkey/0.8.0/source/src/platform_impl/windows/mod.rs)。
 
+### 图库实现清单
+
+- [x] “截图”后增加图库标签，首次进入扩宽窗口；左侧目录树和右侧图片区采用官方 ResizablePanel，可拖动分隔线。图库隐藏设置页的保存/恢复默认。
+- [x] 保存目录作为默认入口，可添加其他目录；默认仅浏览当前目录的 PNG/JPG/JPEG。“从图库移除”只移除额外入口，不移动或删除原文件。无法读取目录时显示错误，不切换来源。
+- [x] 目录按展开层级读取，跳过 reparse point 防止目录联接循环。恢复当前目录及其祖先展开路径；目录、当前路径、视图和排序原子写入独立 gallery.json，不覆盖设置草稿。
+- [x] 缩略图/列表切换、文件名搜索、修改时间/名称/类型/大小排序；列表包含尺寸、大小和本地修改时间。GPUI uniform_list 虚拟化，后台生成 320×240 内缩略图，限制解码分配及缓存数量。过时结果不覆盖当前选择。
+- [x] 双击/Enter 在软件内预览，支持上一张/下一张、Esc 关闭；右键支持文件夹定位、复制、OCR、重命名、移入回收站。方向键选择、F2 重命名、Delete 弹确认框。重命名保留扩展名，拒绝路径字符及保留名称。
+- [x] 单张图片从右侧拖到左侧目录，目标高亮，成功刷新。同名不覆盖，同目录不操作。文件操作在后台执行，期间阻止重复操作。截图保存完成后通知图库刷新。
+- [x] 核对并复用 GPUI Kit/component/base 0.7.1 的 Tree/TreeState/TreeEvent、ResizablePanel、Input、Dialog/WindowExt、NativeMenu，以及 GPUI 0.3.8 的 uniform_list、on_drag/on_drop、drag_over 和键盘事件。只组合图片单元和文件业务，不自建拖放系统；独立预览窗口见下。
+- [x] windows 0.62.2：MoveFileExW(COPY_ALLOWED) 不设 REPLACE_EXISTING；源文件删除未完成时回滚新副本并报错。IFileOperation 使用 RECYCLEONDELETE/ADDUNDORECORD 和系统不可回收警告，不实现永久删除兜底。文件时间使用 FileTimeToSystemTime/SystemTimeToTzSpecificLocalTime。
+- [x] 77 项测试通过：目录非递归扫描、重名不覆盖、占用时保留源文件、实际移动内容校验、入口持久化、缩略图比例及损坏文件错误。
+- [ ] 用户桌面验收：目录树、拖放释放目标、回收站恢复、菜单/对话框焦点、不同 DPI 和窄窗口、多磁盘/网络目录。按用户要求未操作桌面，编译通过不代表交互验收通过。
+
+官方依据：[Tree 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/tree/index.html)、[ResizablePanel 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/resizable/index.html)、[GPUI 拖放](https://docs.rs/gpui-pre/0.3.8/gpui/trait.StatefulInteractiveElement.html#method.on_drag)、[IFileOperation 标志](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifileoperation-setoperationflags)、[MoveFileExW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw)、[文件时间转换](https://learn.microsoft.com/en-us/windows/win32/api/timezoneapi/nf-timezoneapi-systemtimetotzspecificlocaltime)。
+
+### 图库界面精简（2026-10-10）
+
+- [x] 移除公共“开始截图”操作行，截图继续由快捷键和托盘菜单触发；设置页的保存/恢复默认放在页面内容末尾。底部仅保留公共状态栏，图库状态同步到该区域。
+- [x] 继续使用 Tree/ListItem 0.7.1，修正 ListItem 内容容器默认块布局造成的箭头与路径分行；使用横向组合、文件夹图标、34px 行高、主题侧栏底色和圆角选择态。路径单行省略，悬停展示完整路径。
+- [x] 删除右侧路径/打开文件夹整行；搜索右侧依次为缩略图、列表、排序、刷新图标。排序复用 NativeMenu，时间由新到旧、名称升序、类型按扩展名升序、大小由大到小，同值按文件名排序；类型比较忽略扩展名大小写。打开文件夹保留在目录右键菜单。
+- [x] 已检查 Tooltip 0.7.1、Button 的 managed tooltip 和 GPUI 0.3.8 的 StatefulInteractiveElement::tooltip_show_delay。Button 的 managed tooltip 固定 500ms 且短时间切换立即显示，不能满足每次延迟要求；图库改用 GPUI 原生 per-element tooltip 配合官方 Tooltip 内容，每个目标均设置 600ms，由框架处理离开取消、点击关闭和定位，无新增计时器或平台窗口。图库提示显示在主窗口顶层，不改动截图工具条已有的 Windows 原生提示。
+- [x] 关于页的版本号独立为“当前版本”一行，使用正文大小和颜色。
+- [ ] 桌面验收：目录省略/完整提示、快速划过与切换目标的 600ms 延迟、离开/滚动/切页后关闭、图标菜单、窗口缩放及不同 DPI。按用户要求不操作桌面。
+
+组件依据：[ListItem 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/list/struct.ListItem.html)、[GPUI tooltip_show_delay 0.3.8](https://docs.rs/gpui-pre/0.3.8/gpui/trait.StatefulInteractiveElement.html#method.tooltip_show_delay)、[Tooltip 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/tooltip/struct.Tooltip.html)。对应锁定版本的本机源码已核对。
+
+### 连续打开图片后停止加载与快捷键失效（2026-10-10）
+
+- 现场进程两次采样：私有内存约 168MiB，未观察到持续增长或 OOM。用户确认连续双击图片调用系统看图程序后，标签仍可切换，但图库加载及截图快捷键停止；未操作桌面复现。
+- 锁定 GPUI 0.3.8 的 AsyncApp::update_window 使用 AppCell::try_borrow_mut，临时重入会返回标准 BorrowMutError。原 Panel/Gallery/Editor 轮询对任何外层错误都直接退出，且未检查实体释放的内层结果。现仅对该明确的临时借用错误延后至下一次轮询，记录延后/恢复；窗口或实体释放时退出，其他错误记录后退出。测试验证临时冲突不会终止轮询。同步 ShellExecute 的 COM 消息重入是与症状一致的原因，但旧版没有相应日志，现场完整因果尚待用户复测。
+- 打开目录和定位文件移到独立后台线程，按微软要求初始化 STA COM。单次只允许一个未完成的打开请求，不阻塞界面、截图轮询或目录扫描；失败回到公共状态栏。图片打开已由下述内部预览替代。
+- 缩略图工作线程与目录/文件操作分离；请求队列最多 32 项、结果队列最多 16 项，切换目录后在解码前后检查代次并跳过旧任务。每轮界面最多接收 16 项结果。
+- 缩略图改为后台直接生成 BGRA，再交给官方 RenderImage，不再 PNG 编码后由全局资产缓存二次解码。缓存按最近使用淘汰（当前上限见下）；刷新、淘汰、销毁时释放图像资源，调用官方 drop_image 移除 GPU 图集内容。
+- Tree/ListItem 没有“仅截断时提示”属性：组合官方 StyledText::layout/TextLayout::text 与 canvas 读取实际省略后的排版，只有显示文字被截断才注册 Tooltip，仍延迟 600ms；无需按字符数猜测路径宽度。缩放和侧栏宽度变化会重新测量。
+- 80 项测试通过，包括队列满时拒绝新增、跳过旧任务、坏图终态、BGRA 通道和轮询恢复；真实系统看图程序重复打开、快捷键恢复、长时间内存趋势及不同 DPI 的提示显示仍待用户验收。
+
+官方依据：[GPUI AsyncApp 源码](https://docs.rs/crate/gpui-pre/0.3.8/source/src/app/async_context.rs)、[drop_image](https://docs.rs/gpui-pre/0.3.8/gpui/struct.App.html#method.drop_image)、[StyledText](https://docs.rs/gpui-pre/0.3.8/gpui/struct.StyledText.html#method.layout)、[ShellExecuteW 与 COM 初始化](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shellexecutew)。
+
+### 内部预览与可见区域加载（2026-10-10）
+
+- [x] 初版核对并复用 GPUI Kit/component/base 0.7.1 的 Dialog、DialogContent、Button、WindowExt，以及 GPUI 0.3.8 的 img/RenderImage、UniformListDecoration。当前预览已改为下述标准独立窗口，移除旧 Dialog 路径。
+- [x] 双击、Enter、右键“图片预览”均在软件内打开，按当前搜索/排序结果切换上一张和下一张；等比适应预览区域。切图释放旧图 GPU 缓存，CPU 像素按下述缓存规则保留；关闭清空预览缓存，旧请求结果不会覆盖新选择。
+- [x] 使用 UniformListDecoration::compute 提供的真实可见行范围调度缩略图，排除 uniform_list 为测量高度额外渲染的离屏行。滚出视口的任务在解码前后跳过；搜索无结果时清除旧视口任务。队列满时后续轮询继续补齐，不阻塞 UI。
+- [x] 缩略图为 320×240 内的 BGRA，缓存上限为可见图片数与 64 的较大值，按最近使用淘汰。内部预览栅格限制在 2048×1536 内，保留原始尺寸信息，生成栅格时不放大小图；缓存上限见下。一个解码线程优先处理最新预览，避免多张原图并发解码。
+- [x] image 0.25.10 的 ImageReader::limits 设置 max_alloc 为 128MiB；超限、损坏或读取失败显示错误。这不是进程总内存硬上限，原图仍需临时解码，不是分块读取。任务队列 32 项、缩略图结果队列 16 项、预览结果一个槽位。
+- [x] 83 项测试、cargo check、严格 Clippy、格式/UTF-8/diff 检查和 Release 构建通过；新增覆盖真实行范围映射、预览取消/切换丢弃旧结果、预览优先、离屏任务跳过、预览缩放比例和不放大小图。已备份并替换 D:\tool\ShiTu.exe，核对 SHA-256 一致，重启进程存活且 Responding=True；这仅验证启动状态。
+- [ ] 用户桌面验收：连续预览与关闭、上一张/下一张、Esc、滚动/搜索/缩放后加载、不同 DPI、预览期间截图快捷键。未自动操作桌面；用户报告上一版已显示缩略图、运行更流畅且所见内存约 20MB，不作为本轮大图预览的峰值保证。
+
+官方依据：[Dialog 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/dialog/struct.Dialog.html)、[UniformListDecoration 0.3.8](https://docs.rs/gpui-pre/0.3.8/gpui/trait.UniformListDecoration.html)、[RenderImage 0.3.8](https://docs.rs/gpui-pre/0.3.8/gpui/struct.RenderImage.html)、[ImageReader 0.25.10](https://docs.rs/image/0.25.10/image/struct.ImageReader.html#method.limits)。已核对本机对应版本源码。
+
+### 预览缓存与工具栏（2026-10-10）
+
+- [x] 最近使用的预览像素最多 10 张且最多 100MB（100,000,000 字节），任一超限淘汰最久未使用项；命中会更新顺序并取消旧异步请求，不重复解码。同路径不会积累副本。刷新图库使缓存失效，关闭预览清空缓存。
+- [x] 缓存保存 CPU 像素，切图调用官方 drop_image 移除上一张 GPU 图集记录；只有当前显示图上传 GPU。旋转直接读取缓存像素，生成当前角度的一份临时图，不缓存多个旋转版本，不改写文件。100MB 不包含解码中间数据、旋转临时图、缩略图、GPU 资源及进程其他内存，因此不代表整个进程上限。
+- [x] 已检查并复用 GPUI Kit 0.7.1 的 Toolbar、Button、Icon、Dialog、DialogContent，GPUI 0.3.8 的 canvas/Window::paint_image 与原生鼠标事件；未发现完整图片查看器组件。自定义图片变换和缓存；当前窗口与焦点处理见下述标准独立窗口方案。
+- [x] 图片两侧用左右箭头切图；图片区域获得焦点时键盘左右键切图，工具栏获得焦点时保留原生箭头键导航。底部工具栏含缩小、当前比例、放大、适应窗口、左右旋转 90°；图标提示复用现有每次 600ms 延迟。
+- [x] 滚轮以鼠标位置为缩放中心，放大后按住左键拖动，位置限制确保图片不会被拖出可见范围。切图和旋转恢复适应窗口；比例按原图尺寸和显示 DPI 计算。放大仍使用有界预览栅格，不提供原图分块解码或额外高清加载。
+- [x] 88 项测试和严格 Clippy 通过：500 次缓存插入/替换验证数量与字节上限、弱引用证明缓存淘汰与清空后像素对象释放；覆盖重复路径、超大项、最近访问顺序、1/1.25/1.5/2 倍 DPI 下的缩放和拖动边界。这些测试不证明 GPU 驱动内存或真实桌面长期趋势已经验收。
+- [x] Release 构建及格式/UTF-8/diff 检查通过；备份并更新 D:\tool\ShiTu.exe，SHA-256 与构建产物一致，重启后进程存活且 Responding=True。仅验证启动，没有自动操作预览界面。
+- [ ] 用户桌面验收：重复切图和关闭后的内存趋势、缓存命中、旋转、滚轮缩放与拖动、Esc/焦点恢复、不同 DPI 与窗口边缘。按用户要求不自动操作桌面。日志记录每次新图进入缓存的数量/像素字节，以及关闭清空事件，供持续增长时定位。
+
+官方依据：[Toolbar 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/toolbar/struct.Toolbar.html)、[Window::paint_image 0.3.8](https://docs.rs/gpui-pre/0.3.8/gpui/struct.Window.html#method.paint_image)、[drop_image 0.3.8](https://docs.rs/gpui-pre/0.3.8/gpui/struct.App.html#method.drop_image)、[image::imageops 0.25.10](https://docs.rs/image/0.25.10/image/imageops/index.html)。已检查锁定版本本机源码。
+
+### 图库多选与批量回收站（2026-10-10）
+
+- [x] 根因：普通 Dialog 0.7.1 的 button_props 只保存按钮属性，不自动构造 footer。原回收站确认框有 on_ok 回调，却没有可点击的确认/取消按钮。改用官方 AlertDialog.confirm()，由组件构造按钮、处理确认/取消、键盘和焦点恢复；一并修正图库重命名框的相同问题。
+- [x] 已核对 GPUI Kit/component/base 0.7.1 的 List/ListState、ListItem、NativeMenu、AlertDialog、DialogFooter。ListState 仅管理一个 selected_index，现有缩略图网格使用 uniform_list，因此只新增 PictureSelection 状态管理 Ctrl 切换、Shift 固定锚点区间、Ctrl+Shift 合并区间；按当前搜索/排序结果计算，不自建输入、菜单或窗口系统。
+- [x] 单击替换选择，Ctrl 点击追加/取消，Shift 点击选择连续区间；缩略图和列表共享状态，底部显示已选数量。右键已选项保留整组；右键未选项切为单选。多选时原生菜单保留“移入回收站”和下述“删除”，Delete 按键仍将选中组移入回收站；确认框显示总数。多选期间不提供未实现的批量拖动/重命名/复制；单选原有操作保留。目录/搜索变化清理不可见选择，Ctrl/Shift 点击不误开预览。
+- [x] windows 0.62.2 IFileOperation：全组选项预检后逐项 DeleteItem 排队，一次 PerformOperations 执行；保留 RECYCLEONDELETE/ADDUNDORECORD/WANTNUKEWARNING，不添加永久删除兜底。GetAnyOperationsAborted 和源路径状态用于区分已处理与剩余；系统批量操作不是事务，部分失败明确报告数量、文件名与错误，重新扫描并保留剩余项选择，结果不会被刷新后的图片数量提示覆盖。
+- [x] 92 项常规测试、严格 Clippy 通过；另显式运行 1 项真实 Windows 回收站测试：只处理 .codex-tmp 下新建 PNG，覆盖两张批量成功，以及文件占用时准确报告剩余项、解除占用后重试成功。未操作用户图库文件，未执行系统回收站恢复测试。
+- [x] Release、格式/UTF-8/diff 检查通过；备份并替换 D:\tool\ShiTu.exe，校验构建与部署 SHA-256 相同，启动后进程存活且 Responding=True。
+- [ ] 桌面验收：Ctrl/Shift 实际鼠标选择、右键菜单、确认/取消与 Esc、不同缩放比例、批量回收后列表刷新及回收站恢复。按用户要求不自动操作桌面。
+
+官方依据：[AlertDialog 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/dialog/struct.AlertDialog.html)、[IFileOperation::DeleteItem](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifileoperation-deleteitem)、[PerformOperations](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifileoperation-performoperations)、[SetOperationFlags](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifileoperation-setoperationflags)。已核对锁定版本源码。
+
+### 图库细节与原生预览窗口（2026-10-10）
+
+- [x] 回收站确认按钮改为“确定”，标题保留操作含义。缩略图卡片高度从 154px 调整至 164px，文件名保留 26px 高度、24px 行高且不压缩，长名称继续省略。移除图库右键“钉住”及对应后台任务；截图工具条的钉住功能保留。
+- [x] 核对 GPUI Kit 0.7.1 的 Dialog、AlertDialog、NativeMenu、Toolbar 和 open_window，以及 GPUI/pre-windows 0.3.8 的 WindowOptions、TitlebarOptions、on_window_should_close。Dialog 是窗口内弹层，不能提供系统标题栏；采用 open_window 的标准 Normal 窗口，保留默认标题栏，is_resizable/is_minimizable 为 true。Windows 后端直接启用 WS_MAXIMIZEBOX/WS_MINIMIZEBOX，没有自写 Win32 窗口控制。
+- [x] 单个预览窗口复用，支持原生最大化/还原、最小化与关闭，内容随窗口布局。Esc 和系统关闭均取消预览请求、清空缓存。主窗口可继续使用；上一张/下一张固定采用本次打开时的列表顺序，不受主窗口后续选择或排序干扰。再次从图库打开图片会更新此顺序。
+- [x] 92 项常规测试及严格 Clippy 通过；回收站真实系统测试本轮未重复运行。缓存、缩放、DPI 几何、多选和异步取消逻辑测试通过。
+- [x] Release 构建、格式/UTF-8/diff 检查通过。已备份并替换 D:\tool\ShiTu.exe，构建与部署 SHA-256 均为 3379955EADE158AB06270049C675A9BA527B5C15122C993CC8C4F44316594B19；启动进程 39992 存活且 Responding=True，仅作为启动验证。
+- [ ] 桌面验收：最大化/还原、最小化后再打开、Esc/系统关闭后重开、窗口边缘与不同 DPI、文件名显示。未自动操作用户桌面；编译和逻辑测试不等于窗口交互验证。
+
+官方依据：[open_window 0.7.1](https://docs.rs/gpui-kit/0.7.1/gpui_kit/fn.open_window.html)、[WindowOptions 0.3.8](https://docs.rs/gpui-pre/0.3.8/gpui/struct.WindowOptions.html)、[TitlebarOptions 0.3.8](https://docs.rs/gpui-pre/0.3.8/gpui/struct.TitlebarOptions.html)。已核对本机锁定版本源码。
+
+### 图库永久删除（2026-10-10）
+
+- [x] 右键新增“删除”，与“移入回收站”并列，单选/多选均可使用。确认框标题为“永久删除”，列出文件名或图片数量，明确提示“将永久删除所选图片，不会移入回收站，无法从回收站恢复。”；按钮为“确定／取消”。键盘 Delete 仍执行移入回收站。
+- [x] 复用已核对的 GPUI Kit/component 0.7.1 NativeMenu、AlertDialog、DialogButtonProps；没有新建窗口或焦点处理。永久删除使用本机 Rust 1.96.0 官方文档确认的 std::fs::remove_file，只删除选中的文件，不递归删除目录。与 IFileOperation 回收路径共用预检和结果结构，不作互相回退。
+- [x] 全组选项预检和去重后在后台删除，遇到首个错误停止，显示已删除数量、剩余项及错误；刷新列表并保留剩余选择。永久删除不具备事务回滚。十种语言文案已同步。
+- [x] 95 项测试、严格 Clippy 通过。新增 3 项真实临时文件测试：只删选中项/去重、缺失文件或目录/非图片预检、共享占用导致部分失败及解锁重试；未删除用户图库文件。真实回收站测试本轮保持忽略。
+- [x] Release、格式/UTF-8/diff 检查通过；备份并替换 D:\tool\ShiTu.exe，SHA-256 与构建产物一致，启动进程 12828 存活且 Responding=True。此项只验证部署及启动。
+- [ ] 桌面验收：单选/多选右键菜单、确认/取消/Esc、长文件名与不同缩放比例。未自动操作用户桌面。
+
+官方依据：[AlertDialog 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/dialog/struct.AlertDialog.html)、[std::fs::remove_file](https://doc.rust-lang.org/1.96.0/std/fs/fn.remove_file.html)。已核对本机对应版本源码与离线标准库文档。
+
+### 图库目录选中状态（2026-10-10）
+
+- [x] 已核对 GPUI Kit/component 0.7.1 的 Tree、ListItem：ListItem 在自定义样式之后应用默认选中底色，不能仅通过 bg 覆盖。保留 Tree 的选中、键盘、展开、拖放行为，在选中行组合绝对定位的装饰层，使用主题蓝色 18%（浅色）/28%（深色）底色和 70% 蓝色细边框，文件夹图标使用主题蓝色；内容绘制在装饰层上方，不增加布局宽度或事件处理。
+- [x] Release 构建、格式/UTF-8/diff 检查通过；备份并替换 D:\tool\ShiTu.exe，部署与构建 SHA-256 一致，启动进程 10308 存活且 Responding=True。此轮仅样式调整，未重复运行行为测试。
+- [ ] 桌面验收：浅色/深色主题、鼠标与键盘切换目录、拖入文件夹时的选中及悬停效果。未自动操作桌面。
+
+官方依据：[ListItem 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/list/struct.ListItem.html)，已核对本机对应版本 Tree/ListItem 渲染源码。
+
+### 关于页检查与手动更新（2026-10-11）
+
+- [x] 进入“关于”页自动在后台查询正式发布，不进行额外联网探测。自动检查失败静默结束，不显示错误或弹窗；主动检查的进度、暂无可用更新、失败原因，以及下载进度和更新结果统一显示在底部公共状态栏。检查并发受状态约束，单次请求总超时 20 秒。
+- [x] 新版说明与“更新并重启”按钮直接显示在页面；只有点击按钮后才下载，不另弹确认框。页面预先提示保存未完成内容。复用 GPUI Kit/component 0.7.1 的 TabBar、Button 和滚动内容，未自建窗口或通知机制。
+- [x] 锁定 ureq 2.12.1、semver 1.0.28、sha2 0.10.9、zip 4.6.1，已检查对应本机官方源码；使用 HTTPS、超时、响应大小限制和后台流式下载。只接受本仓库稳定版本、匹配的 x86_64 ZIP/校验文件，严格比较版本，禁止降级；下载后核验 SHA-256，ZIP 必须且只能包含根目录 ShiTu.exe。SHA-256 是完整性校验，不是独立发布签名。
+- [x] Windows 0.62.2 的 GetCurrentPackageFullName 区分便携/打包进程，打包版本提示通过原分发渠道更新，不覆盖安装目录。便携版写入安装目录内独立 `.shitu-update-*` 目录，无写权限时在退出前明确失败。当前仅支持 Windows x86_64。
+- [x] 复制当前程序作为更新辅助进程，握手确认就绪后主程序才退出。辅助进程通过 OpenProcess/WaitForSingleObject 等待确切进程退出，未提交或等待超时不替换文件；校验原程序和新程序后备份、替换、启动新版，并等待主窗口创建成功的启动回执。失败尝试恢复原程序；恢复失败保留备份并记录明确错误，不宣称更新成功。
+- [x] 更新和回滚都不弹窗；结果由公共状态栏展示。辅助进程错误记录在配置目录 `logs/update.log`，替换后错误另记录在更新目录 `error.txt`。成功更新保留更新目录中的 `old.exe` 和辅助程序用于恢复，不自动清理备份目录；配置和图库目录引用不变。
+- [x] 103 项常规测试、严格 Clippy 通过，涵盖静默/手动错误状态、版本比较、缺少或恶意附件、大小上限、校验文件绑定、ZIP 路径/多文件拒绝、真实临时文件替换/回滚与共享占用失败。
+- [x] 单独执行真实联网测试，实际查询最新正式发布为 v0.3.0，本机 v0.4.0 不显示升级；成功下载其 8,413,118 字节 ZIP，核对发布 SHA-256、解压指定文件并经 GetBinaryTypeW 检查 Windows 64 位程序。未执行或安装下载的旧版。
+- [x] `python tools/test-updater-helper.py` 使用实际 Release 辅助进程和独立 APPDATA、临时无窗口夹具，验证成功替换/启动回执、启动失败后恢复并重启旧程序、未提交保护、校验失败保护四种情况；未操作用户安装、配置或图片。这不等于真实新版本的桌面升级验收。
+- [x] 最终 Release、格式/UTF-8/diff 检查通过；辅助进程四项测试在最终二进制上复验通过。已备份并替换 D:\tool\ShiTu.exe，构建与部署 SHA-256 一致，启动进程 24220 存活且 Responding=True，仅作为部署与启动验证。
+- [ ] 桌面验收：关于页布局、手动点击升级、不同主题/DPI、真实新版发布后的整套应用升级。打包安装环境和安装目录拒绝写入的实际设备场景尚未验收。
+
+官方依据：[GitHub 获取最新发布](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)、[ureq AgentBuilder 2.12.1](https://docs.rs/ureq/2.12.1/ureq/struct.AgentBuilder.html)、[ZIP 4.6.1](https://docs.rs/zip/4.6.1/zip/read/struct.ZipArchive.html)、[GetCurrentPackageFullName](https://learn.microsoft.com/en-us/windows/win32/api/appmodel/nf-appmodel-getcurrentpackagefullname)、[WaitForSingleObject](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject)、[GetBinaryTypeW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getbinarytypew)。
+
 ## 本地运行与复验
 
 运行最新 Release：`D:\workspace\12.aiwork\ShiTu\target\release\ShiTu.exe`。本轮已获准退出并更新工作区旧版应用；不要同时运行多个版本，以免占用快捷键。

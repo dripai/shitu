@@ -14,6 +14,30 @@ pub fn open_path(path: &Path) -> Result<()> {
     shell_execute(path.as_os_str(), None)
 }
 
+/// Run on a dedicated worker. ShellExecute can pump COM messages, so do not
+/// call it while a GPUI view/App is borrowed on the UI thread.
+/// https://learn.microsoft.com/windows/win32/api/shellapi/nf-shellapi-shellexecutew
+pub fn open_on_worker(path: &Path, reveal: bool) -> Result<()> {
+    use windows::Win32::System::Com::{
+        COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoInitializeEx, CoUninitialize,
+    };
+    unsafe {
+        CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE).ok()?;
+    }
+    struct Apartment;
+    impl Drop for Apartment {
+        fn drop(&mut self) {
+            unsafe { CoUninitialize() };
+        }
+    }
+    let _apartment = Apartment;
+    if reveal {
+        reveal_in_folder(path)
+    } else {
+        open_path(path)
+    }
+}
+
 pub fn reveal_in_folder(path: &Path) -> Result<()> {
     let canonical = path.canonicalize().unwrap_or_else(|_| PathBuf::from(path));
     let status = Command::new("explorer.exe")

@@ -823,6 +823,105 @@ msgstr "Error al preparar el modelo de Windows AI OCR"
 msgid "Cut"
 msgstr "Cortar"
 
+msgid "按大小"
+msgstr "Tamaño"
+
+msgid "按名称"
+msgstr "Nombre"
+
+msgid "处理中…"
+msgstr "Procesando…"
+
+msgid "从图库移除"
+msgstr "Quitar de la galería"
+
+msgid "打开"
+msgstr "Abrir"
+
+msgid "打开文件夹"
+msgstr "Abrir carpeta"
+
+msgid "复制"
+msgstr "Copiar"
+
+msgid "加载中…"
+msgstr "Cargando…"
+
+msgid "列表"
+msgstr "Lista"
+
+msgid "目标文件已存在"
+msgstr "El archivo de destino ya existe"
+
+msgid "目录不存在"
+msgstr "La carpeta no existe"
+
+msgid "目录已添加"
+msgstr "Carpeta ya añadida"
+
+msgid "取消"
+msgstr "Cancelar"
+
+msgid "确定"
+msgstr "Aceptar"
+
+msgid "删除未完成"
+msgstr "No se completó la eliminación"
+
+msgid "刷新"
+msgstr "Actualizar"
+
+msgid "搜索文件名"
+msgstr "Buscar nombres"
+
+msgid "缩略图"
+msgstr "Miniaturas"
+
+msgid "添加文件夹"
+msgstr "Añadir carpeta"
+
+msgid "图库"
+msgstr "Galería"
+
+msgid "图片不存在或不受支持"
+msgstr "Imagen inexistente o no compatible"
+
+msgid "文件名无效"
+msgstr "Nombre no válido"
+
+msgid "移入回收站"
+msgstr "Mover a la papelera"
+
+msgid "已复制"
+msgstr "Copiado"
+
+msgid "预览失败"
+msgstr "Falló la vista previa"
+
+msgid "暂无图片"
+msgstr "Sin imágenes"
+
+msgid "张图片"
+msgstr "imágenes"
+
+msgid "重命名"
+msgstr "Renombrar"
+
+msgid "最新优先"
+msgstr "Más recientes"
+
+msgid "文件名"
+msgstr "Nombre de archivo"
+
+msgid "尺寸"
+msgstr "Dimensiones"
+
+msgid "文件大小"
+msgstr "Tamaño"
+
+msgid "修改时间"
+msgstr "Modificado"
+
 msgid "Copy"
 msgstr "Copiar"
 
@@ -846,3 +945,102 @@ msgstr "Línea continua"
 
 msgid "虚线"
 msgstr "Línea discontinua"
+
+msgid "排序"
+msgstr "Ordenar"
+
+msgid "时间"
+msgstr "Fecha"
+
+msgid "名称"
+msgstr "Nombre"
+
+msgid "类型"
+msgstr "Tipo"
+
+msgid "大小"
+msgstr "Tamaño"
+
+msgid "当前版本"
+msgstr "Versión actual"
+
+msgid "图片预览"
+msgstr "Vista previa"
+
+msgid "上一张"
+msgstr "Anterior"
+
+msgid "下一张"
+msgstr "Siguiente"
+
+msgid "缩小"
+msgstr "Alejar"
+
+msgid "放大"
+msgstr "Acercar"
+
+msgid "适应窗口"
+msgstr "Ajustar a la ventana"
+
+msgid "已移入回收站"
+msgstr "Movidas a la papelera"
+
+msgid "未完成"
+msgstr "Sin completar"
+
+msgid "已选择"
+msgstr "Seleccionadas"
+
+msgid "删除"
+msgstr "Eliminar"
+
+msgid "永久删除"
+msgstr "Eliminar permanentemente"
+
+msgid "已永久删除"
+msgstr "Eliminadas permanentemente"
+
+msgid "将永久删除所选图片，不会移入回收站，无法从回收站恢复。"
+msgstr "Las imágenes seleccionadas se eliminarán permanentemente. No se enviarán a la papelera ni podrán restaurarse desde ella."
+
+msgid "暂无可用更新"
+msgstr "No hay una versión más reciente"
+
+msgid "最新发布"
+msgstr "Última versión publicada"
+
+msgid "正在检查更新…"
+msgstr "Buscando actualizaciones…"
+
+msgid "检查更新失败"
+msgstr "No se pudo buscar actualizaciones"
+
+msgid "请先结束截图，再重新更新。"
+msgstr "Finaliza la captura antes de intentar actualizar de nuevo."
+
+msgid "更新失败"
+msgstr "Error de actualización"
+
+msgid "更新完成"
+msgstr "Actualización completada"
+
+msgid "检查更新"
+msgstr "Buscar actualizaciones"
+
+msgid "更新并重启"
+msgstr "Actualizar y reiniciar"
+
+msgid "发现新版本"
+msgstr "Nueva versión disponible"
+
+msgid "发行说明"
+msgstr "Notas de la versión"
+
+msgid "点击更新将关闭并重启软件，请先保存未完成的内容。"
+msgstr "La actualización cerrará y reiniciará la aplicación. Guarda primero el trabajo pendiente."
+
+msgid "请通过原安装渠道更新此版本。"
+msgstr "Actualiza esta instalación mediante su canal de distribución original."
+
+msgid "下载并校验更新…"
+msgstr "Descargando y verificando la actualización…"

@@ -823,6 +823,105 @@ msgstr "Windows AI OCR モデルの準備に失敗しました"
 msgid "Cut"
 msgstr "切り取り"
 
+msgid "按大小"
+msgstr "サイズ順"
+
+msgid "按名称"
+msgstr "名前順"
+
+msgid "处理中…"
+msgstr "処理中…"
+
+msgid "从图库移除"
+msgstr "ギャラリーから外す"
+
+msgid "打开"
+msgstr "開く"
+
+msgid "打开文件夹"
+msgstr "フォルダーを開く"
+
+msgid "复制"
+msgstr "コピー"
+
+msgid "加载中…"
+msgstr "読み込み中…"
+
+msgid "列表"
+msgstr "一覧"
+
+msgid "目标文件已存在"
+msgstr "移動先に同名のファイルがあります"
+
+msgid "目录不存在"
+msgstr "フォルダーが存在しません"
+
+msgid "目录已添加"
+msgstr "追加済みのフォルダーです"
+
+msgid "取消"
+msgstr "キャンセル"
+
+msgid "确定"
+msgstr "OK"
+
+msgid "删除未完成"
+msgstr "削除が完了しませんでした"
+
+msgid "刷新"
+msgstr "更新"
+
+msgid "搜索文件名"
+msgstr "ファイル名を検索"
+
+msgid "缩略图"
+msgstr "サムネイル"
+
+msgid "添加文件夹"
+msgstr "フォルダーを追加"
+
+msgid "图库"
+msgstr "ギャラリー"
+
+msgid "图片不存在或不受支持"
+msgstr "画像が存在しないか未対応です"
+
+msgid "文件名无效"
+msgstr "無効なファイル名です"
+
+msgid "移入回收站"
+msgstr "ごみ箱に移動"
+
+msgid "已复制"
+msgstr "コピーしました"
+
+msgid "预览失败"
+msgstr "プレビュー失敗"
+
+msgid "暂无图片"
+msgstr "画像がありません"
+
+msgid "张图片"
+msgstr "枚"
+
+msgid "重命名"
+msgstr "名前を変更"
+
+msgid "最新优先"
+msgstr "新しい順"
+
+msgid "文件名"
+msgstr "ファイル名"
+
+msgid "尺寸"
+msgstr "寸法"
+
+msgid "文件大小"
+msgstr "ファイルサイズ"
+
+msgid "修改时间"
+msgstr "更新日時"
+
 msgid "Copy"
 msgstr "コピー"
 
@@ -846,3 +945,102 @@ msgstr "実線"
 
 msgid "虚线"
 msgstr "破線"
+
+msgid "排序"
+msgstr "並べ替え"
+
+msgid "时间"
+msgstr "日時"
+
+msgid "名称"
+msgstr "名前"
+
+msgid "类型"
+msgstr "種類"
+
+msgid "大小"
+msgstr "サイズ"
+
+msgid "当前版本"
+msgstr "現在のバージョン"
+
+msgid "图片预览"
+msgstr "画像プレビュー"
+
+msgid "上一张"
+msgstr "前の画像"
+
+msgid "下一张"
+msgstr "次の画像"
+
+msgid "缩小"
+msgstr "縮小"
+
+msgid "放大"
+msgstr "拡大"
+
+msgid "适应窗口"
+msgstr "ウィンドウに合わせる"
+
+msgid "已移入回收站"
+msgstr "ごみ箱に移動しました"
+
+msgid "未完成"
+msgstr "未完了"
+
+msgid "已选择"
+msgstr "選択済み"
+
+msgid "删除"
+msgstr "削除"
+
+msgid "永久删除"
+msgstr "完全に削除"
+
+msgid "已永久删除"
+msgstr "完全に削除しました"
+
+msgid "将永久删除所选图片，不会移入回收站，无法从回收站恢复。"
+msgstr "選択した画像を完全に削除します。ごみ箱には移動されず、ごみ箱から復元できません。"
+
+msgid "暂无可用更新"
+msgstr "新しいバージョンはありません"
+
+msgid "最新发布"
+msgstr "最新リリース"
+
+msgid "正在检查更新…"
+msgstr "更新を確認中…"
+
+msgid "检查更新失败"
+msgstr "更新の確認に失敗しました"
+
+msgid "请先结束截图，再重新更新。"
+msgstr "キャプチャを終了してから、更新を再試行してください。"
+
+msgid "更新失败"
+msgstr "更新に失敗しました"
+
+msgid "更新完成"
+msgstr "更新が完了しました"
+
+msgid "检查更新"
+msgstr "更新を確認"
+
+msgid "更新并重启"
+msgstr "更新して再起動"
+
+msgid "发现新版本"
+msgstr "新しいバージョンがあります"
+
+msgid "发行说明"
+msgstr "リリースノート"
+
+msgid "点击更新将关闭并重启软件，请先保存未完成的内容。"
+msgstr "更新するとアプリを終了して再起動します。先に作業内容を保存してください。"
+
+msgid "请通过原安装渠道更新此版本。"
+msgstr "このバージョンは元の配布元から更新してください。"
+
+msgid "下载并校验更新…"
+msgstr "更新をダウンロードして検証中…"

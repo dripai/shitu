@@ -10,9 +10,11 @@ ShiTu is built for the small screenshot tasks that happen all day: copying part 
 - Capture a screen region or select a visible window.
 - Annotate with pen, rectangle, ellipse, arrow, text, eraser, and mosaic tools; select, move and resize annotations, with undo and redo.
 - Copy immediately, save as PNG/JPEG, or enable automatic saving.
+- Browse PNG/JPEG folders in Gallery with thumbnails or a file list. Double-click for an internal preview with left/right navigation, zoom/pan, rotation and Esc to close. Preview pixels are cached up to 10 images and 100MB, then cleared on close; rotation does not modify files. Thumbnails load for visible rows. Rename images, move them by dragging to a folder, or send them to the Recycle Bin. Ctrl-click toggles selection, Shift-click selects a range; right-click or Delete confirms moving the selected group to the Recycle Bin. The context menu also offers Delete, with an explicit permanent-deletion warning and confirmation; it bypasses the Recycle Bin. Removing a folder from Gallery keeps its files intact.
 - Pin screenshots above other windows and adjust zoom, opacity, and always-on-top behavior.
 - Recognize text locally with Windows system OCR and copy the result.
 - Start a capture from the system tray or the default `Ctrl+Alt+C` shortcut.
+- Opening About checks for updates in the background; automatic check failures stay silent, while manual failures are shown inline. Update and restart downloads, verifies and installs newer Windows x64 portable releases without a confirmation popup. Save unfinished work first. Packaged installations use their original distribution channel.
 - Follow the system theme and language, or choose Simplified Chinese, English, Japanese, Korean, French, German, Spanish, Portuguese, Russian, or Hindi in General → Language. Click Save to keep the language after restarting.
 
 The UI now uses GPUI Kit 0.7.1. Migration scope, source references and validation are tracked in [MIGRATION.md](MIGRATION.md).

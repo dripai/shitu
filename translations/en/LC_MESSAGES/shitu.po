@@ -823,6 +823,105 @@ msgstr "Windows AI OCR model preparation failed"
 msgid "Cut"
 msgstr "Cut"
 
+msgid "按大小"
+msgstr "Size"
+
+msgid "按名称"
+msgstr "Name"
+
+msgid "处理中…"
+msgstr "Working…"
+
+msgid "从图库移除"
+msgstr "Remove from gallery"
+
+msgid "打开"
+msgstr "Open"
+
+msgid "打开文件夹"
+msgstr "Open folder"
+
+msgid "复制"
+msgstr "Copy"
+
+msgid "加载中…"
+msgstr "Loading…"
+
+msgid "列表"
+msgstr "List"
+
+msgid "目标文件已存在"
+msgstr "Destination file already exists"
+
+msgid "目录不存在"
+msgstr "Folder does not exist"
+
+msgid "目录已添加"
+msgstr "Folder already added"
+
+msgid "取消"
+msgstr "Cancel"
+
+msgid "确定"
+msgstr "OK"
+
+msgid "删除未完成"
+msgstr "Deletion did not complete"
+
+msgid "刷新"
+msgstr "Refresh"
+
+msgid "搜索文件名"
+msgstr "Search filenames"
+
+msgid "缩略图"
+msgstr "Thumbnails"
+
+msgid "添加文件夹"
+msgstr "Add folder"
+
+msgid "图库"
+msgstr "Gallery"
+
+msgid "图片不存在或不受支持"
+msgstr "Image is missing or unsupported"
+
+msgid "文件名无效"
+msgstr "Invalid filename"
+
+msgid "移入回收站"
+msgstr "Move to Recycle Bin"
+
+msgid "已复制"
+msgstr "Copied"
+
+msgid "预览失败"
+msgstr "Preview failed"
+
+msgid "暂无图片"
+msgstr "No images"
+
+msgid "张图片"
+msgstr "images"
+
+msgid "重命名"
+msgstr "Rename"
+
+msgid "最新优先"
+msgstr "Newest first"
+
+msgid "文件名"
+msgstr "Filename"
+
+msgid "尺寸"
+msgstr "Dimensions"
+
+msgid "文件大小"
+msgstr "File size"
+
+msgid "修改时间"
+msgstr "Modified"
+
 msgid "Copy"
 msgstr "Copy"
 
@@ -846,3 +945,102 @@ msgstr "Solid line"
 
 msgid "虚线"
 msgstr "Dashed line"
+
+msgid "排序"
+msgstr "Sort"
+
+msgid "时间"
+msgstr "Time"
+
+msgid "名称"
+msgstr "Name"
+
+msgid "类型"
+msgstr "Type"
+
+msgid "大小"
+msgstr "Size"
+
+msgid "当前版本"
+msgstr "Current version"
+
+msgid "图片预览"
+msgstr "Image preview"
+
+msgid "上一张"
+msgstr "Previous"
+
+msgid "下一张"
+msgstr "Next"
+
+msgid "缩小"
+msgstr "Zoom out"
+
+msgid "放大"
+msgstr "Zoom in"
+
+msgid "适应窗口"
+msgstr "Fit to window"
+
+msgid "已移入回收站"
+msgstr "Moved to Recycle Bin"
+
+msgid "未完成"
+msgstr "Not completed"
+
+msgid "已选择"
+msgstr "Selected"
+
+msgid "删除"
+msgstr "Delete"
+
+msgid "永久删除"
+msgstr "Permanently delete"
+
+msgid "已永久删除"
+msgstr "Permanently deleted"
+
+msgid "将永久删除所选图片，不会移入回收站，无法从回收站恢复。"
+msgstr "The selected images will be permanently deleted. They will not be moved to the Recycle Bin and cannot be restored from it."
+
+msgid "暂无可用更新"
+msgstr "No newer version"
+
+msgid "最新发布"
+msgstr "Latest release"
+
+msgid "正在检查更新…"
+msgstr "Checking for updates…"
+
+msgid "检查更新失败"
+msgstr "Update check failed"
+
+msgid "请先结束截图，再重新更新。"
+msgstr "Finish the capture before trying the update again."
+
+msgid "更新失败"
+msgstr "Update failed"
+
+msgid "更新完成"
+msgstr "Update complete"
+
+msgid "检查更新"
+msgstr "Check for updates"
+
+msgid "更新并重启"
+msgstr "Update and restart"
+
+msgid "发现新版本"
+msgstr "New version available"
+
+msgid "发行说明"
+msgstr "Release notes"
+
+msgid "点击更新将关闭并重启软件，请先保存未完成的内容。"
+msgstr "Updating will close and restart the app. Save unfinished work first."
+
+msgid "请通过原安装渠道更新此版本。"
+msgstr "Update this installation through its original distribution channel."
+
+msgid "下载并校验更新…"
+msgstr "Downloading and verifying update…"

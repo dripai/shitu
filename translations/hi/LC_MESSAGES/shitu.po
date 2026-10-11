@@ -823,6 +823,105 @@ msgstr "Windows AI OCR मॉडल की तैयारी विफल ह�
 msgid "Cut"
 msgstr "काटें"
 
+msgid "按大小"
+msgstr "आकार"
+
+msgid "按名称"
+msgstr "नाम"
+
+msgid "处理中…"
+msgstr "प्रक्रिया जारी…"
+
+msgid "从图库移除"
+msgstr "गैलरी से हटाएँ"
+
+msgid "打开"
+msgstr "खोलें"
+
+msgid "打开文件夹"
+msgstr "फ़ोल्डर खोलें"
+
+msgid "复制"
+msgstr "कॉपी करें"
+
+msgid "加载中…"
+msgstr "लोड हो रहा है…"
+
+msgid "列表"
+msgstr "सूची"
+
+msgid "目标文件已存在"
+msgstr "लक्ष्य फ़ाइल पहले से मौजूद है"
+
+msgid "目录不存在"
+msgstr "फ़ोल्डर मौजूद नहीं है"
+
+msgid "目录已添加"
+msgstr "फ़ोल्डर पहले से जोड़ा गया है"
+
+msgid "取消"
+msgstr "रद्द करें"
+
+msgid "确定"
+msgstr "ठीक है"
+
+msgid "删除未完成"
+msgstr "हटाना पूरा नहीं हुआ"
+
+msgid "刷新"
+msgstr "रीफ़्रेश करें"
+
+msgid "搜索文件名"
+msgstr "फ़ाइल नाम खोजें"
+
+msgid "缩略图"
+msgstr "थंबनेल"
+
+msgid "添加文件夹"
+msgstr "फ़ोल्डर जोड़ें"
+
+msgid "图库"
+msgstr "गैलरी"
+
+msgid "图片不存在或不受支持"
+msgstr "चित्र अनुपलब्ध या असमर्थित है"
+
+msgid "文件名无效"
+msgstr "अमान्य फ़ाइल नाम"
+
+msgid "移入回收站"
+msgstr "रीसायकल बिन में भेजें"
+
+msgid "已复制"
+msgstr "कॉपी किया गया"
+
+msgid "预览失败"
+msgstr "पूर्वावलोकन विफल"
+
+msgid "暂无图片"
+msgstr "कोई चित्र नहीं"
+
+msgid "张图片"
+msgstr "चित्र"
+
+msgid "重命名"
+msgstr "नाम बदलें"
+
+msgid "最新优先"
+msgstr "नवीनतम पहले"
+
+msgid "文件名"
+msgstr "फ़ाइल नाम"
+
+msgid "尺寸"
+msgstr "आयाम"
+
+msgid "文件大小"
+msgstr "फ़ाइल आकार"
+
+msgid "修改时间"
+msgstr "संशोधित"
+
 msgid "Copy"
 msgstr "कॉपी करें"
 
@@ -846,3 +945,102 @@ msgstr "ठोस रेखा"
 
 msgid "虚线"
 msgstr "डैश वाली रेखा"
+
+msgid "排序"
+msgstr "क्रमबद्ध करें"
+
+msgid "时间"
+msgstr "समय"
+
+msgid "名称"
+msgstr "नाम"
+
+msgid "类型"
+msgstr "प्रकार"
+
+msgid "大小"
+msgstr "आकार"
+
+msgid "当前版本"
+msgstr "वर्तमान संस्करण"
+
+msgid "图片预览"
+msgstr "चित्र पूर्वावलोकन"
+
+msgid "上一张"
+msgstr "पिछला"
+
+msgid "下一张"
+msgstr "अगला"
+
+msgid "缩小"
+msgstr "ज़ूम आउट"
+
+msgid "放大"
+msgstr "ज़ूम इन"
+
+msgid "适应窗口"
+msgstr "विंडो में फ़िट करें"
+
+msgid "已移入回收站"
+msgstr "रीसायकल बिन में भेजा गया"
+
+msgid "未完成"
+msgstr "अधूरा"
+
+msgid "已选择"
+msgstr "चयनित"
+
+msgid "删除"
+msgstr "हटाएँ"
+
+msgid "永久删除"
+msgstr "स्थायी रूप से हटाएँ"
+
+msgid "已永久删除"
+msgstr "स्थायी रूप से हटाया गया"
+
+msgid "将永久删除所选图片，不会移入回收站，无法从回收站恢复。"
+msgstr "चुनी गई छवियाँ स्थायी रूप से हटा दी जाएँगी। वे रीसायकल बिन में नहीं जाएँगी और वहाँ से पुनर्स्थापित नहीं की जा सकेंगी।"
+
+msgid "暂无可用更新"
+msgstr "कोई नया संस्करण नहीं"
+
+msgid "最新发布"
+msgstr "नवीनतम रिलीज़"
+
+msgid "正在检查更新…"
+msgstr "अपडेट की जाँच हो रही है…"
+
+msgid "检查更新失败"
+msgstr "अपडेट की जाँच विफल"
+
+msgid "请先结束截图，再重新更新。"
+msgstr "फिर से अपडेट करने से पहले स्क्रीनशॉट पूरा करें।"
+
+msgid "更新失败"
+msgstr "अपडेट विफल"
+
+msgid "更新完成"
+msgstr "अपडेट पूरा हुआ"
+
+msgid "检查更新"
+msgstr "अपडेट की जाँच करें"
+
+msgid "更新并重启"
+msgstr "अपडेट करके पुनः शुरू करें"
+
+msgid "发现新版本"
+msgstr "नया संस्करण उपलब्ध है"
+
+msgid "发行说明"
+msgstr "रिलीज़ नोट्स"
+
+msgid "点击更新将关闭并重启软件，请先保存未完成的内容。"
+msgstr "अपडेट करने पर ऐप बंद होकर पुनः शुरू होगा। पहले अधूरा काम सहेज लें।"
+
+msgid "请通过原安装渠道更新此版本。"
+msgstr "इस इंस्टॉलेशन को उसके मूल वितरण चैनल से अपडेट करें।"
+
+msgid "下载并校验更新…"
+msgstr "अपडेट डाउनलोड और सत्यापित किया जा रहा है…"

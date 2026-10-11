@@ -1,7 +1,10 @@
 mod annotation;
 mod editor;
+mod gallery;
+mod polling;
 mod toolbar_layout;
 mod tray;
+mod update;
 
 use crate::{
     capture,
@@ -39,8 +42,10 @@ use std::{
 };
 
 pub(super) enum Message {
+    Update(update::Event),
     Status(String),
     CaptureClosed,
+    GalleryChanged,
     Ocr(Result<String, OcrFailure>),
     Pin(CapturedImage, Option<PathBuf>),
     Ai(Result<AiOcrState, OcrFailure>, bool),
@@ -92,6 +97,9 @@ pub fn run(start_minimized: bool) -> Result<()> {
             });
             match result {
                 Ok((handle, panel)) => {
+                    if let Err(error) = crate::updater::signal_started() {
+                        logging::error(format!("Update startup acknowledgement: {error:#}"));
+                    }
                     if start_minimized
                         && panel.read(cx).tray.is_some()
                         && let Err(error) = handle
@@ -115,12 +123,14 @@ pub fn run(start_minimized: bool) -> Result<()> {
 }
 
 struct Panel {
+    update: update::UpdateState,
     shared: SharedApp,
     receiver: mpsc::Receiver<Message>,
     draft: Config,
     fields: HashMap<&'static str, Entity<InputState>>,
     hotkey: HotkeyState,
     hotkey_recording: Option<String>,
+    gallery: Option<Entity<gallery::Gallery>>,
     tray: Option<tray::Tray>,
     tab: usize,
     status: String,
@@ -204,26 +214,28 @@ impl Panel {
         let theme_subscription =
             cx.observe_window_appearance(window, |panel, window, cx| panel.apply_theme(window, cx));
         cx.spawn_in(window, async move |this, cx| {
+            let mut polling = polling::Polling::default();
             loop {
                 cx.background_executor()
                     .timer(Duration::from_millis(40))
                     .await;
-                if cx
-                    .update(|window, cx| this.update(cx, |panel, cx| panel.poll(window, cx)))
-                    .is_err()
-                {
+                let result =
+                    cx.update(|window, cx| this.update(cx, |panel, cx| panel.poll(window, cx)));
+                if !polling.proceed(result, "Panel") {
                     break;
                 }
             }
         })
         .detach();
         let mut panel = Self {
+            update: update::UpdateState::default(),
             shared,
             receiver,
             draft,
             fields: HashMap::new(),
             hotkey,
             hotkey_recording: None,
+            gallery: None,
             tray,
             tab: 0,
             status,
@@ -234,6 +246,7 @@ impl Panel {
             _subscriptions: vec![theme_subscription],
         };
         panel.populate(window, cx);
+        panel.load_update_notice();
         panel._subscriptions.push(cx.subscribe_in(
             &panel.fields["hotkey"],
             window,
@@ -427,8 +440,14 @@ impl Panel {
         }
         while let Ok(message) = self.receiver.try_recv() {
             match message {
+                Message::Update(event) => self.update_event(event, cx),
                 Message::Status(status) => self.status = status,
                 Message::CaptureClosed => self.capture_finished(),
+                Message::GalleryChanged => {
+                    if let Some(gallery) = &self.gallery {
+                        gallery.update(cx, |gallery, cx| gallery.activate(cx));
+                    }
+                }
                 Message::Pin(image, path) => {
                     self.report(
                         editor::open_pin(image, path, self.shared.clone(), cx),
@@ -651,16 +670,60 @@ impl Render for Panel {
         let labels = [
             i18n::text("常规"),
             i18n::text("截图"),
+            i18n::text("图库"),
             i18n::text("OCR 识别"),
             i18n::text("钉住"),
             i18n::text("快捷键"),
             i18n::text("关于"),
         ];
         let tabs = TabBar::new("settings-tabs")
-            .selected_index(self.tab)
+            .selected_index(
+                [0, 1, 6, 2, 3, 4, 5]
+                    .iter()
+                    .position(|id| *id == self.tab)
+                    .unwrap_or(0),
+            )
             .children(labels.into_iter().map(|label| Tab::new().label(label)))
-            .on_click(cx.listener(|this, index, _, cx| {
-                this.tab = *index;
+            .on_click(cx.listener(|this, index, window, cx| {
+                this.tab = [0, 1, 6, 2, 3, 4, 5][*index];
+                if this.tab == 5 {
+                    this.check_updates(false, cx);
+                }
+                if this.tab == 6 {
+                    if this.gallery.is_none() {
+                        match crate::gallery::Preferences::load() {
+                            Ok(prefs) => {
+                                let gallery = cx.new(|cx| {
+                                    gallery::Gallery::new(this.shared.clone(), prefs, window, cx)
+                                });
+                                let mut last_status = gallery.read(cx).status().to_owned();
+                                this._subscriptions.push(cx.observe(
+                                    &gallery,
+                                    move |this, gallery, cx| {
+                                        let status = gallery.read(cx).status();
+                                        if status != last_status {
+                                            last_status = status.to_owned();
+                                            if this.tab == 6 {
+                                                this.status = last_status.clone();
+                                                cx.notify();
+                                            }
+                                        }
+                                    },
+                                ));
+                                this.gallery = Some(gallery);
+                            }
+                            Err(error) => this.report(Err(error), ""),
+                        }
+                    } else if let Some(gallery) = &this.gallery {
+                        gallery.update(cx, |gallery, cx| gallery.activate(cx));
+                    }
+                    if let Some(gallery) = &this.gallery {
+                        this.status = gallery.read(cx).status().to_owned();
+                    }
+                    if window.viewport_size().width < px(900.) {
+                        window.resize(size(px(1000.), px(650.)));
+                    }
+                }
                 cx.notify();
             }));
         let mut page = div().v_flex().gap_4().p_5();
@@ -922,6 +985,7 @@ impl Render for Panel {
                         .into_any_element(),
                 ));
             }
+            6 => {}
             _ => {
                 let icon = std::sync::Arc::new(gpui_kit::Image::from_bytes(
                     gpui_kit::ImageFormat::Png,
@@ -934,21 +998,12 @@ impl Render for Panel {
                             .gap_3()
                             .child(img(icon).size(px(44.)).flex_shrink_0())
                             .child(
-                                div()
-                                    .v_flex()
-                                    .gap_1()
-                                    .child(
-                                        div()
-                                            .text_xl()
-                                            .font_weight(FontWeight::BOLD)
-                                            .child(i18n::text("拾图")),
-                                    )
-                                    .child(
-                                        div()
-                                            .text_xs()
-                                            .text_color(cx.theme().muted_foreground)
-                                            .child(format!("v{}", env!("CARGO_PKG_VERSION"))),
-                                    ),
+                                div().v_flex().gap_1().child(
+                                    div()
+                                        .text_xl()
+                                        .font_weight(FontWeight::BOLD)
+                                        .child(i18n::text("拾图")),
+                                ),
                             )
                             .child(
                                 div()
@@ -959,6 +1014,23 @@ impl Render for Panel {
                             ),
                     )
                     .child(div().h(px(1.)).bg(cx.theme().border))
+                    .child(
+                        div()
+                            .h_flex()
+                            .child(
+                                div()
+                                    .w(px(80.))
+                                    .flex_shrink_0()
+                                    .child(i18n::text("当前版本")),
+                            )
+                            .child(
+                                div()
+                                    .flex_shrink_0()
+                                    .child(format!("v{}", env!("CARGO_PKG_VERSION"))),
+                            )
+                            .child(self.update_controls(cx)),
+                    )
+                    .children(self.update_details(cx))
                     .child(
                         div()
                             .h_flex()
@@ -991,39 +1063,17 @@ impl Render for Panel {
                     );
             }
         }
-        div()
-            .v_flex()
-            .size_full()
-            .bg(cx.theme().background)
-            .text_color(cx.theme().foreground)
-            .text_sm()
-            .child(tabs)
-            .child(
-                div()
-                    .id("settings-scroll")
-                    .flex_1()
-                    .min_h_0()
-                    .overflow_y_scrollbar()
-                    .child(page),
-            )
-            .child(
-                div()
-                    .h_flex()
-                    .p_3()
-                    .gap_2()
-                    .child(
-                        Button::new("capture")
-                            .primary()
-                            .label(i18n::text("开始截图"))
-                            .disabled(self.capturing)
-                            .on_click(cx.listener(|this, _, _, cx| this.start_capture(cx))),
-                    )
-                    .child(div().flex_1())
-                    .when(self.tab != 5, |row| {
-                        row.child(
+        // Settings actions belong to their page; the shared footer is status only.
+        if self.tab != 5 && self.tab != 6 {
+            page =
+                page.child(
+                    div()
+                        .h_flex()
+                        .justify_end()
+                        .gap_2()
+                        .child(
                             Button::new("restore")
                                 .label(i18n::text("恢复默认"))
-                                .disabled(self.tab == 5)
                                 .on_click(cx.listener(|this, _, window, cx| {
                                     this.restore_defaults(window, cx)
                                 })),
@@ -1032,10 +1082,37 @@ impl Render for Panel {
                             Button::new("save")
                                 .label(i18n::text("保存"))
                                 .on_click(cx.listener(|this, _, window, cx| this.save(window, cx))),
-                        )
-                    }),
+                        ),
+                );
+        }
+        div()
+            .v_flex()
+            .size_full()
+            .bg(cx.theme().background)
+            .text_color(cx.theme().foreground)
+            .text_sm()
+            .child(tabs)
+            .when(self.tab == 6, |root| {
+                root.child(div().flex_1().min_h_0().children(self.gallery.clone()))
+            })
+            .when(self.tab != 6, |root| {
+                root.child(
+                    div()
+                        .id("settings-scroll")
+                        .flex_1()
+                        .min_h_0()
+                        .overflow_y_scrollbar()
+                        .child(page),
+                )
+            })
+            .child(
+                div()
+                    .px_3()
+                    .py_2()
+                    .border_t_1()
+                    .border_color(cx.theme().border)
+                    .child(self.status.clone()),
             )
-            .child(div().px_3().pb_3().child(self.status.clone()))
     }
 }
 
