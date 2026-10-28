@@ -93,6 +93,10 @@ jobs:
         if: matrix.kind == 'windows'
         run: cargo test --workspace --locked
 
+      - name: Test stale-window accessibility queries
+        if: matrix.kind == 'windows'
+        run: cargo test --manifest-path vendor/accesskit_windows/Cargo.toml --lib regression_tests --target-dir target/accesskit-regression -- --test-threads=1
+
       - name: Build ShiTu release binary
         if: matrix.kind == 'windows'
         run: cargo build --release --locked --package shitu --bin ShiTu

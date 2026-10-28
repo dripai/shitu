@@ -63,3 +63,5 @@ jobs:
         run: cargo check --locked --package shitu
       - name: Test ShiTu workspace
         run: cargo test --workspace --locked
+      - name: Test stale-window accessibility queries
+        run: cargo test --manifest-path vendor/accesskit_windows/Cargo.toml --lib regression_tests --target-dir target/accesskit-regression -- --test-threads=1

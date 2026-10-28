@@ -416,15 +416,15 @@ impl Panel {
         });
         Ok(())
     }
-    fn start_capture(&mut self, cx: &mut Context<Self>) {
+    fn start_capture(&mut self, delay: Duration, cx: &mut Context<Self>) {
         if self.capturing {
             return;
         }
-        // Capture the desktop as the user left it, including this window when
-        // visible. Keep the delay so a triggering tray menu can close first.
-        logging::info("capture scheduled");
+        // Preserve the desktop and main window. Only the tray-menu entry point
+        // supplies a delay so its own menu can close before the snapshot.
+        logging::info(format!("capture scheduled: delay={}ms", delay.as_millis()));
         self.capturing = true;
-        self.capture_due = Some(Instant::now() + Duration::from_millis(160));
+        self.capture_due = Some(Instant::now() + delay);
         cx.notify();
     }
     fn poll(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -443,13 +443,13 @@ impl Panel {
                         logging::error("Active hotkey event has no registered binding");
                     }
                 } else {
-                    self.start_capture(cx);
+                    self.start_capture(Duration::ZERO, cx);
                 }
             }
         }
         while let Some(action) = self.tray.as_ref().and_then(tray::Tray::next) {
             match action {
-                tray::Action::Capture => self.start_capture(cx),
+                tray::Action::Capture => self.start_capture(Duration::from_millis(160), cx),
                 tray::Action::Show => {
                     self.report(native::show(window), i18n::text("就绪"));
                     cx.notify();
