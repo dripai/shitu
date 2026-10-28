@@ -249,7 +249,7 @@ fn open(
                     .refine(&StyleRefinement::default().bg(rgba(0x00000000)));
                 cx.notify();
             });
-            native::prepare_image_window(window, is_capture)?;
+            native::prepare_popup_window(window, is_capture)?;
             native::place(
                 window,
                 RECT {
@@ -1087,7 +1087,7 @@ impl Editor {
             let setup = handle
                 .update(cx, |_, toolbar_window, cx| {
                     native::hide(toolbar_window)?;
-                    native::prepare_image_window(toolbar_window, false)?;
+                    native::prepare_popup_window(toolbar_window, false)?;
                     native::set_owner(toolbar_window, window)?;
                     let tips = NativeTooltips::new(native::hwnd(toolbar_window)?)?;
                     toolbar.update(cx, |toolbar, cx| {

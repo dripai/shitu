@@ -10,7 +10,7 @@ use windows::Win32::{
     Graphics::{
         Dwm::{
             DWMNCRENDERINGPOLICY, DWMNCRP_DISABLED, DWMNCRP_ENABLED, DWMWA_NCRENDERING_POLICY,
-            DwmSetWindowAttribute,
+            DwmFlush, DwmSetWindowAttribute,
         },
         Gdi::{GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromRect},
     },
@@ -26,7 +26,7 @@ use windows::Win32::{
 /// adds a non-client frame. This shrinks our client image by 16x8 pixels.
 /// Use a genuine borderless popup; don't replace GPUI's window procedure.
 /// https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowlongptrw
-pub fn prepare_image_window(window: &Window, cover_taskbar: bool) -> Result<()> {
+pub fn prepare_popup_window(window: &Window, cover_taskbar: bool) -> Result<()> {
     let hwnd = hwnd(window)?;
     unsafe {
         SetLastError(WIN32_ERROR(0));
@@ -94,6 +94,11 @@ pub fn hide(window: &Window) -> Result<()> {
         let _ = ShowWindow(hwnd(window)?, SW_HIDE);
     }
     Ok(())
+}
+/// Wait for this application's queued DirectX changes, not other apps' animations.
+/// https://learn.microsoft.com/windows/win32/api/dwmapi/nf-dwmapi-dwmflush
+pub fn flush_composition() -> Result<()> {
+    unsafe { DwmFlush() }.context("Synchronize menu hiding with desktop composition")
 }
 pub fn show(window: &Window) -> Result<()> {
     unsafe {

@@ -42,6 +42,7 @@ use std::{
 };
 
 pub(super) enum Message {
+    Tray(tray::Action),
     Update(update::Event),
     Status(String),
     CaptureClosed,
@@ -420,8 +421,8 @@ impl Panel {
         if self.capturing {
             return;
         }
-        // Preserve the desktop and main window. Only the tray-menu entry point
-        // supplies a delay so its own menu can close before the snapshot.
+        // Preserve the desktop and main window. The application-owned tray menu
+        // sends its capture request only after hiding its host window.
         logging::info(format!("capture scheduled: delay={}ms", delay.as_millis()));
         self.capturing = true;
         self.capture_due = Some(Instant::now() + delay);
@@ -448,30 +449,11 @@ impl Panel {
             }
         }
         while let Some(action) = self.tray.as_ref().and_then(tray::Tray::next) {
-            match action {
-                tray::Action::Capture => self.start_capture(Duration::from_millis(160), cx),
-                tray::Action::Show => {
-                    self.report(native::show(window), i18n::text("就绪"));
-                    cx.notify();
-                }
-                tray::Action::Hide => {
-                    self.report(native::hide(window), i18n::text("就绪"));
-                    cx.notify();
-                }
-                tray::Action::Quit => cx.quit(),
-            }
-        }
-        if self.capture_due.is_some_and(|due| due <= Instant::now()) {
-            logging::info("capture opening");
-            self.capture_due = None;
-            if let Err(error) = editor::open_capture(self.shared.clone(), cx) {
-                self.report(Err(error), "");
-                self.capture_finished();
-                cx.notify();
-            }
+            self.tray_action(action, window, cx);
         }
         while let Ok(message) = self.receiver.try_recv() {
             match message {
+                Message::Tray(action) => self.tray_action(action, window, cx),
                 Message::Update(event) => self.update_event(event, cx),
                 Message::Status(status) => self.status = status,
                 Message::CaptureClosed => self.capture_finished(),
@@ -513,9 +495,33 @@ impl Panel {
             }
             cx.notify();
         }
+        if self.capture_due.is_some_and(|due| due <= Instant::now()) {
+            logging::info("capture opening");
+            self.capture_due = None;
+            if let Err(error) = editor::open_capture(self.shared.clone(), cx) {
+                self.report(Err(error), "");
+                self.capture_finished();
+                cx.notify();
+            }
+        }
     }
     fn capture_finished(&mut self) {
         self.capturing = false;
+    }
+    fn tray_action(&mut self, action: tray::Action, window: &mut Window, cx: &mut Context<Self>) {
+        match action {
+            tray::Action::Capture => self.start_capture(Duration::ZERO, cx),
+            tray::Action::Show => self.report(native::show(window), i18n::text("就绪")),
+            tray::Action::Hide => self.report(native::hide(window), i18n::text("就绪")),
+            tray::Action::Quit => cx.quit(),
+            tray::Action::Menu { x, y } => {
+                if let Some(tray) = &mut self.tray {
+                    let result = tray.open_menu(x, y, self.shared.clone(), cx);
+                    self.report(result, i18n::text("就绪"));
+                }
+            }
+        }
+        cx.notify();
     }
     fn restore_defaults(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.finish_hotkey_recording(false, window, cx);

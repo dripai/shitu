@@ -6621,7 +6621,7 @@ dependencies = [
 
 [[package]]
 name = "shitu"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "anyhow",
  "chrono",
