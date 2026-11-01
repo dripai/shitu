@@ -30,7 +30,7 @@ impl Tray {
             .resize(32, 32, image::imageops::FilterType::Lanczos3)
             .to_rgba8();
         let icon = TrayIconBuilder::new()
-            .with_tooltip(i18n::text("拾图"))
+            .with_tooltip(i18n::text("PicKeep"))
             .with_icon(Icon::from_rgba(image.into_raw(), 32, 32)?)
             .build()?;
         Ok(Self { icon, menu: None })
@@ -38,7 +38,7 @@ impl Tray {
 
     pub fn refresh_language(&self) {
         // Menu labels are read from the active catalog each time it opens.
-        if let Err(error) = self.icon.set_tooltip(Some(i18n::text("拾图"))) {
+        if let Err(error) = self.icon.set_tooltip(Some(i18n::text("PicKeep"))) {
             logging::error(format!("Tray tooltip: {error}"));
         }
     }

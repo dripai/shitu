@@ -209,7 +209,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let directory = std::env::temp_dir().join(format!("gridstart-test-{}", std::process::id()));
+        let directory = std::env::temp_dir().join(format!("pickeep-test-{}", std::process::id()));
         std::fs::create_dir_all(&directory).unwrap();
         let png = directory.join("output.png");
         let jpeg = directory.join("output.jpg");

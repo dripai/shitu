@@ -1,4 +1,4 @@
-name: Publish ShiTu release
+name: Publish PicKeep release
 
 on:
   push:
@@ -45,7 +45,7 @@ jobs:
       - name: Verify tag matches package versions
         shell: pwsh
         run: |
-          $packageNames = @('shitu')
+          $packageNames = @('pickeep')
           $packages = @(
             (cargo metadata --locked --format-version 1 | ConvertFrom-Json).packages |
               Where-Object { $_.name -in $packageNames }
@@ -74,7 +74,7 @@ jobs:
             os: windows-latest
             kind: windows
             architecture: x86_64
-            artifact_name: shitu-windows-x86_64
+            artifact_name: pickeep-windows-x86_64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -87,7 +87,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: release-shitu-${{ matrix.artifact_name }}
+          shared-key: release-pickeep-${{ matrix.artifact_name }}
 
       - name: Test Windows workspace
         if: matrix.kind == 'windows'
@@ -97,9 +97,9 @@ jobs:
         if: matrix.kind == 'windows'
         run: cargo test --manifest-path vendor/accesskit_windows/Cargo.toml --lib regression_tests --target-dir target/accesskit-regression -- --test-threads=1
 
-      - name: Build ShiTu release binary
+      - name: Build PicKeep release binary
         if: matrix.kind == 'windows'
-        run: cargo build --release --locked --package shitu --bin ShiTu
+        run: cargo build --release --locked --package pickeep --bin PicKeep
 
       - name: Build Microsoft Store upload assets
         if: matrix.kind == 'windows'
@@ -108,9 +108,9 @@ jobs:
           $packages = (cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json).packages
           $storeProducts = @(
             @{
-              Product = 'ShiTu'
-              PackageName = 'shitu'
-              Executable = '.\target\release\ShiTu.exe'
+              Product = 'PicKeep'
+              PackageName = 'pickeep'
+              Executable = '.\target\release\PicKeep.exe'
             }
           )
 
@@ -137,8 +137,8 @@ jobs:
 
           $products = @(
             @{
-              Name = 'ShiTu'
-              Executable = 'target\release\ShiTu.exe'
+              Name = 'PicKeep'
+              Executable = 'target\release\PicKeep.exe'
             }
           )
 

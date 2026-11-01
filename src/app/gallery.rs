@@ -1802,7 +1802,7 @@ mod tests {
         };
         let (jobs, receiver) = mpsc::sync_channel(32);
         let (sender, replies) = mpsc::sync_channel(16);
-        let missing = std::env::temp_dir().join("shitu-nonexistent-preview-test.png");
+        let missing = std::env::temp_dir().join("pickeep-nonexistent-preview-test.png");
         for _ in 0..32 {
             jobs.try_send(Some((1, missing.clone()))).unwrap();
         }
@@ -1862,7 +1862,7 @@ mod tests {
             time::Duration,
         };
         let control = Arc::new(DecodeControl::default());
-        let missing = std::env::temp_dir().join("shitu-missing-preview-priority.png");
+        let missing = std::env::temp_dir().join("pickeep-missing-preview-priority.png");
         control.preview.lock().unwrap().request(missing.clone());
         control.wanted.lock().unwrap().insert(missing.clone());
         let (jobs, receiver) = mpsc::sync_channel(32);
@@ -1895,7 +1895,7 @@ mod tests {
 
     #[test]
     fn thumbnails_keep_aspect_ratio_and_invalid_images_report_errors() -> Result<()> {
-        let path = std::env::temp_dir().join(format!("shitu-thumb-{}.png", std::process::id()));
+        let path = std::env::temp_dir().join(format!("pickeep-thumb-{}.png", std::process::id()));
         let result = (|| -> Result<()> {
             image::RgbaImage::from_pixel(800, 400, image::Rgba([10, 20, 30, 255])).save(&path)?;
             let (decoded, width, height) = thumbnail(&path)?;

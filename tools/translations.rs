@@ -51,7 +51,7 @@ pub fn compile() {
     check_source_keys(Path::new("src"), "rs", r"i18n::text", reference);
 
     let mut generated = String::from(
-        "// Generated from translations/*/LC_MESSAGES/shitu.po.\n\
+        "// Generated from translations/*/LC_MESSAGES/pickeep.po.\n\
          fn catalog_text(language: LanguageMode, key: &str) -> &'static str {\n\
          let language_index = match language {\n\
          LanguageMode::System => panic!(\"system language must be resolved\"),\n",
@@ -90,7 +90,7 @@ pub fn compile() {
 fn read_catalog(code: &str) -> Catalog {
     let path = Path::new("translations")
         .join(code)
-        .join("LC_MESSAGES/shitu.po");
+        .join("LC_MESSAGES/pickeep.po");
     let po = rspolib::pofile(path.as_path())
         .unwrap_or_else(|error| panic!("{}: {error}", path.display()));
     assert_eq!(

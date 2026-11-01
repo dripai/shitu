@@ -11,7 +11,7 @@ workspace = Path(__file__).resolve().parents[1]
 root = workspace / '.codex-tmp' / ('update-helper-smoke-' + str(time.time_ns()))
 root.mkdir()
 assert root.resolve().is_relative_to((workspace / '.codex-tmp').resolve())
-helper = workspace / 'target/release/ShiTu.exe'
+helper = workspace / 'target/release/PicKeep.exe'
 source = root / 'fixture.rs'
 source.write_text(r'''
 #![windows_subsystem = "windows"]
@@ -41,9 +41,9 @@ def wait_for(predicate, timeout=20):
 for scenario in ['success', 'startup_failure', 'no_commit', 'bad_hash']:
     case = root / scenario
     case.mkdir()
-    stage = case / '.shitu-update-fixture'
+    stage = case / '.pickeep-update-fixture'
     stage.mkdir()
-    target = case / 'ShiTu.exe'
+    target = case / 'PicKeep.exe'
     shutil.copy2(fixture, target)
     # A harmless overlay makes the new executable byte-distinct.
     candidate = stage / 'new.exe'

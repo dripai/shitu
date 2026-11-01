@@ -30,7 +30,7 @@ fn main() -> anyhow::Result<()> {
         // Release builds have no console: report startup failure explicitly.
         if !std::env::args_os().any(|arg| arg == "--update-started") {
             rfd::MessageDialog::new()
-                .set_title(i18n::text("拾图"))
+                .set_title(i18n::text("PicKeep"))
                 .set_level(rfd::MessageLevel::Error)
                 .set_description(format!("{}: {error:#}", i18n::text("操作失败")))
                 .show();

@@ -68,17 +68,17 @@ pub fn recognize(image: &CapturedImage, config: &OcrConfig) -> Result<String, Oc
 }
 
 #[cfg(windows)]
-const WORKER_ARGUMENT: &str = "--gridstart-system-ocr-worker";
+const WORKER_ARGUMENT: &str = "--pickeep-system-ocr-worker";
 #[cfg(windows)]
-const AI_PROBE_ARGUMENT: &str = "--gridstart-ai-ocr-probe";
+const AI_PROBE_ARGUMENT: &str = "--pickeep-ai-ocr-probe";
 #[cfg(windows)]
-const AI_PREPARE_ARGUMENT: &str = "--gridstart-ai-ocr-prepare";
+const AI_PREPARE_ARGUMENT: &str = "--pickeep-ai-ocr-prepare";
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 #[cfg(windows)]
 const WORKER_TIMEOUT: Duration = Duration::from_secs(30);
 #[cfg(windows)]
-const WORKER_LANGUAGE_ENV: &str = "SHITU_UI_LANGUAGE";
+const WORKER_LANGUAGE_ENV: &str = "PICKEEP_UI_LANGUAGE";
 
 #[cfg(windows)]
 #[derive(Deserialize, Serialize)]
@@ -380,7 +380,7 @@ impl OcrJob {
             .unwrap_or_default()
             .as_nanos();
         let directory =
-            std::env::temp_dir().join(format!("gridstart-ocr-{}-{nonce}", std::process::id()));
+            std::env::temp_dir().join(format!("pickeep-ocr-{}-{nonce}", std::process::id()));
         fs::create_dir(&directory).map_err(|error| {
             OcrFailure::Failed(format!(
                 "{}: {error}",
@@ -452,7 +452,7 @@ mod tests {
     #[test]
     fn ocr_worker_inherits_every_resolved_language() {
         for mode in LanguageMode::ALL[1..].iter().copied() {
-            let command = worker_command(std::path::Path::new("ShiTu.exe"), mode);
+            let command = worker_command(std::path::Path::new("PicKeep.exe"), mode);
             let value = command
                 .get_envs()
                 .find(|(key, _)| *key == WORKER_LANGUAGE_ENV)

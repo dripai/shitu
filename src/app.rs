@@ -58,8 +58,11 @@ pub(super) struct Shared {
 }
 type SharedApp = Rc<RefCell<Shared>>;
 
+// Page IDs stay independent of their presentation order.
+const TAB_ORDER: [usize; 7] = [6, 1, 2, 3, 4, 0, 5];
+
 pub fn run(start_minimized: bool) -> Result<()> {
-    logging::initialize(Config::log_directory(), "gridstart.log");
+    logging::initialize(Config::log_directory(), "pickeep.log");
     logging::info("UI: GPUI Kit 0.7.1");
     i18n::prepare(LanguageMode::System);
     let config = Config::load()?;
@@ -82,12 +85,12 @@ pub fn run(start_minimized: bool) -> Result<()> {
             gpui_kit::component::set_locale(i18n::current_language().bundle_code());
             let options = WindowOptions {
                 titlebar: Some(TitlebarOptions {
-                    title: Some(i18n::text("拾图").into()),
+                    title: Some(i18n::text("PicKeep").into()),
                     ..Default::default()
                 }),
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
                     None,
-                    size(px(640.), px(560.)),
+                    size(px(1000.), px(650.)),
                     cx,
                 ))),
                 window_min_size: Some(size(px(540.), px(460.))),
@@ -157,7 +160,7 @@ pub(super) fn input(
     })
 }
 
-// GPUI's built-in editing labels do not cover all ten ShiTu languages.
+// GPUI's built-in editing labels do not cover all ten PicKeep languages.
 // Reuse NativeMenu and official editing actions; only supply our catalog text.
 pub(super) fn text_menu(
     menu: component::native_menu::NativeMenu,
@@ -240,9 +243,9 @@ impl Panel {
             hotkey_recording: None,
             gallery: None,
             tray,
-            tab: 0,
-            compact_size: window.window_bounds().get_bounds().size,
-            gallery_size: size(px(1000.), px(650.)),
+            tab: TAB_ORDER[0],
+            compact_size: size(px(640.), px(560.)),
+            gallery_size: window.window_bounds().get_bounds().size,
             status,
             ai: AiOcrState::Checking,
             system_ocr,
@@ -252,6 +255,12 @@ impl Panel {
         };
         panel.populate(window, cx);
         panel.load_update_notice();
+        if panel.tab == TAB_ORDER[0] {
+            panel.activate_gallery(window, cx);
+        } else {
+            // Update results still open About, using the compact settings size.
+            window.resize(panel.compact_size);
+        }
         panel._subscriptions.push(cx.subscribe_in(
             &panel.fields["hotkey"],
             window,
@@ -366,7 +375,7 @@ impl Panel {
         self.fields["hotkey"].update(cx, |state, cx| {
             state.set_placeholder(i18n::text("未设置"), window, cx);
         });
-        window.set_window_title(i18n::text("拾图"));
+        window.set_window_title(i18n::text("PicKeep"));
         if let Some(tray) = &self.tray {
             tray.refresh_language();
         }
@@ -389,6 +398,36 @@ impl Panel {
             let _ = sender.send(Message::Ai(result, prepare));
         });
     }
+    fn activate_gallery(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.gallery.is_none() {
+            match crate::gallery::Preferences::load() {
+                Ok(prefs) => {
+                    let gallery =
+                        cx.new(|cx| gallery::Gallery::new(self.shared.clone(), prefs, window, cx));
+                    let mut last_status = gallery.read(cx).status().to_owned();
+                    self._subscriptions
+                        .push(cx.observe(&gallery, move |this, gallery, cx| {
+                            let status = gallery.read(cx).status();
+                            if status != last_status {
+                                last_status = status.to_owned();
+                                if this.tab == 6 {
+                                    this.status = last_status.clone();
+                                    cx.notify();
+                                }
+                            }
+                        }));
+                    self.gallery = Some(gallery);
+                }
+                Err(error) => self.report(Err(error), ""),
+            }
+        } else if let Some(gallery) = &self.gallery {
+            gallery.update(cx, |gallery, cx| gallery.activate(cx));
+        }
+        if let Some(gallery) = &self.gallery {
+            self.status = gallery.read(cx).status().to_owned();
+        }
+    }
+
     fn resize_for_tab(&mut self, tab: usize, window: &mut Window) -> Result<()> {
         let was_gallery = self.tab == 6;
         let is_gallery = tab == 6;
@@ -706,24 +745,19 @@ fn row(label: &'static str, control: AnyElement) -> Div {
 impl Render for Panel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let labels = [
-            i18n::text("常规"),
-            i18n::text("截图"),
             i18n::text("图库"),
+            i18n::text("截图"),
             i18n::text("OCR 识别"),
             i18n::text("钉住"),
             i18n::text("快捷键"),
+            i18n::text("常规"),
             i18n::text("关于"),
         ];
         let tabs = TabBar::new("settings-tabs")
-            .selected_index(
-                [0, 1, 6, 2, 3, 4, 5]
-                    .iter()
-                    .position(|id| *id == self.tab)
-                    .unwrap_or(0),
-            )
+            .selected_index(TAB_ORDER.iter().position(|id| *id == self.tab).unwrap_or(0))
             .children(labels.into_iter().map(|label| Tab::new().label(label)))
             .on_click(cx.listener(|this, index, window, cx| {
-                let tab = [0, 1, 6, 2, 3, 4, 5][*index];
+                let tab = TAB_ORDER[*index];
                 if let Err(error) = this.resize_for_tab(tab, window) {
                     this.report(Err(error), "");
                     cx.notify();
@@ -734,36 +768,7 @@ impl Render for Panel {
                     this.check_updates(false, cx);
                 }
                 if this.tab == 6 {
-                    if this.gallery.is_none() {
-                        match crate::gallery::Preferences::load() {
-                            Ok(prefs) => {
-                                let gallery = cx.new(|cx| {
-                                    gallery::Gallery::new(this.shared.clone(), prefs, window, cx)
-                                });
-                                let mut last_status = gallery.read(cx).status().to_owned();
-                                this._subscriptions.push(cx.observe(
-                                    &gallery,
-                                    move |this, gallery, cx| {
-                                        let status = gallery.read(cx).status();
-                                        if status != last_status {
-                                            last_status = status.to_owned();
-                                            if this.tab == 6 {
-                                                this.status = last_status.clone();
-                                                cx.notify();
-                                            }
-                                        }
-                                    },
-                                ));
-                                this.gallery = Some(gallery);
-                            }
-                            Err(error) => this.report(Err(error), ""),
-                        }
-                    } else if let Some(gallery) = &this.gallery {
-                        gallery.update(cx, |gallery, cx| gallery.activate(cx));
-                    }
-                    if let Some(gallery) = &this.gallery {
-                        this.status = gallery.read(cx).status().to_owned();
-                    }
+                    this.activate_gallery(window, cx);
                 }
                 cx.notify();
             }));
@@ -1043,7 +1048,7 @@ impl Render for Panel {
                                     div()
                                         .text_xl()
                                         .font_weight(FontWeight::BOLD)
-                                        .child(i18n::text("拾图")),
+                                        .child(i18n::text("PicKeep")),
                                 ),
                             )
                             .child(
@@ -1096,7 +1101,7 @@ impl Render for Panel {
                             .child(
                                 Button::new("about-github")
                                     .link()
-                                    .label("dripai/shitu")
+                                    .label("PicKeep")
                                     .on_click(|_, _, cx| {
                                         cx.open_url("https://github.com/dripai/shitu")
                                     }),

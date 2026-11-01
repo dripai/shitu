@@ -2,7 +2,7 @@ use super::*;
 use std::io::Cursor;
 
 fn response(version: &str) -> serde_json::Value {
-    let name = format!("ShiTu-v{version}-windows-x86_64.zip");
+    let name = format!("PicKeep-v{version}-windows-x86_64.zip");
     serde_json::json!({
         "tag_name": format!("v{version}"), "draft": false, "prerelease": false,
         "body": "Release notes", "assets": [
@@ -89,14 +89,14 @@ fn zip_fixture(path: &Path, names: &[&str]) -> Result<()> {
 #[test]
 fn extraction_rejects_extra_or_traversing_entries_and_never_overwrites() -> Result<()> {
     let root = std::env::temp_dir().join(format!(
-        "shitu-update-zip-{}",
+        "pickeep-update-zip-{}",
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
     ));
     fs::create_dir(&root)?;
     for (index, names) in [
-        vec!["../ShiTu.exe"],
-        vec!["ShiTu.exe", "script.cmd"],
-        vec!["folder/ShiTu.exe"],
+        vec!["../PicKeep.exe"],
+        vec!["PicKeep.exe", "script.cmd"],
+        vec!["folder/PicKeep.exe"],
     ]
     .iter()
     .enumerate()
@@ -109,7 +109,7 @@ fn extraction_rejects_extra_or_traversing_entries_and_never_overwrites() -> Resu
     }
     let archive = root.join("valid.zip");
     let target = root.join("new.exe");
-    zip_fixture(&archive, &["ShiTu.exe"])?;
+    zip_fixture(&archive, &["PicKeep.exe"])?;
     extract(&archive, &target)?;
     assert_eq!(fs::read(&target)?, b"fixture contents");
     assert!(extract(&archive, &target).is_err());
@@ -144,7 +144,7 @@ fn github_check_and_published_archive_verify_without_installing() -> Result<()> 
         .update
         .context("No published stable asset")?;
     let root = std::env::temp_dir().join(format!(
-        "shitu-network-update-{}",
+        "pickeep-network-update-{}",
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
     ));
     fs::create_dir(&root)?;

@@ -1,4 +1,4 @@
-name: ShiTu CI
+name: PicKeep CI
 
 on:
   push:
@@ -43,8 +43,8 @@ jobs:
           components: rustfmt
       - run: cargo fmt --all -- --check
 
-  shitu:
-    name: ShiTu (Windows)
+  pickeep:
+    name: PicKeep (Windows)
     if: >-
       github.event_name != 'push' ||
       (!contains(github.event.head_commit.message, '[code-only]') &&
@@ -58,10 +58,10 @@ jobs:
           toolchain: 1.96.0
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: shitu-windows
-      - name: Compile ShiTu
-        run: cargo check --locked --package shitu
-      - name: Test ShiTu workspace
+          shared-key: pickeep-windows
+      - name: Compile PicKeep
+        run: cargo check --locked --package pickeep
+      - name: Test PicKeep workspace
         run: cargo test --workspace --locked
       - name: Test stale-window accessibility queries
         run: cargo test --manifest-path vendor/accesskit_windows/Cargo.toml --lib regression_tests --target-dir target/accesskit-regression -- --test-threads=1

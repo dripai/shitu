@@ -4,7 +4,7 @@ fn main() {
     let runtime = env::args_os()
         .nth(1)
         .map(PathBuf::from)
-        .expect("usage: gridstart-windows-ai-bindgen <Windows App Runtime directory>");
+        .expect("usage: pickeep-windows-ai-bindgen <Windows App Runtime directory>");
     let output = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("..")

@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: shitu\n"
+"Project-Id-Version: pickeep\n"
 "Language: de\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -109,8 +109,8 @@ msgstr "Mosaikgröße"
 msgid "边框样式"
 msgstr "Rahmenstil"
 
-msgid "拾图"
-msgstr "ShiTu"
+msgid "PicKeep"
+msgstr "PicKeep"
 
 msgid "就绪"
 msgstr "Bereit"

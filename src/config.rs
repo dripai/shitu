@@ -250,7 +250,7 @@ fn is_reserved_windows_filename(filename: &str) -> bool {
 }
 
 pub fn app_data_directory() -> PathBuf {
-    crate::paths::roaming_app_data_directory("ShiTu")
+    crate::paths::roaming_app_data_directory("PicKeep")
 }
 
 #[cfg(test)]

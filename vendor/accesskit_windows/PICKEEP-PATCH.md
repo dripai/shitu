@@ -1,4 +1,4 @@
-# ShiTu stale-window fix
+# PicKeep stale-window fix
 
 Based on the published `accesskit_windows` 0.34.0 source, upstream commit
 `c88605b96d04431f9c3c792464a0f2f253480e94`.
@@ -6,7 +6,7 @@ Based on the published `accesskit_windows` 0.34.0 source, upstream commit
 - Upstream source: https://github.com/AccessKit/accesskit/tree/c88605b96d04431f9c3c792464a0f2f253480e94/platforms/windows
 - Windows error contract: https://learn.microsoft.com/windows/win32/winauto/uiauto-error-codes
 
-ShiTu v0.5.2 crash logs show `util.rs:380` panicking on an invalid HWND.
+PicKeep v0.5.2 crash logs show `util.rs:380` panicking on an invalid HWND.
 GPUI's delayed window teardown can leave a UIA request holding its context
 after the native window is destroyed. The upstream main branch still uses
 the same `ClientToScreen(...).unwrap()` as of 2026-10-28.

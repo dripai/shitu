@@ -1,12 +1,12 @@
-# ShiTu 目录整理与 GPUI 迁移清单
+# PicKeep 目录整理与 GPUI 迁移清单
 
 截至 2026-10-10，目录整理和 Slint → GPUI Kit 代码迁移已完成，Debug/Release 构建、63 项测试、严格 Clippy 和未签名 MSIX 打包通过。主设置窗口已做部分桌面实测；截图、标注、贴图的完整交互验收尚未完成。下方分别记录实现与实测，不以编译通过替代功能验收。
 
 ## 目录整理：已完成
 
-- [x] 应用提升到根 Cargo 包 `shitu`，二进制名保持 `ShiTu`；合并原 shi-foundation、shi-ui，移除 apps/crates 分包。
+- [x] 应用提升到根 Cargo 包 `pickeep`，二进制名为 `PicKeep`；合并原 shi-foundation、shi-ui，移除 apps/crates 分包。
 - [x] 删除未实现的拾音占位应用、录音依赖和多产品启动入口。
-- [x] 图标统一到 assets/icons，旧版参考图移到 assets/shitu_01.jpg；Store 清单移到 packaging/AppxManifest.xml。
+- [x] 图标统一到 assets/icons，旧版参考图移到 assets/legacy-ui.jpg；Store 清单移到 packaging/AppxManifest.xml。
 - [x] 保留本地产品文档、已有发布产物及用户原有 CI 改动；未清理用户忽略文件和临时研究目录。
 - [x] 保留 tools/windows-ai-bindgen 独立工具包：它用于生成 Windows AI 绑定，不属于应用拆包。
 
@@ -80,15 +80,15 @@
 - GPUI Base 0.7.1 的 `TooltipOverlay` 在窗口内渲染，首次延迟 500ms，存在 300ms 连续切换宽限期；Windows 0.3.8 后端仍未实现 `AnchoredPopup`。因此工具条提示改用 Windows 标准 `TOOLTIPS_CLASSW` 控件，`TTF_SUBCLASS` 自动接收按钮区域鼠标消息，`TTM_SETDELAYTIME` 将首次/切换延迟统一为 600ms，显示 5 秒后自动关闭。不手写悬停计时器、定位或失焦策略。
 - 提示区域来自每帧实际布局并按 DPI 转成物理客户区坐标；仅在区域/文本改变时更新，移除不再显示的按钮，保持原生计时器稳定。控件由工具条持有并在关闭时释放，不激活窗口。
 - 已核对 Button、Tooltip/TooltipOverlay、DropdownMenu、NativeMenu、NumberInput 官方源码及 windows 0.62.2 绑定。64 项测试与严格 Clippy 通过，新增隐藏原生控件测试验证首次/切换延迟、区域移动、旧区域删除、同位置文字替换和控件销毁。没有桌面鼠标/键盘自动验收；真实外观、菜单选择、不同 DPI 与边缘避让由用户测试。
-- Release 构建、格式/UTF-8/diff 检查通过。已按用户授权替换并重启 `D:\tool\ShiTu.exe`，替换后 SHA-256 与工作区 Release 一致；未提交或推送。
+- Release 构建、格式/UTF-8/diff 检查通过。已按用户授权替换并重启当时部署的可执行文件，替换后 SHA-256 与工作区 Release 一致；未提交或推送。
 
 官方资料：[NativeMenu 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/native_menu/struct.NativeMenu.html)、[Windows Tooltip 控件](https://learn.microsoft.com/en-us/windows/win32/controls/tooltip-controls)、[TTM_SETDELAYTIME](https://learn.microsoft.com/en-us/windows/win32/controls/ttm-setdelaytime)、[TTTOOLINFOW](https://learn.microsoft.com/en-us/windows/win32/api/commctrl/ns-commctrl-tttoolinfow)。
 
 ### 截图保留主窗口显示状态
 
-- 快捷键、托盘截图和“开始截图”按钮均不再隐藏主窗口；截图结束或失败时也不主动恢复/激活它。显示中的拾图窗口可以包含在截图内，已经收进托盘的窗口继续保持隐藏。
+- 快捷键、托盘截图和“开始截图”按钮均不再隐藏主窗口；截图结束或失败时也不主动恢复/激活它。显示中的PicKeep窗口可以包含在截图内，已经收进托盘的窗口继续保持隐藏。
 - 删除截图专用的 `restore_main` 状态和不再使用的可见性查询函数。保留现有 160ms 延迟，供触发截图的托盘菜单关闭，不新增配置项或平台 API。
-- 63 项测试、严格 Clippy、格式/UTF-8/diff 检查和 Release 构建通过；工作区构建不会自动替换 `D:\tool\ShiTu.exe`。
+- 63 项测试、严格 Clippy、格式/UTF-8/diff 检查和 Release 构建通过；工作区构建不会自动替换当时部署的可执行文件。
 - 此项需要复验：主窗口显示时截图自身、主窗口已隐藏时截图、取消/完成/失败后的窗口状态。
 
 ### 2026-10-10 工具条遮挡与贴图交互回归
@@ -210,7 +210,7 @@
 - [x] 使用 UniformListDecoration::compute 提供的真实可见行范围调度缩略图，排除 uniform_list 为测量高度额外渲染的离屏行。滚出视口的任务在解码前后跳过；搜索无结果时清除旧视口任务。队列满时后续轮询继续补齐，不阻塞 UI。
 - [x] 缩略图为 320×240 内的 BGRA，缓存上限为可见图片数与 64 的较大值，按最近使用淘汰。内部预览栅格限制在 2048×1536 内，保留原始尺寸信息，生成栅格时不放大小图；缓存上限见下。一个解码线程优先处理最新预览，避免多张原图并发解码。
 - [x] image 0.25.10 的 ImageReader::limits 设置 max_alloc 为 128MiB；超限、损坏或读取失败显示错误。这不是进程总内存硬上限，原图仍需临时解码，不是分块读取。任务队列 32 项、缩略图结果队列 16 项、预览结果一个槽位。
-- [x] 83 项测试、cargo check、严格 Clippy、格式/UTF-8/diff 检查和 Release 构建通过；新增覆盖真实行范围映射、预览取消/切换丢弃旧结果、预览优先、离屏任务跳过、预览缩放比例和不放大小图。已备份并替换 D:\tool\ShiTu.exe，核对 SHA-256 一致，重启进程存活且 Responding=True；这仅验证启动状态。
+- [x] 83 项测试、cargo check、严格 Clippy、格式/UTF-8/diff 检查和 Release 构建通过；新增覆盖真实行范围映射、预览取消/切换丢弃旧结果、预览优先、离屏任务跳过、预览缩放比例和不放大小图。已备份并替换当时部署的可执行文件，核对 SHA-256 一致，重启进程存活且 Responding=True；这仅验证启动状态。
 - [ ] 用户桌面验收：连续预览与关闭、上一张/下一张、Esc、滚动/搜索/缩放后加载、不同 DPI、预览期间截图快捷键。未自动操作桌面；用户报告上一版已显示缩略图、运行更流畅且所见内存约 20MB，不作为本轮大图预览的峰值保证。
 
 官方依据：[Dialog 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/dialog/struct.Dialog.html)、[UniformListDecoration 0.3.8](https://docs.rs/gpui-pre/0.3.8/gpui/trait.UniformListDecoration.html)、[RenderImage 0.3.8](https://docs.rs/gpui-pre/0.3.8/gpui/struct.RenderImage.html)、[ImageReader 0.25.10](https://docs.rs/image/0.25.10/image/struct.ImageReader.html#method.limits)。已核对本机对应版本源码。
@@ -223,7 +223,7 @@
 - [x] 图片两侧用左右箭头切图；图片区域获得焦点时键盘左右键切图，工具栏获得焦点时保留原生箭头键导航。底部工具栏含缩小、当前比例、放大、适应窗口、左右旋转 90°；图标提示复用现有每次 600ms 延迟。
 - [x] 滚轮以鼠标位置为缩放中心，放大后按住左键拖动，位置限制确保图片不会被拖出可见范围。切图和旋转恢复适应窗口；比例按原图尺寸和显示 DPI 计算。放大仍使用有界预览栅格，不提供原图分块解码或额外高清加载。
 - [x] 88 项测试和严格 Clippy 通过：500 次缓存插入/替换验证数量与字节上限、弱引用证明缓存淘汰与清空后像素对象释放；覆盖重复路径、超大项、最近访问顺序、1/1.25/1.5/2 倍 DPI 下的缩放和拖动边界。这些测试不证明 GPU 驱动内存或真实桌面长期趋势已经验收。
-- [x] Release 构建及格式/UTF-8/diff 检查通过；备份并更新 D:\tool\ShiTu.exe，SHA-256 与构建产物一致，重启后进程存活且 Responding=True。仅验证启动，没有自动操作预览界面。
+- [x] Release 构建及格式/UTF-8/diff 检查通过；备份并更新 当时部署的可执行文件，SHA-256 与构建产物一致，重启后进程存活且 Responding=True。仅验证启动，没有自动操作预览界面。
 - [ ] 用户桌面验收：重复切图和关闭后的内存趋势、缓存命中、旋转、滚轮缩放与拖动、Esc/焦点恢复、不同 DPI 与窗口边缘。按用户要求不自动操作桌面。日志记录每次新图进入缓存的数量/像素字节，以及关闭清空事件，供持续增长时定位。
 
 官方依据：[Toolbar 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/toolbar/struct.Toolbar.html)、[Window::paint_image 0.3.8](https://docs.rs/gpui-pre/0.3.8/gpui/struct.Window.html#method.paint_image)、[drop_image 0.3.8](https://docs.rs/gpui-pre/0.3.8/gpui/struct.App.html#method.drop_image)、[image::imageops 0.25.10](https://docs.rs/image/0.25.10/image/imageops/index.html)。已检查锁定版本本机源码。
@@ -235,7 +235,7 @@
 - [x] 单击替换选择，Ctrl 点击追加/取消，Shift 点击选择连续区间；缩略图和列表共享状态，底部显示已选数量。右键已选项保留整组；右键未选项切为单选。多选时原生菜单保留“移入回收站”和下述“删除”，Delete 按键仍将选中组移入回收站；确认框显示总数。多选期间不提供未实现的批量拖动/重命名/复制；单选原有操作保留。目录/搜索变化清理不可见选择，Ctrl/Shift 点击不误开预览。
 - [x] windows 0.62.2 IFileOperation：全组选项预检后逐项 DeleteItem 排队，一次 PerformOperations 执行；保留 RECYCLEONDELETE/ADDUNDORECORD/WANTNUKEWARNING，不添加永久删除兜底。GetAnyOperationsAborted 和源路径状态用于区分已处理与剩余；系统批量操作不是事务，部分失败明确报告数量、文件名与错误，重新扫描并保留剩余项选择，结果不会被刷新后的图片数量提示覆盖。
 - [x] 92 项常规测试、严格 Clippy 通过；另显式运行 1 项真实 Windows 回收站测试：只处理 .codex-tmp 下新建 PNG，覆盖两张批量成功，以及文件占用时准确报告剩余项、解除占用后重试成功。未操作用户图库文件，未执行系统回收站恢复测试。
-- [x] Release、格式/UTF-8/diff 检查通过；备份并替换 D:\tool\ShiTu.exe，校验构建与部署 SHA-256 相同，启动后进程存活且 Responding=True。
+- [x] Release、格式/UTF-8/diff 检查通过；备份并替换当时部署的可执行文件，校验构建与部署 SHA-256 相同，启动后进程存活且 Responding=True。
 - [ ] 桌面验收：Ctrl/Shift 实际鼠标选择、右键菜单、确认/取消与 Esc、不同缩放比例、批量回收后列表刷新及回收站恢复。按用户要求不自动操作桌面。
 
 官方依据：[AlertDialog 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/dialog/struct.AlertDialog.html)、[IFileOperation::DeleteItem](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifileoperation-deleteitem)、[PerformOperations](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifileoperation-performoperations)、[SetOperationFlags](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifileoperation-setoperationflags)。已核对锁定版本源码。
@@ -246,7 +246,7 @@
 - [x] 核对 GPUI Kit 0.7.1 的 Dialog、AlertDialog、NativeMenu、Toolbar 和 open_window，以及 GPUI/pre-windows 0.3.8 的 WindowOptions、TitlebarOptions、on_window_should_close。Dialog 是窗口内弹层，不能提供系统标题栏；采用 open_window 的标准 Normal 窗口，保留默认标题栏，is_resizable/is_minimizable 为 true。Windows 后端直接启用 WS_MAXIMIZEBOX/WS_MINIMIZEBOX，没有自写 Win32 窗口控制。
 - [x] 单个预览窗口复用，支持原生最大化/还原、最小化与关闭，内容随窗口布局。Esc 和系统关闭均取消预览请求、清空缓存。主窗口可继续使用；上一张/下一张固定采用本次打开时的列表顺序，不受主窗口后续选择或排序干扰。再次从图库打开图片会更新此顺序。
 - [x] 92 项常规测试及严格 Clippy 通过；回收站真实系统测试本轮未重复运行。缓存、缩放、DPI 几何、多选和异步取消逻辑测试通过。
-- [x] Release 构建、格式/UTF-8/diff 检查通过。已备份并替换 D:\tool\ShiTu.exe，构建与部署 SHA-256 均为 3379955EADE158AB06270049C675A9BA527B5C15122C993CC8C4F44316594B19；启动进程 39992 存活且 Responding=True，仅作为启动验证。
+- [x] Release 构建、格式/UTF-8/diff 检查通过。已备份并替换当时部署的可执行文件，构建与部署 SHA-256 均为 3379955EADE158AB06270049C675A9BA527B5C15122C993CC8C4F44316594B19；启动进程 39992 存活且 Responding=True，仅作为启动验证。
 - [ ] 桌面验收：最大化/还原、最小化后再打开、Esc/系统关闭后重开、窗口边缘与不同 DPI、文件名显示。未自动操作用户桌面；编译和逻辑测试不等于窗口交互验证。
 
 官方依据：[open_window 0.7.1](https://docs.rs/gpui-kit/0.7.1/gpui_kit/fn.open_window.html)、[WindowOptions 0.3.8](https://docs.rs/gpui-pre/0.3.8/gpui/struct.WindowOptions.html)、[TitlebarOptions 0.3.8](https://docs.rs/gpui-pre/0.3.8/gpui/struct.TitlebarOptions.html)。已核对本机锁定版本源码。
@@ -257,7 +257,7 @@
 - [x] 复用已核对的 GPUI Kit/component 0.7.1 NativeMenu、AlertDialog、DialogButtonProps；没有新建窗口或焦点处理。永久删除使用本机 Rust 1.96.0 官方文档确认的 std::fs::remove_file，只删除选中的文件，不递归删除目录。与 IFileOperation 回收路径共用预检和结果结构，不作互相回退。
 - [x] 全组选项预检和去重后在后台删除，遇到首个错误停止，显示已删除数量、剩余项及错误；刷新列表并保留剩余选择。永久删除不具备事务回滚。十种语言文案已同步。
 - [x] 95 项测试、严格 Clippy 通过。新增 3 项真实临时文件测试：只删选中项/去重、缺失文件或目录/非图片预检、共享占用导致部分失败及解锁重试；未删除用户图库文件。真实回收站测试本轮保持忽略。
-- [x] Release、格式/UTF-8/diff 检查通过；备份并替换 D:\tool\ShiTu.exe，SHA-256 与构建产物一致，启动进程 12828 存活且 Responding=True。此项只验证部署及启动。
+- [x] Release、格式/UTF-8/diff 检查通过；备份并替换当时部署的可执行文件，SHA-256 与构建产物一致，启动进程 12828 存活且 Responding=True。此项只验证部署及启动。
 - [ ] 桌面验收：单选/多选右键菜单、确认/取消/Esc、长文件名与不同缩放比例。未自动操作用户桌面。
 
 官方依据：[AlertDialog 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/dialog/struct.AlertDialog.html)、[std::fs::remove_file](https://doc.rust-lang.org/1.96.0/std/fs/fn.remove_file.html)。已核对本机对应版本源码与离线标准库文档。
@@ -265,7 +265,7 @@
 ### 图库目录选中状态（2026-10-10）
 
 - [x] 已核对 GPUI Kit/component 0.7.1 的 Tree、ListItem：ListItem 在自定义样式之后应用默认选中底色，不能仅通过 bg 覆盖。保留 Tree 的选中、键盘、展开、拖放行为，在选中行组合绝对定位的装饰层，使用主题蓝色 18%（浅色）/28%（深色）底色和 70% 蓝色细边框，文件夹图标使用主题蓝色；内容绘制在装饰层上方，不增加布局宽度或事件处理。
-- [x] Release 构建、格式/UTF-8/diff 检查通过；备份并替换 D:\tool\ShiTu.exe，部署与构建 SHA-256 一致，启动进程 10308 存活且 Responding=True。此轮仅样式调整，未重复运行行为测试。
+- [x] Release 构建、格式/UTF-8/diff 检查通过；备份并替换当时部署的可执行文件，部署与构建 SHA-256 一致，启动进程 10308 存活且 Responding=True。此轮仅样式调整，未重复运行行为测试。
 - [ ] 桌面验收：浅色/深色主题、鼠标与键盘切换目录、拖入文件夹时的选中及悬停效果。未自动操作桌面。
 
 官方依据：[ListItem 0.7.1](https://docs.rs/gpui-component/0.7.1/gpui_component/list/struct.ListItem.html)，已核对本机对应版本 Tree/ListItem 渲染源码。
@@ -274,28 +274,28 @@
 
 - [x] 进入“关于”页自动在后台查询正式发布，不进行额外联网探测。自动检查失败静默结束，不显示错误或弹窗；主动检查的进度、暂无可用更新、失败原因，以及下载进度和更新结果统一显示在底部公共状态栏。检查并发受状态约束，单次请求总超时 20 秒。
 - [x] 新版说明与“更新并重启”按钮直接显示在页面；只有点击按钮后才下载，不另弹确认框。页面预先提示保存未完成内容。复用 GPUI Kit/component 0.7.1 的 TabBar、Button 和滚动内容，未自建窗口或通知机制。
-- [x] 锁定 ureq 2.12.1、semver 1.0.28、sha2 0.10.9、zip 4.6.1，已检查对应本机官方源码；使用 HTTPS、超时、响应大小限制和后台流式下载。只接受本仓库稳定版本、匹配的 x86_64 ZIP/校验文件，严格比较版本，禁止降级；下载后核验 SHA-256，ZIP 必须且只能包含根目录 ShiTu.exe。SHA-256 是完整性校验，不是独立发布签名。
-- [x] Windows 0.62.2 的 GetCurrentPackageFullName 区分便携/打包进程，打包版本提示通过原分发渠道更新，不覆盖安装目录。便携版写入安装目录内独立 `.shitu-update-*` 目录，无写权限时在退出前明确失败。当前仅支持 Windows x86_64。
+- [x] 锁定 ureq 2.12.1、semver 1.0.28、sha2 0.10.9、zip 4.6.1，已检查对应本机官方源码；使用 HTTPS、超时、响应大小限制和后台流式下载。只接受本仓库稳定版本、匹配的 x86_64 ZIP/校验文件，严格比较版本，禁止降级；下载后核验 SHA-256，ZIP 必须且只能包含根目录 PicKeep.exe。SHA-256 是完整性校验，不是独立发布签名。
+- [x] Windows 0.62.2 的 GetCurrentPackageFullName 区分便携/打包进程，打包版本提示通过原分发渠道更新，不覆盖安装目录。便携版写入安装目录内独立 `.pickeep-update-*` 目录，无写权限时在退出前明确失败。当前仅支持 Windows x86_64。
 - [x] 复制当前程序作为更新辅助进程，握手确认就绪后主程序才退出。辅助进程通过 OpenProcess/WaitForSingleObject 等待确切进程退出，未提交或等待超时不替换文件；校验原程序和新程序后备份、替换、启动新版，并等待主窗口创建成功的启动回执。失败尝试恢复原程序；恢复失败保留备份并记录明确错误，不宣称更新成功。
 - [x] 更新和回滚都不弹窗；结果由公共状态栏展示。辅助进程错误记录在配置目录 `logs/update.log`，替换后错误另记录在更新目录 `error.txt`。成功更新保留更新目录中的 `old.exe` 和辅助程序用于恢复，不自动清理备份目录；配置和图库目录引用不变。
 - [x] 103 项常规测试、严格 Clippy 通过，涵盖静默/手动错误状态、版本比较、缺少或恶意附件、大小上限、校验文件绑定、ZIP 路径/多文件拒绝、真实临时文件替换/回滚与共享占用失败。
 - [x] 单独执行真实联网测试，实际查询最新正式发布为 v0.3.0，本机 v0.4.0 不显示升级；成功下载其 8,413,118 字节 ZIP，核对发布 SHA-256、解压指定文件并经 GetBinaryTypeW 检查 Windows 64 位程序。未执行或安装下载的旧版。
 - [x] `python tools/test-updater-helper.py` 使用实际 Release 辅助进程和独立 APPDATA、临时无窗口夹具，验证成功替换/启动回执、启动失败后恢复并重启旧程序、未提交保护、校验失败保护四种情况；未操作用户安装、配置或图片。这不等于真实新版本的桌面升级验收。
-- [x] 最终 Release、格式/UTF-8/diff 检查通过；辅助进程四项测试在最终二进制上复验通过。已备份并替换 D:\tool\ShiTu.exe，构建与部署 SHA-256 一致，启动进程 24220 存活且 Responding=True，仅作为部署与启动验证。
+- [x] 最终 Release、格式/UTF-8/diff 检查通过；辅助进程四项测试在最终二进制上复验通过。已备份并替换当时部署的可执行文件，构建与部署 SHA-256 一致，启动进程 24220 存活且 Responding=True，仅作为部署与启动验证。
 - [ ] 桌面验收：关于页布局、手动点击升级、不同主题/DPI、真实新版发布后的整套应用升级。打包安装环境和安装目录拒绝写入的实际设备场景尚未验收。
 
 官方依据：[GitHub 获取最新发布](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)、[ureq AgentBuilder 2.12.1](https://docs.rs/ureq/2.12.1/ureq/struct.AgentBuilder.html)、[ZIP 4.6.1](https://docs.rs/zip/4.6.1/zip/read/struct.ZipArchive.html)、[GetCurrentPackageFullName](https://learn.microsoft.com/en-us/windows/win32/api/appmodel/nf-appmodel-getcurrentpackagefullname)、[WaitForSingleObject](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject)、[GetBinaryTypeW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getbinarytypew)。
 
 ## 本地运行与复验
 
-运行最新 Release：`D:\workspace\12.aiwork\ShiTu\target\release\ShiTu.exe`。本轮已获准退出并更新工作区旧版应用；不要同时运行多个版本，以免占用快捷键。
+运行最新 Release：`.\target\release\PicKeep.exe`。本轮已获准退出并更新工作区旧版应用；不要同时运行多个版本，以免占用快捷键。
 
 ```powershell
 cargo fmt --all -- --check
 cargo test --offline --locked
 cargo clippy --offline --locked --all-targets -- -D warnings
 cargo build --release --offline --locked
-.\tools\package-store-msix.ps1 -Product ShiTu -ExecutablePath .\target\release\ShiTu.exe -Version 0.3.0 -OutputDirectory .\.codex-tmp\gpui-package-check
+.\tools\package-store-msix.ps1 -Product PicKeep -ExecutablePath .\target\release\PicKeep.exe -Version 0.3.0 -OutputDirectory .\.codex-tmp\gpui-package-check
 ```
 
 本次打包检查产物位于 `.codex-tmp/gpui-package-check/`，没有覆盖 release-assets 中的既有产物。未签名 MSIX 仅用于本次打包验证，不代表 Store 审核或侧载安装通过。

@@ -13,7 +13,7 @@ use windows::{
 };
 
 const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
-const VALUE_NAME: &str = "GridStartCapture";
+const VALUE_NAME: &str = "PicKeep";
 const START_MINIMIZED_ARGUMENT: &str = "--minimized";
 
 pub fn set_enabled(enabled: bool, start_minimized: bool) -> Result<()> {
@@ -98,14 +98,14 @@ mod tests {
 
     #[test]
     fn startup_command_only_adds_minimized_argument_when_enabled() {
-        let executable = Path::new(r"C:\Program Files\ShiTu\ShiTu.exe");
+        let executable = Path::new(r"C:\Program Files\PicKeep\PicKeep.exe");
         assert_eq!(
             startup_command(executable, false),
-            r#""C:\Program Files\ShiTu\ShiTu.exe""#
+            r#""C:\Program Files\PicKeep\PicKeep.exe""#
         );
         assert_eq!(
             startup_command(executable, true),
-            r#""C:\Program Files\ShiTu\ShiTu.exe" --minimized"#
+            r#""C:\Program Files\PicKeep\PicKeep.exe" --minimized"#
         );
     }
 }

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('ShiTu')]
+    [ValidateSet('PicKeep')]
     [string]$Product,
 
     [Parameter(Mandatory)]
@@ -17,8 +17,8 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $products = @{
-    ShiTu = @{
-        ExecutableName = 'ShiTu.exe'
+    PicKeep = @{
+        ExecutableName = 'PicKeep.exe'
         ManifestTemplate = Join-Path $PSScriptRoot '..\packaging\AppxManifest.xml'
         IconSource = Join-Path $PSScriptRoot '..\assets\app.png'
     }

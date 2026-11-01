@@ -1,4 +1,4 @@
-// ShiTu regression coverage for UIA requests that outlive a native window.
+// PicKeep regression coverage for UIA requests that outlive a native window.
 // Tests create hidden windows only; they do not automate the desktop.
 use super::{context::ActionHandlerWrapper, context::Context, util::client_top_left};
 use accesskit::{ActionHandler, ActionRequest, Node, NodeId, Rect, Role, TreeUpdate};
@@ -16,7 +16,7 @@ impl HiddenWindow {
             CreateWindowExW(
                 Default::default(),
                 w!("STATIC"),
-                w!("ShiTu AccessKit regression"),
+                w!("PicKeep AccessKit regression"),
                 WS_POPUP,
                 120,
                 140,

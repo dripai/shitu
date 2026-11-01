@@ -58,7 +58,7 @@ fn agent() -> ureq::Agent {
         .timeout_read(Duration::from_secs(20))
         .timeout_write(Duration::from_secs(20))
         .redirects(5)
-        .user_agent(concat!("ShiTu/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("PicKeep/", env!("CARGO_PKG_VERSION")))
         .build()
 }
 fn bounded_bytes(reader: impl Read, limit: u64) -> Result<Vec<u8>> {
@@ -106,7 +106,7 @@ fn parse_release(bytes: &[u8], current: &str) -> Result<Check> {
     if version <= Version::parse(current)? {
         return Ok(result);
     }
-    let name = format!("ShiTu-v{version}-windows-x86_64.zip");
+    let name = format!("PicKeep-v{version}-windows-x86_64.zip");
     let asset = |name: &str, max: u64| -> Result<Asset> {
         let matching: Vec<_> = response.assets.iter().filter(|a| a.name == name).collect();
         ensure!(
@@ -165,12 +165,15 @@ fn file_hash(path: &Path) -> Result<String> {
 }
 fn extract(archive: &Path, target: &Path) -> Result<()> {
     let mut zip = zip::ZipArchive::new(File::open(archive)?)?;
-    // The release workflow packages exactly ShiTu.exe. Never extract paths
+    // The release workflow packages exactly PicKeep.exe. Never extract paths
     // supplied by ZIP entries, or accept extra files/scripts beside the binary.
-    ensure!(zip.len() == 1, "Update archive must contain only ShiTu.exe");
+    ensure!(
+        zip.len() == 1,
+        "Update archive must contain only PicKeep.exe"
+    );
     let mut entry = zip.by_index(0)?;
     ensure!(
-        entry.name() == "ShiTu.exe" && entry.is_file(),
+        entry.name() == "PicKeep.exe" && entry.is_file(),
         "Unexpected update archive entry"
     );
     ensure!(
@@ -239,7 +242,7 @@ pub fn prepare(release: &Release, mut progress: impl FnMut(u8)) -> Result<Prepar
         .parent()
         .context("Missing installation directory")?
         .join(format!(
-            ".shitu-update-{}-{}",
+            ".pickeep-update-{}-{}",
             std::process::id(),
             SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
         ));

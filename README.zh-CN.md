@@ -1,11 +1,13 @@
-# 拾图（ShiTu）
+# 图片馆（PicKeep）
 
 [English](README.md)
 
-本地 Windows 截图工具，提供标注、OCR 与钉住功能，无需账号。
+本地 Windows 截图与图片管理工具，提供标注、OCR 与钉住功能，无需账号。
 
 
-拾图服务于每天都会发生的轻量截图任务：复制文档片段、说明界面问题、提取文字，或把参考内容留在桌面上随时对照。
+图片馆服务于每天都会发生的截图与图片整理任务：复制文档片段、说明界面问题、提取文字，或把参考内容留在桌面上随时对照。
+
+启动默认进入图库。选项卡依次为图库、截图、OCR 识别、钉住、快捷键、常规和关于；图库与设置页分别保留窗口尺寸。
 
 - 截取屏幕区域，或直接选择可见窗口。
 - 使用画笔、矩形、圆形/椭圆、箭头、文字、橡皮擦与马赛克标注，支持选择、移动、缩放、撤销和重做。
@@ -29,7 +31,7 @@ UI 已切换到 GPUI Kit 0.7.1，迁移范围、官方依据和验证进度见 [
 
 ## 本地构建
 
-需要 Windows、Rust 1.96、Visual Studio C++ Build Tools 和 Windows SDK。仅 start.sh 需要 Git Bash；根 Cargo 包直接构建拾图：
+需要 Windows、Rust 1.96、Visual Studio C++ Build Tools 和 Windows SDK。仅 start.sh 需要 Git Bash；根 Cargo 包直接构建 PicKeep：
 
 ```bash
 ./start.sh dev
@@ -37,7 +39,9 @@ UI 已切换到 GPUI Kit 0.7.1，迁移范围、官方依据和验证进度见 [
 cargo test --locked
 ```
 
-版本标签只发布拾图 Windows x64 包。
+版本标签只发布 PicKeep Windows x64 包。
+
+程序名为 `PicKeep.exe`，配置与日志保存在 `%APPDATA%\PicKeep`，不读取或迁移旧名称下的数据。下载、反馈和更新链接继续使用当前 GitHub 仓库 `dripai/shitu`。
 
 ## 当前边界
 
@@ -45,4 +49,4 @@ cargo test --locked
 - Windows AI OCR 增强路径仍为实验能力，尚未在受支持的 NPU 设备上验证。
 - `src/`：应用和平台实现；`assets/`：图标及参考图；`translations/`：十种语言；`packaging/`：Store 清单；`tools/`：打包、翻译编译和 AI 绑定生成。
 - 已移除 Slint UI、Slint vendor 补丁、共享分包和未实现的录音占位项目。
-- `assets/shitu_01.jpg` 保留为旧版界面的历史参考图。
+- `assets/legacy-ui.jpg` 保留为旧版界面的历史参考图。

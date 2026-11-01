@@ -6,7 +6,7 @@ if (( $# != 1 )); then
     exit 2
 fi
 case "$1" in
-    dev) exec cargo run --locked --bin ShiTu ;;
-    build) exec cargo build --release --locked --bin ShiTu ;;
+    dev) exec cargo run --locked --bin PicKeep ;;
+    build) exec cargo build --release --locked --bin PicKeep ;;
     *) echo "Usage: ./start.sh <dev|build>" >&2; exit 2 ;;
 esac

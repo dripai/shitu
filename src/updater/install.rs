@@ -144,7 +144,7 @@ fn validate_location(stage: &Path, target: &Path) -> Result<()> {
     ensure!(
         canonical_stage
             .file_name()
-            .is_some_and(|n| n.to_string_lossy().starts_with(".shitu-update-")),
+            .is_some_and(|n| n.to_string_lossy().starts_with(".pickeep-update-")),
         "Unexpected update directory"
     );
     ensure!(
@@ -351,11 +351,11 @@ mod tests {
     #[test]
     fn replacement_and_rollback_preserve_exact_bytes() -> Result<()> {
         let root = std::env::temp_dir().join(format!(
-            "shitu-replace-{}",
+            "pickeep-replace-{}",
             SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
         ));
         fs::create_dir(&root)?;
-        let target = root.join("ShiTu.exe");
+        let target = root.join("PicKeep.exe");
         let new = root.join("new.exe");
         let backup = root.join("old.exe");
         fs::write(&target, b"original")?;
@@ -379,11 +379,11 @@ mod tests {
     fn locked_candidate_restores_original_after_rename_failure() -> Result<()> {
         use std::os::windows::fs::OpenOptionsExt;
         let root = std::env::temp_dir().join(format!(
-            "shitu-locked-update-{}",
+            "pickeep-locked-update-{}",
             SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
         ));
         fs::create_dir(&root)?;
-        let target = root.join("ShiTu.exe");
+        let target = root.join("PicKeep.exe");
         let new = root.join("new.exe");
         let backup = root.join("old.exe");
         fs::write(&target, b"original")?;

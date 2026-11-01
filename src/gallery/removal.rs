@@ -137,7 +137,7 @@ mod tests {
     #[test]
     fn permanent_delete_removes_only_selected_files_and_deduplicates() -> Result<()> {
         let root = std::env::temp_dir().join(format!(
-            "shitu-delete-{}",
+            "pickeep-delete-{}",
             SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
         ));
         fs::create_dir(&root)?;
@@ -158,7 +158,7 @@ mod tests {
     #[test]
     fn permanent_delete_preflights_whole_selection_and_rejects_directories() -> Result<()> {
         let root = std::env::temp_dir().join(format!(
-            "shitu-delete-preflight-{}",
+            "pickeep-delete-preflight-{}",
             SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
         ));
         fs::create_dir(&root)?;
@@ -188,7 +188,7 @@ mod tests {
     fn permanent_delete_reports_partial_failure_and_can_retry_remaining() -> Result<()> {
         use std::os::windows::fs::OpenOptionsExt;
         let root = std::env::temp_dir().join(format!(
-            "shitu-delete-partial-{}",
+            "pickeep-delete-partial-{}",
             SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
         ));
         fs::create_dir(&root)?;
@@ -220,7 +220,7 @@ mod tests {
     #[test]
     fn batch_preflight_keeps_all_files_when_an_input_is_missing() -> Result<()> {
         let root = std::env::temp_dir().join(format!(
-            "shitu-recycle-preflight-{}",
+            "pickeep-recycle-preflight-{}",
             SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
         ));
         fs::create_dir(&root)?;

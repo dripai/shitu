@@ -44,7 +44,7 @@ use std::{
 use windows::Win32::Foundation::RECT;
 
 gpui_kit::actions!(
-    shitu_editor,
+    pickeep_editor,
     [
         CopyImage,
         SaveImage,
@@ -1005,7 +1005,7 @@ impl Editor {
                 },
                 cx,
                 |window, cx| {
-                    window.set_window_title("ShiTu · Toolbar");
+                    window.set_window_title("PicKeep · Toolbar");
                     window.on_window_should_close(cx, |_, _| false);
                     cx.new(|cx| {
                         let kind = snapshot.number_kind();
@@ -1564,7 +1564,7 @@ impl Render for Editor {
                     .cursor(CursorStyle::OpenHand)
             })
             .track_focus(&self.focus)
-            .key_context("ShiTuEditor")
+            .key_context("PicKeepEditor")
             .child(
                 div()
                     .size_full()

@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn files_are_scanned_nonrecursively_and_moved_without_overwrite() -> Result<()> {
         let root = std::env::temp_dir().join(format!(
-            "shitu-gallery-test-{}-{}",
+            "pickeep-gallery-test-{}-{}",
             std::process::id(),
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)?
